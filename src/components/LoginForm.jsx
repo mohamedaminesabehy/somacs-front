@@ -33,7 +33,7 @@ export default function LoginForm({ onLoginSuccess }) {
           if (onLoginSuccess) {
             onLoginSuccess(data.accessToken, data.user)
           }
-          navigate('/users', { replace: true })
+          navigate('/', { replace: true })
         } else {
           setError('Réponse du serveur invalide.')
         }

@@ -87,10 +87,18 @@ export default function App() {
   return (
     <Routes>
       <Route
-        path="/login"
+        path="/"
         element={
           isLoggedIn ? (
-            <Navigate to="/users" replace />
+            <AppLayout
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={handleToggleSidebar}
+              onCloseSidebar={handleCloseSidebar}
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            >
+              <UserManagement currentUser={currentUser} />
+            </AppLayout>
           ) : (
             <div
               className="min-h-screen w-full flex items-center justify-center px-4 sm:px-6 py-8 sm:py-10"
@@ -108,22 +116,8 @@ export default function App() {
         }
       />
       <Route
-        path="/"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <UserManagement currentUser={currentUser} />
-            </AppLayout>
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
+        path="/login"
+        element={<Navigate to="/" replace />}
       />
       <Route
         path="/users"
@@ -139,7 +133,7 @@ export default function App() {
               <UserManagement currentUser={currentUser} />
             </AppLayout>
           ) : (
-            <Navigate to="/login" replace />
+            <Navigate to="/" replace />
           )
         }
       />
@@ -157,7 +151,7 @@ export default function App() {
               <Dashboard />
             </AppLayout>
           ) : (
-            <Navigate to="/login" replace />
+            <Navigate to="/" replace />
           )
         }
       />
@@ -175,7 +169,7 @@ export default function App() {
               <EmployeeTasks />
             </AppLayout>
           ) : (
-            <Navigate to="/login" replace />
+            <Navigate to="/" replace />
           )
         }
       />
@@ -193,13 +187,13 @@ export default function App() {
               <EmployeeHistory />
             </AppLayout>
           ) : (
-            <Navigate to="/login" replace />
+            <Navigate to="/" replace />
           )
         }
       />
       <Route
         path="*"
-        element={<Navigate to={isLoggedIn ? '/users' : '/login'} replace />}
+        element={<Navigate to="/" replace />}
       />
     </Routes>
   )

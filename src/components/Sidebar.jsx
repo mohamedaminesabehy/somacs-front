@@ -45,7 +45,7 @@ function SidebarContent({ onClose, currentUser, onLogout }) {
             Gestion
           </div>
           <NavLink
-            to="/users"
+            to="/"
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg transition ${
                 isActive ? 'bg-[#0052CC] text-white' : 'text-slate-300 hover:bg-[#0052CC]/10 hover:text-white'
