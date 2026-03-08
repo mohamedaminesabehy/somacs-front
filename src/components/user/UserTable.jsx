@@ -238,31 +238,34 @@ export default function UserTable({
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      <div className="px-4 sm:px-6 py-4 border-b border-gray-200 flex flex-wrap gap-3 md:gap-4 items-center">
-        <input
-          type="text"
-          placeholder="Rechercher par nom, email..."
-          value={searchTerm}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full md:flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]"
-        />
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+
+      {/* ── FILTERS BAR ── */}
+      <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap gap-3 items-center bg-slate-50/50">
+        <div className="relative flex-1 min-w-[200px]">
+          <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input
+            type="text"
+            placeholder="Rechercher par nom ou email..."
+            value={searchTerm}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] transition-all font-medium placeholder:text-slate-400"
+          />
+        </div>
         <select
           value={roleFilter}
           onChange={(e) => onRoleChange(e.target.value)}
-          className="w-full sm:w-auto px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC] bg-white"
+          className="w-full sm:w-auto px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] transition-all cursor-pointer"
         >
           <option>Tous les rôles</option>
           {availableRoles.map((role) => (
-            <option key={role.name} value={role.name}>
-              {role.name}
-            </option>
+            <option key={role.name} value={role.name}>{role.name}</option>
           ))}
         </select>
         <select
           value={statusFilter}
           onChange={(e) => onStatusChange(e.target.value)}
-          className="w-full sm:w-auto px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC] bg-white"
+          className="w-full sm:w-auto px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] transition-all cursor-pointer"
         >
           <option>Statut: Tous</option>
           <option>Actif</option>
@@ -270,94 +273,89 @@ export default function UserTable({
         </select>
       </div>
 
+      {/* ── TABLE ── */}
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px]">
           <thead>
-          <tr className="bg-gray-50 border-b border-gray-200">
-            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Utilisateur</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Email</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Rôle</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Statut</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Dernière connexion</th>
-            <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Actions</th>
-          </tr>
+            <tr className="bg-slate-50 border-b border-slate-100">
+              <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Utilisateur</th>
+              <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Email</th>
+              <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Rôle</th>
+              <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Statut</th>
+              <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Dernière connexion</th>
+              <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
+            </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
-          {isLoading ? (
-            <tr>
-              <td colSpan={6} className="px-6 py-6 text-center text-sm text-gray-500">
-                Chargement des utilisateurs...
-              </td>
-            </tr>
-          ) : userList.length === 0 ? (
-            <tr>
-              <td colSpan={6} className="px-6 py-6 text-center text-sm text-gray-500">
-                Aucun utilisateur trouvé.
-              </td>
-            </tr>
-          ) : (
-            userList.map((user) => (
-              <tr key={user.id} className="hover:bg-gray-50 transition">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-10 h-10 rounded-full ${
-                        avatarBgColors.default
-                      } flex items-center justify-center text-white font-semibold text-sm`}
-                    >
-                      {user.avatar}
+          <tbody className="divide-y divide-slate-50">
+            {isLoading ? (
+              <tr><td colSpan={6} className="px-6 py-16 text-center">
+                <div className="flex flex-col items-center gap-3">
+                  <svg className="animate-spin h-8 w-8 text-[#0052CC]" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                  <p className="text-sm font-semibold text-slate-400">Chargement des utilisateurs...</p>
+                </div>
+              </td></tr>
+            ) : userList.length === 0 ? (
+              <tr><td colSpan={6} className="px-6 py-16 text-center">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center">
+                    <Shield size={24} className="text-slate-300" />
+                  </div>
+                  <p className="font-bold text-slate-500">Aucun utilisateur trouvé</p>
+                  <p className="text-sm text-slate-400">Modifiez vos critères ou créez un nouveau compte.</p>
+                </div>
+              </td></tr>
+            ) : (
+              userList.map((user) => (
+                <tr key={user.id} className="hover:bg-slate-50/70 transition-colors group">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#0052CC] to-blue-700 flex items-center justify-center text-white font-black text-sm shrink-0 shadow-sm">
+                        {user.avatar}
+                      </div>
+                      <span className="font-semibold text-slate-900 text-sm">{user.name}</span>
                     </div>
-                    <span className="font-medium text-gray-900">{user.name}</span>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
-                <td className="px-6 py-4">
-                  <span
-                    className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${roleColors[user.roleColor]}`}
-                  >
-                    {user.role === 'Administrateur' && <Shield size={14} className="inline mr-1" />}
-                    {user.role}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <span
-                    className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${statusColors[user.statusColor]}`}
-                  >
-                    {user.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-600">{user.lastLogin}</td>
-                <td className="px-6 py-4">
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition"
-                      onClick={() => handleOpenView(user)}
-                    >
-                      <Eye size={18} />
-                    </button>
-                    <button
-                      type="button"
-                      className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition"
-                      onClick={() => handleOpenEdit(user)}
-                    >
-                      <Edit2 size={18} />
-                    </button>
-                    <button
-                      type="button"
-                      className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition"
-                      onClick={() => handleOpenDelete(user)}
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                    <button className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition">
-                      <Shield size={18} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))
-          )}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-slate-500 font-medium">{user.email}</td>
+                  <td className="px-6 py-4">
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold ${roleColors[user.roleColor]}`}>
+                      {user.role === 'Administrateur' && <Shield size={12} />}
+                      {user.role}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold ${statusColors[user.statusColor]}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${user.statusColor === 'green' ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                      {user.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
+                      <Clock size={13} className="text-slate-400 shrink-0" />
+                      {user.lastLogin}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex gap-1">
+                      <button type="button" onClick={() => handleOpenView(user)}
+                        className="p-2 text-slate-400 hover:text-[#0052CC] hover:bg-blue-50 rounded-xl transition-all" title="Voir le profil">
+                        <Eye size={16} />
+                      </button>
+                      <button type="button" onClick={() => handleOpenEdit(user)}
+                        className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all" title="Modifier">
+                        <Edit2 size={16} />
+                      </button>
+                      <button type="button" onClick={() => handleOpenDelete(user)}
+                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all" title="Supprimer">
+                        <Trash2 size={16} />
+                      </button>
+                      <button className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition-all" title="Gérer les droits">
+                        <Shield size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

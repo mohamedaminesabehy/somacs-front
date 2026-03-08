@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import logo from '../assets/logo-removebg-preview.png'
+import logo from '../../assets/logo-removebg-preview.png'
 
 const messages = [
   'Initialisation des modules...',

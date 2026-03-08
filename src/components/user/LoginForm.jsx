@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff } from 'lucide-react'
-import logo from '../assets/logo.jpg'
+import logo from '../../assets/logo.jpg'
 
 export default function LoginForm({ onLoginSuccess }) {
   const [showPassword, setShowPassword] = useState(false)

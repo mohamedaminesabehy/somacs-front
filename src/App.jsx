@@ -1,12 +1,18 @@
 import { useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import Sidebar from './components/Sidebar'
-import Header from './components/Header'
-import UserManagement from './pages/UserManagement'
-import Dashboard from './pages/Dashboard'
-import EmployeeTasks from './pages/EmployeeTasks'
-import EmployeeHistory from './pages/EmployeeHistory'
-import LoginForm from './components/LoginForm'
+import Sidebar from './components/layout/Sidebar'
+import Header from './components/layout/Header'
+import UserManagement from './pages/user/UserManagement'
+import ListMission from './pages/mission/ListMission'
+import EmployeeMissions from './pages/mission/EmployeeMissions'
+import EmployeeHistory from './pages/mission/EmployeeHistory'
+import MissionDetails from './pages/mission/MissionDetails'
+import InterventionList from './pages/intervention/InterventionList'
+import CreateIntervention from './pages/intervention/CreateIntervention'
+import InterventionDetails from './pages/intervention/InterventionDetails'
+import InterventionHistory from './pages/intervention/InterventionHistory'
+import AssignMission from './pages/mission/AssignMission'
+import LoginForm from './components/user/LoginForm'
 import loginBackground from './assets/login.jpg'
 
 function AppLayout({
@@ -138,7 +144,7 @@ export default function App() {
         }
       />
       <Route
-        path="/tasks"
+        path="/missions"
         element={
           isLoggedIn ? (
             <AppLayout
@@ -148,7 +154,7 @@ export default function App() {
               currentUser={currentUser}
               onLogout={handleLogout}
             >
-              <Dashboard />
+              <ListMission />
             </AppLayout>
           ) : (
             <Navigate to="/" replace />
@@ -156,7 +162,7 @@ export default function App() {
         }
       />
       <Route
-        path="/tasks/my"
+        path="/missions/my"
         element={
           isLoggedIn ? (
             <AppLayout
@@ -166,7 +172,115 @@ export default function App() {
               currentUser={currentUser}
               onLogout={handleLogout}
             >
-              <EmployeeTasks />
+              <EmployeeMissions />
+            </AppLayout>
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+      <Route
+        path="/missions/assign"
+        element={
+          isLoggedIn ? (
+            <AppLayout
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={handleToggleSidebar}
+              onCloseSidebar={handleCloseSidebar}
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            >
+              <AssignMission />
+            </AppLayout>
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+      <Route
+        path="/missions/:id"
+        element={
+          isLoggedIn ? (
+            <AppLayout
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={handleToggleSidebar}
+              onCloseSidebar={handleCloseSidebar}
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            >
+              <MissionDetails />
+            </AppLayout>
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+      <Route
+        path="/interventions"
+        element={
+          isLoggedIn ? (
+            <AppLayout
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={handleToggleSidebar}
+              onCloseSidebar={handleCloseSidebar}
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            >
+              <InterventionList />
+            </AppLayout>
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+      <Route
+        path="/interventions/create"
+        element={
+          isLoggedIn ? (
+            <AppLayout
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={handleToggleSidebar}
+              onCloseSidebar={handleCloseSidebar}
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            >
+              <CreateIntervention />
+            </AppLayout>
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+      <Route
+        path="/interventions/:id"
+        element={
+          isLoggedIn ? (
+            <AppLayout
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={handleToggleSidebar}
+              onCloseSidebar={handleCloseSidebar}
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            >
+              <InterventionDetails />
+            </AppLayout>
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+      <Route
+        path="/interventions/history"
+        element={
+          isLoggedIn ? (
+            <AppLayout
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={handleToggleSidebar}
+              onCloseSidebar={handleCloseSidebar}
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            >
+              <InterventionHistory />
             </AppLayout>
           ) : (
             <Navigate to="/" replace />

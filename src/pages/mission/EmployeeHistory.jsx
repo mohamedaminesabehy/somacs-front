@@ -22,7 +22,7 @@ const priorityColors = {
 const mockHistory = [
   {
     id: 1,
-    task: 'Réparation urgente pompe hydraulique',
+    mission: 'Réparation urgente pompe hydraulique',
     startDate: '2024-10-21 08:10',
     endDate: '2024-10-21 12:05',
     realDuration: '3h55',
@@ -34,7 +34,7 @@ const mockHistory = [
   },
   {
     id: 2,
-    task: 'Inventaire pièces détachées Q4',
+    mission: 'Inventaire pièces détachées Q4',
     startDate: '2024-10-19 09:00',
     endDate: '2024-10-20 17:30',
     realDuration: '7h30',
@@ -46,7 +46,7 @@ const mockHistory = [
   },
   {
     id: 3,
-    task: 'Formation équipe nouveaux outils',
+    mission: 'Formation équipe nouveaux outils',
     startDate: '2024-10-18 14:00',
     endDate: '2024-10-18 16:00',
     realDuration: '2h00',
@@ -58,7 +58,7 @@ const mockHistory = [
   },
   {
     id: 4,
-    task: 'Installation nouveau système CRM',
+    mission: 'Installation nouveau système CRM',
     startDate: '2024-10-15 09:30',
     endDate: '2024-10-15 11:00',
     realDuration: '1h30',
@@ -88,12 +88,12 @@ export default function EmployeeHistory() {
     return () => clearTimeout(timer)
   }, [employeeId])
 
-  const completedTasks = useMemo(
+  const completedMissions = useMemo(
     () => items.filter((item) => item.finalStatus === 'Terminée').length,
     [items],
   )
 
-  const lateTasks = useMemo(
+  const lateMissions = useMemo(
     () => items.filter((item) => item.finalStatus === 'En retard').length,
     [items],
   )
@@ -166,16 +166,16 @@ export default function EmployeeHistory() {
               <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2.5">
                 <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
                   <CheckCircle2 size={14} className="text-blue-500" />
-                  Tâches terminées
+                  Missions terminées
                 </div>
-                <div className="text-lg font-semibold text-gray-900">{completedTasks}</div>
+                <div className="text-lg font-semibold text-gray-900">{completedMissions}</div>
               </div>
               <div className="bg-orange-50 border border-orange-100 rounded-lg px-3 py-2.5">
                 <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
                   <AlertCircle size={14} className="text-orange-500" />
                   En retard
                 </div>
-                <div className="text-lg font-semibold text-gray-900">{lateTasks}</div>
+                <div className="text-lg font-semibold text-gray-900">{lateMissions}</div>
               </div>
               <div className="bg-green-50 border border-green-100 rounded-lg px-3 py-2.5">
                 <div className="flex items-center gap-2 text-xs text-gray-600 mb-1">
@@ -192,7 +192,7 @@ export default function EmployeeHistory() {
           <div className="px-4 sm:px-6 py-4 border-b border-gray-200 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-2 text-sm text-gray-700">
               <User size={18} className="text-gray-500" />
-              <span>Historique des tâches</span>
+              <span>Historique des missions</span>
             </div>
             <div className="flex flex-wrap gap-3">
               <div className="flex items-center gap-2">
@@ -238,7 +238,7 @@ export default function EmployeeHistory() {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    Tâche
+                    Mission
                   </th>
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
                     Début
@@ -281,7 +281,7 @@ export default function EmployeeHistory() {
                     >
                       <td className="px-4 sm:px-6 py-3">
                         <div>
-                          <p className="text-sm font-medium text-gray-900">{item.task}</p>
+                          <p className="text-sm font-medium text-gray-900">{item.mission}</p>
                           <div className="mt-1 flex flex-wrap gap-2">
                             <span
                               className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium ${priorityColors[item.priorityColor]}`}
