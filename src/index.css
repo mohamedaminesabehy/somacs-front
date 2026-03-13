@@ -32,6 +32,30 @@
   scrollbar-width: none;  /* Firefox */
 }
 
+/* Gray scrollbar — used on specific panels (calendar, mission list) */
+.scrollbar-gray {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.scrollbar-gray::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-gray::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-gray::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+  border: none;
+}
+
+.scrollbar-gray::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
 * {
   margin: 0;
   padding: 0;

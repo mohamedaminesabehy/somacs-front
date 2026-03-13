@@ -1,432 +1,552 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { 
-  Search, 
-  Plus, 
-  Filter, 
-  MoreVertical, 
-  Eye, 
-  Edit2, 
-  Trash2, 
-  Wrench,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  PlayCircle,
-  FileText,
-  ChevronRight,
-  UserPlus,
-  Hourglass,
-  UserCheck,
-  ArrowRight,
-  Building2,
-  Calendar,
-  Settings,
-  ArrowUpDown
+import {
+  Search, Plus, MoreVertical, Eye, Edit2, Trash2, Wrench,
+  CheckCircle2, FileText, ChevronRight, UserPlus, Hourglass,
+  UserCheck, Building2, Calendar, Settings,
+  PlayCircle, LayoutGrid, LayoutList, X, TrendingUp, AlertTriangle,
+  SlidersHorizontal, RefreshCw, UserCheck2, Filter, ChevronDown,
+  ArrowUpRight, Clock, MapPin, MoreHorizontal, Download, Printer,
+  Share2, ShieldCheck, Zap, FileSearch, Truck, GraduationCap,
+  ShieldAlert, ClipboardCheck, ChevronLeft, ChevronRight as ChevronRightIcon
 } from 'lucide-react'
 
-// ── Workflow statuses aligned with real SAV process ──
+// ─── Configuration ────────────────────────────────────────────────────────────
 const statusConfig = {
-  PENDING:     { label: 'En attente',     color: 'bg-amber-50 text-amber-700 border border-amber-200',    dot: 'bg-amber-500',   icon: Hourglass,   step: 1 },
-  ASSIGNED:    { label: 'Affectée',       color: 'bg-blue-50 text-blue-700 border border-blue-200',       dot: 'bg-blue-500',    icon: UserCheck,   step: 2 },
-  IN_PROGRESS: { label: 'En cours',       color: 'bg-orange-50 text-orange-700 border border-orange-200',  dot: 'bg-orange-500',  icon: PlayCircle,  step: 3 },
-  TESTING:     { label: 'En test',        color: 'bg-purple-50 text-purple-700 border border-purple-200',  dot: 'bg-purple-500',  icon: Settings,    step: 4 },
-  CLOSED:      { label: 'Clôturé',       color: 'bg-green-50 text-green-700 border border-green-200',    dot: 'bg-green-500',   icon: CheckCircle2, step: 5 },
+  PENDING:     { label: "En attente d'affectation", color: 'bg-amber-50 text-amber-700 border-amber-100',    dot: 'bg-amber-500',  icon: Hourglass,    bar: 'bg-amber-400'  },
+  ASSIGNED:    { label: 'Affectée technicien',    color: 'bg-blue-50 text-blue-700 border-blue-100',       dot: 'bg-blue-500',   icon: UserCheck2,   bar: 'bg-blue-500'   },
+  IN_PROGRESS: { label: 'En cours',                color: 'bg-orange-50 text-orange-700 border-orange-100', dot: 'bg-orange-500', icon: PlayCircle,   bar: 'bg-orange-500' },
+  CLOSED:      { label: 'Intervention Clôturée',   color: 'bg-green-50 text-green-700 border-green-100',   dot: 'bg-green-500',  icon: CheckCircle2, bar: 'bg-green-500'  },
 }
 
-// ── Workflow steps for the visual pipeline ──
-const workflowSteps = [
-  { key: 'PENDING',     label: 'En attente',  icon: Hourglass },
-  { key: 'ASSIGNED',    label: 'Affectée',    icon: UserCheck },
-  { key: 'IN_PROGRESS', label: 'En cours',    icon: PlayCircle },
-  { key: 'TESTING',     label: 'En test',     icon: Settings },
-  { key: 'CLOSED',      label: 'Clôturé',    icon: CheckCircle2 },
+const typeConfig = {
+  DEVIS:        { label: 'Devis',        color: 'bg-[#004a77]/5 text-[#004a77] border-[#004a77]/10', icon: FileSearch     },
+  LIVRAISON:    { label: 'Livraison',    color: 'bg-[#004a77]/5 text-[#004a77] border-[#004a77]/10', icon: Truck          },
+  FORMATION:    { label: 'Formation',    color: 'bg-[#004a77]/5 text-[#004a77] border-[#004a77]/10', icon: GraduationCap },
+  INSTALLATION: { label: 'Installation',  color: 'bg-[#004a77]/5 text-[#004a77] border-[#004a77]/10', icon: Plus           },
+  REPARATION:   { label: 'Réparation',    color: 'bg-[#004a77]/5 text-[#004a77] border-[#004a77]/10', icon: Wrench         },
+  GARANTIE:     { label: 'Garantie',     color: 'bg-[#004a77]/5 text-[#004a77] border-[#004a77]/10', icon: ShieldAlert    },
+}
+
+// ─── Mock data ────────────────────────────────────────────────────────────────
+const mockInterventions = [
+  { id: 'INT-001', client: 'Total Energies',    machine: 'Compresseur C-12',  type: 'REPARATION',   status: 'PENDING',     date: '2025-05-01', assignee: null, priority: 'Haute' },
+  { id: 'INT-002', client: 'Sonatrach',         machine: 'Turbine T-04',      type: 'GARANTIE',     status: 'ASSIGNED',    date: '2025-05-02', assignee: 'Ali Boumediene', priority: 'Critique' },
+  { id: 'INT-003', client: 'Air Liquide',       machine: 'Pompe P-07',        type: 'INSTALLATION', status: 'IN_PROGRESS', date: '2025-05-03', assignee: 'Sara Meziane', priority: 'Moyenne' },
+  { id: 'INT-004', client: 'Cevital',           machine: 'Moteur M-21',       type: 'FORMATION',    status: 'PENDING',     date: '2025-04-28', assignee: 'Karim Hadj', priority: 'Haute' },
+  { id: 'INT-005', client: 'Naftal',            machine: 'Générateur G-03',  type: 'LIVRAISON',    status: 'CLOSED',      date: '2025-04-25', assignee: 'Sara Meziane', priority: 'Basse' },
+  { id: 'INT-006', client: 'Total Energies',    machine: 'Vanne V-09',        type: 'DEVIS',        status: 'IN_PROGRESS', date: '2025-05-04', assignee: 'Yacine Ferhat', priority: 'Haute' },
+  { id: 'INT-007', client: 'Sonelgaz',          machine: 'Transform. TR-02',  type: 'REPARATION',   status: 'PENDING',     date: '2025-05-05', assignee: null, priority: 'Moyenne' },
+  { id: 'INT-008', client: 'Hamamet Resort',    machine: 'Climatiseur CL-15', type: 'REPARATION',   status: 'ASSIGNED',    date: '2025-05-06', assignee: 'Ali Boumediene', priority: 'Basse' },
+  { id: 'INT-009', client: 'Cevital',           machine: 'Convoyeur CV-01',   type: 'DEVIS',        status: 'CLOSED',      date: '2025-04-22', assignee: 'Karim Hadj', priority: 'Moyenne' },
+  { id: 'INT-010', client: 'Sonatrach',         machine: 'Robinet RB-11',     type: 'INSTALLATION', status: 'IN_PROGRESS', date: '2025-04-30', assignee: 'Yacine Ferhat', priority: 'Haute' },
 ]
 
-const mockInterventions = [
-  { id: 'INT-2026-001', ficheNumber: '2026/03/01 100201', client: 'Garage Central',     machine: 'Pont Élévateur 4T',      type: 'Réparation',             status: 'IN_PROGRESS', assignedTo: 'Jean Dupont',   date: '2026-03-01', clientCode: 'CLT-882' },
-  { id: 'INT-2026-002', ficheNumber: '2026/03/02 100302', client: 'Usine MetalPlus',    machine: 'Compresseur Industriel', type: 'Installation',            status: 'PENDING',     assignedTo: null,            date: '2026-03-02', clientCode: 'CLT-445' },
-  { id: 'INT-2026-003', ficheNumber: '2026/03/02 100303', client: 'Logistique Express', machine: 'Chariot Élévateur',      type: 'Réparation',             status: 'ASSIGNED',    assignedTo: 'Pierre Martin', date: '2026-03-02', clientCode: 'CLT-116' },
-  { id: 'INT-2026-004', ficheNumber: '2026/02/28 090401', client: 'BTP Service',        machine: 'Générateur 50kVA',       type: 'Devis',                   status: 'CLOSED',      assignedTo: 'Jean Dupont',   date: '2026-02-28', clientCode: 'CLT-290' },
-  { id: 'INT-2026-005', ficheNumber: '2026/03/01 110501', client: 'AgriTech SA',        machine: "Système d'Irrigation",   type: 'Réparation',             status: 'TESTING',     assignedTo: 'Marie Curie',   date: '2026-03-01', clientCode: 'CLT-512' },
-  { id: 'INT-2026-006', ficheNumber: '2026/03/03 140601', client: 'Clinique Moderne',   machine: 'Ascenseur Bloc B',       type: 'Garantie',                status: 'PENDING',     assignedTo: null,            date: '2026-03-03', clientCode: 'CLT-780' },
-  { id: 'INT-2026-007', ficheNumber: '2026/03/03 150701', client: 'MegaDistrib SA',     machine: 'Porte Automatique',      type: 'Réparation',             status: 'ASSIGNED',    assignedTo: 'Sarah Martin',  date: '2026-03-03', clientCode: 'CLT-331' },
-]
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function StatCard({ label, count, total, icon: Icon, active, onClick, colorClass }) {
+  const pct = total > 0 ? Math.round((count / total) * 100) : 0
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-1 min-w-[200px] bg-white border-2 rounded-2xl p-5 text-left transition-all relative overflow-hidden group
+        ${active ? 'border-[#0052CC] shadow-xl shadow-blue-100/50 translate-y-[-4px]' : 'border-slate-100 hover:border-slate-300 hover:shadow-lg hover:translate-y-[-2px]'}`}
+    >
+      <div className={`absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 rounded-full opacity-[0.05] transition-transform group-hover:scale-110 ${colorClass}`} />
+      <div className="flex items-center justify-between mb-4 relative z-10">
+        <div className={`p-2.5 rounded-xl shadow-sm ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-blue-600 transition-colors'}`}>
+          <Icon size={20} />
+        </div>
+        <div className="flex flex-col items-end">
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</span>
+          <span className={`text-2xl font-black leading-none mt-1 transition-colors ${active ? 'text-blue-600' : 'text-slate-900'}`}>{count}</span>
+        </div>
+      </div>
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] font-bold text-slate-400 tracking-tight">{pct}% de l'activité</span>
+          <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${active ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-500'}`}>{count} / {total}</span>
+        </div>
+        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+          <div className={`h-full rounded-full transition-all duration-1000 ease-out shadow-sm ${colorClass}`} style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+    </button>
+  )
+}
+
+function ActionMenu({ id, onNavigate }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
+      >
+        <MoreHorizontal size={16} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-10 z-50 w-48 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="px-3 py-2 border-b border-slate-50">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Actions dossier</p>
+          </div>
+          <button onClick={() => { onNavigate('details', id); setOpen(false) }}
+            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-[#0052CC] transition-colors">
+            <Eye size={14} /> Consulter le dossier
+          </button>
+          <button onClick={() => { onNavigate('edit', id); setOpen(false) }}
+            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-[#0052CC] transition-colors">
+            <Edit2 size={14} /> Modifier les infos
+          </button>
+          <button onClick={() => { onNavigate('assign', id); setOpen(false) }}
+            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-[#0052CC] transition-colors">
+            <UserCheck2 size={14} /> Affecter technicien
+          </button>
+          <div className="border-t border-slate-50" />
+          <button onClick={() => { alert('Supprimer ' + id); setOpen(false) }}
+            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors">
+            <Trash2 size={14} /> Supprimer dossier
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function InterventionList() {
   const navigate = useNavigate()
-  const [searchTerm, setSearchTerm]     = useState('')
+  const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
-  const [showActions, setShowActions]   = useState(null)
-  const [sortField, setSortField]       = useState('date')
-  const [sortDir, setSortDir]           = useState('desc')
+  const [typeFilter, setTypeFilter] = useState('ALL')
+  const [viewMode, setViewMode] = useState('list')
+  
+  // Date Filters
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
 
-  const counts = useMemo(() => {
-    const c = { ALL: mockInterventions.length }
-    Object.keys(statusConfig).forEach(k => { c[k] = mockInterventions.filter(i => i.status === k).length })
-    return c
-  }, [])
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 6
 
-  const filteredInterventions = useMemo(() => {
-    let list = mockInterventions.filter(item => {
-      const q = searchTerm.toLowerCase()
-      const matchesSearch =
-        item.id.toLowerCase().includes(q) ||
-        item.ficheNumber.toLowerCase().includes(q) ||
-        item.client.toLowerCase().includes(q) ||
-        item.machine.toLowerCase().includes(q) ||
-        (item.assignedTo && item.assignedTo.toLowerCase().includes(q))
-      const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter
-      return matchesSearch && matchesStatus
-    })
-    list.sort((a, b) => {
-      let cmp = 0
-      if (sortField === 'date') cmp = a.date.localeCompare(b.date)
-      else if (sortField === 'client') cmp = a.client.localeCompare(b.client)
-      else if (sortField === 'status') cmp = statusConfig[a.status].step - statusConfig[b.status].step
-      return sortDir === 'desc' ? -cmp : cmp
-    })
-    return list
-  }, [searchTerm, statusFilter, sortField, sortDir])
-
-  const toggleSort = (field) => {
-    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    else { setSortField(field); setSortDir('asc') }
+  const handleNavigate = (action, id) => {
+    if (action === 'details') navigate(`/interventions/${id}`)
+    else if (action === 'edit') navigate(`/interventions/${id}/edit`)
+    else if (action === 'assign') navigate(`/interventions/${id}/assign`)
   }
 
-  const getWorkflowStep = (status) => statusConfig[status]?.step || 0
+  const filtered = useMemo(() => {
+    setCurrentPage(1) // Reset pagination on filter change
+    return mockInterventions.filter(i => {
+      const matchSearch = [i.id, i.client, i.machine].some(v => v.toLowerCase().includes(search.toLowerCase()))
+      const matchStatus = statusFilter === 'ALL' || i.status === statusFilter
+      const matchType   = typeFilter   === 'ALL' || i.type   === typeFilter
+      
+      // Date filtering logic
+      let matchDate = true
+      if (startDate || endDate) {
+        const itemDate = new Date(i.date)
+        if (startDate) {
+          const start = new Date(startDate)
+          if (itemDate < start) matchDate = false
+        }
+        if (endDate) {
+          const end = new Date(endDate)
+          if (itemDate > end) matchDate = false
+        }
+      }
+
+      return matchSearch && matchStatus && matchType && matchDate
+    })
+  }, [search, statusFilter, typeFilter, startDate, endDate])
+
+  const total = mockInterventions.length
+  const kpiData = Object.entries(statusConfig).map(([key, cfg]) => ({
+    key, ...cfg, count: mockInterventions.filter(i => i.status === key).length
+  }))
+
+  // Pagination logic
+  const totalPages = Math.ceil(filtered.length / itemsPerPage)
+  const paginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    return filtered.slice(startIndex, startIndex + itemsPerPage)
+  }, [filtered, currentPage])
 
   return (
-    <div className="p-6 lg:p-8 space-y-8 bg-slate-50 min-h-full">
-
-      {/* ── PAGE HEADER ── */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-        <div className="flex items-center gap-5">
-          <div className="w-14 h-14 bg-gradient-to-br from-[#0052CC] to-blue-700 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
-            <FileText size={26} className="text-white" />
+    <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
+      {/* ── Top Bar ── */}
+      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200">
+        <div className="max-w-[1600px] mx-auto px-6 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-100">
+              <Wrench size={24} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-black text-slate-900 tracking-tight">Liste des Interventions</h1>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded uppercase tracking-wider">{total} dossiers</span>
+                <div className="w-1 h-1 bg-slate-300 rounded-full" />
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Gestion SAV</span>
+              </div>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Dossiers d’interventions SAV</h1>
-            <p className="text-sm text-slate-500 font-medium mt-0.5">Suivez le cycle de vie complet : Création → En attente → Affectation → Clôture</p>
-          </div>
-        </div>
-        <button
-          onClick={() => navigate('/interventions/create')}
-          className="group flex items-center gap-2.5 bg-gradient-to-r from-[#0052CC] to-blue-600 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-200 hover:shadow-blue-300 active:scale-95 shrink-0"
-        >
-          <Plus size={18} strokeWidth={3} />
-          Nouvelle intervention
-          <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" strokeWidth={3} />
-        </button>
-      </div>
 
-      {/* ── WORKFLOW PIPELINE ── */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Pipeline du workflow</h3>
-          <span className="text-[10px] font-bold text-slate-400">{mockInterventions.length} dossiers au total</span>
-        </div>
-        <div className="flex items-center gap-0">
-          {workflowSteps.map((step, idx) => {
-            const Icon = step.icon
-            const count = counts[step.key] || 0
-            const isActive = statusFilter === step.key
-            const cfg = statusConfig[step.key]
-            return (
-              <React.Fragment key={step.key}>
-                {idx > 0 && (
-                  <div className="flex-shrink-0 w-8 flex items-center justify-center">
-                    <ArrowRight size={16} className="text-slate-200" />
-                  </div>
-                )}
-                <button
-                  onClick={() => setStatusFilter(statusFilter === step.key ? 'ALL' : step.key)}
-                  className={`flex-1 flex flex-col items-center gap-2 py-4 px-2 rounded-xl border-2 transition-all cursor-pointer ${
-                    isActive
-                      ? 'border-[#0052CC] bg-[#0052CC]/5 shadow-md shadow-blue-100'
-                      : 'border-transparent hover:border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
-                    isActive ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-200' : count > 0 ? cfg.color : 'bg-slate-100 text-slate-300'
-                  }`}>
-                    <Icon size={20} />
-                  </div>
-                  <div className="text-center">
-                    <p className={`text-2xl font-black ${isActive ? 'text-[#0052CC]' : 'text-slate-800'}`}>{count}</p>
-                    <p className={`text-[10px] font-bold uppercase tracking-wider mt-0.5 ${isActive ? 'text-[#0052CC]' : 'text-slate-400'}`}>{step.label}</p>
-                  </div>
-                </button>
-              </React.Fragment>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* ── SEARCH + FILTER BAR ── */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4 flex flex-col md:flex-row gap-3 items-center">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-          <input
-            type="text"
-            placeholder="Rechercher par N° dossier, client, équipement ou employé assigné..."
-            className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] focus:bg-white transition-all font-medium placeholder:text-slate-400"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
-          <Filter className="text-slate-400 shrink-0" size={16} />
-          <select
-            className="flex-1 md:w-52 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] focus:bg-white transition-all cursor-pointer"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="ALL">Tous les statuts</option>
-            {Object.entries(statusConfig).map(([key, config]) => (
-              <option key={key} value={key}>{config.label}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* ── TABLE ── */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-
-        {/* Table header bar */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <p className="text-sm font-bold text-slate-700">
-            {filteredInterventions.length} dossier{filteredInterventions.length > 1 ? 's' : ''}
-            <span className="font-normal text-slate-400 ml-1">
-              {statusFilter !== 'ALL' ? `— filtré par “${statusConfig[statusFilter].label}”` : `sur ${mockInterventions.length} au total`}
-            </span>
-          </p>
-          {statusFilter !== 'ALL' && (
-            <button onClick={() => setStatusFilter('ALL')} className="text-xs font-bold text-[#0052CC] hover:underline">
-              Effacer le filtre
+          <div className="flex items-center gap-3">
+            <button className="hidden sm:flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all">
+              <Download size={16} /> Export
             </button>
-          )}
+            <button
+              onClick={() => navigate('/interventions/create')}
+              className="flex items-center gap-2 px-6 py-3 bg-[#0052CC] text-white rounded-xl text-xs font-black shadow-lg shadow-blue-200 hover:bg-[#0042a3] transition-all active:scale-95"
+            >
+              <Plus size={18} strokeWidth={3} /> Nouvelle Intervention
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ── Main Content ── */}
+      <main className="flex-1 max-w-[1600px] mx-auto w-full p-6 sm:p-8 space-y-8">
+        
+        {/* KPI Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <StatCard
+            label="Tout"
+            count={total}
+            total={total}
+            icon={LayoutGrid}
+            colorClass="bg-slate-400"
+            active={statusFilter === 'ALL'}
+            onClick={() => setStatusFilter('ALL')}
+          />
+          {kpiData.map(k => (
+            <StatCard
+              key={k.key}
+              label={k.label}
+              count={k.count}
+              total={total}
+              icon={k.icon}
+              colorClass={k.bar}
+              active={statusFilter === k.key}
+              onClick={() => setStatusFilter(prev => prev === k.key ? 'ALL' : k.key)}
+            />
+          ))}
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-100">
-                <th className="px-6 py-3.5 text-[11px] font-black text-slate-400 uppercase tracking-widest">
-                  N° Fiche
-                </th>
-                <th className="px-6 py-3.5 text-[11px] font-black text-slate-400 uppercase tracking-widest">
-                  <button onClick={() => toggleSort('client')} className="flex items-center gap-1 hover:text-slate-600 transition-colors">
-                    Client
-                    <ArrowUpDown size={12} className={sortField === 'client' ? 'text-[#0052CC]' : 'text-slate-300'} />
-                  </button>
-                </th>
-                <th className="px-6 py-3.5 text-[11px] font-black text-slate-400 uppercase tracking-widest">Équipement</th>
-                <th className="px-6 py-3.5 text-[11px] font-black text-slate-400 uppercase tracking-widest">Type</th>
-                <th className="px-6 py-3.5 text-[11px] font-black text-slate-400 uppercase tracking-widest">
-                  <button onClick={() => toggleSort('status')} className="flex items-center gap-1 hover:text-slate-600 transition-colors">
-                    Statut
-                    <ArrowUpDown size={12} className={sortField === 'status' ? 'text-[#0052CC]' : 'text-slate-300'} />
-                  </button>
-                </th>
-                <th className="px-6 py-3.5 text-[11px] font-black text-slate-400 uppercase tracking-widest">Employé assigné</th>
-                <th className="px-6 py-3.5 text-[11px] font-black text-slate-400 uppercase tracking-widest">
-                  <button onClick={() => toggleSort('date')} className="flex items-center gap-1 hover:text-slate-600 transition-colors">
-                    Date
-                    <ArrowUpDown size={12} className={sortField === 'date' ? 'text-[#0052CC]' : 'text-slate-300'} />
-                  </button>
-                </th>
-                <th className="px-6 py-3.5 text-[11px] font-black text-slate-400 uppercase tracking-widest">Progression</th>
-                <th className="px-6 py-3.5 text-[11px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {filteredInterventions.length > 0 ? (
-                filteredInterventions.map((item) => {
-                  const cfg = statusConfig[item.status]
-                  const StatusIcon = cfg.icon
-                  const currentStep = getWorkflowStep(item.status)
-                  return (
-                    <tr key={item.id} className="hover:bg-slate-50/70 transition-colors group">
-                      {/* N° Fiche */}
-                      <td className="px-6 py-4">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-mono text-xs font-bold text-[#0052CC] bg-blue-50 px-2.5 py-1 rounded-lg inline-block w-fit">{item.id}</span>
-                          <span className="text-[10px] text-slate-400 font-medium pl-1">{item.ficheNumber}</span>
-                        </div>
-                      </td>
-                      {/* Client */}
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-100 to-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
-                            <Building2 size={16} className="text-slate-400" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-slate-900 leading-tight">{item.client}</p>
-                            <p className="text-[10px] text-slate-400 font-semibold">{item.clientCode}</p>
-                          </div>
-                        </div>
-                      </td>
-                      {/* Équipement */}
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-slate-600 font-medium">{item.machine}</div>
-                      </td>
-                      {/* Type */}
-                      <td className="px-6 py-4">
-                        <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">{item.type}</span>
-                      </td>
-                      {/* Statut */}
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold ${cfg.color}`}>
-                          <StatusIcon size={13} />
-                          {cfg.label}
-                        </span>
-                      </td>
-                      {/* Employé assigné */}
-                      <td className="px-6 py-4">
-                        {item.assignedTo ? (
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#0052CC] to-blue-700 flex items-center justify-center text-white text-[10px] font-black shrink-0 shadow-sm">
-                              {item.assignedTo.split(' ').map(n => n[0]).join('')}
+        {/* Filters & Actions Bar */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex flex-wrap items-center gap-4">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[280px]">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input 
+                type="text"
+                placeholder="Rechercher par ID, client ou machine..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all"
+              />
+            </div>
+            
+            {/* Type filter with icons */}
+            <div className="relative group min-w-[180px]">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                {typeFilter !== 'ALL' ? (
+                  React.createElement(typeConfig[typeFilter].icon, { size: 14 })
+                ) : (
+                  <Filter size={14} />
+                )}
+              </div>
+              <select 
+                value={typeFilter}
+                onChange={e => setTypeFilter(e.target.value)}
+                className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-600 outline-none cursor-pointer hover:bg-white hover:border-blue-200 transition-all appearance-none"
+              >
+                <option value="ALL">Tous les types</option>
+                {Object.entries(typeConfig).map(([key, cfg]) => (
+                  <option key={key} value={key}>{cfg.label}</option>
+                ))}
+              </select>
+              <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* Date Filters Row (Now on the same line) */}
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500" size={12} />
+                <input 
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-600 focus:bg-white outline-none transition-all w-36"
+                />
+              </div>
+              <span className="text-slate-300 text-xs">à</span>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500" size={12} />
+                <input 
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-600 focus:bg-white outline-none transition-all w-36"
+                />
+              </div>
+            </div>
+
+            {/* Actions / View Mode */}
+            <div className="flex items-center gap-2 ml-auto">
+              {(startDate || endDate || search || typeFilter !== 'ALL' || statusFilter !== 'ALL') && (
+                <button 
+                  onClick={() => { setStartDate(''); setEndDate(''); setSearch(''); setTypeFilter('ALL'); setStatusFilter('ALL'); }}
+                  className="p-2.5 text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                  title="Réinitialiser"
+                >
+                  <RefreshCw size={18} />
+                </button>
+              )}
+              <div className="h-8 w-px bg-slate-100 mx-2" />
+              <button 
+                onClick={() => setViewMode('list')}
+                className={`p-2.5 rounded-xl transition-all ${viewMode === 'list' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:bg-slate-100'}`}
+              >
+                <LayoutList size={18} />
+              </button>
+              <button 
+                onClick={() => setViewMode('kanban')}
+                className={`p-2.5 rounded-xl transition-all ${viewMode === 'kanban' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:bg-slate-100'}`}
+              >
+                <LayoutGrid size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* List View */}
+        {viewMode === 'list' && (
+          <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-lg shadow-slate-100/50 overflow-hidden">
+            <div className="overflow-x-auto no-scrollbar">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b-2 border-slate-100">
+                    <th className="px-6 py-5 text-[11px] font-black text-slate-500 uppercase tracking-widest border-r border-slate-100 last:border-0">ID / Machine</th>
+                    <th className="px-6 py-5 text-[11px] font-black text-slate-500 uppercase tracking-widest border-r border-slate-100 last:border-0">Client / Site</th>
+                    <th className="px-6 py-5 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center border-r border-slate-100 last:border-0">Statut</th>
+                    <th className="px-6 py-5 text-[11px] font-black text-slate-500 uppercase tracking-widest border-r border-slate-100 last:border-0">Date d'intervention</th>
+                    <th className="px-6 py-5 text-[11px] font-black text-slate-500 uppercase tracking-widest border-r border-slate-100 last:border-0">Technicien</th>
+                    <th className="px-6 py-5 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {paginatedData.map((item, idx) => {
+                    const st = statusConfig[item.status]
+                    const ty = typeConfig[item.type]
+                    const TyIcon = ty.icon
+                    return (
+                      <tr key={item.id} className={`hover:bg-blue-50/50 transition-colors group cursor-pointer ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`} onClick={() => handleNavigate('details', item.id)}>
+                        <td className="px-6 py-4 border-r border-slate-50 last:border-0">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${ty.color}`}>
+                              <TyIcon size={18} />
                             </div>
-                            <span className="text-sm font-medium text-slate-700">{item.assignedTo}</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full border-2 border-dashed border-amber-300 bg-amber-50 flex items-center justify-center shrink-0">
-                              <UserPlus size={12} className="text-amber-400" />
-                            </div>
-                            <span className="text-xs font-bold text-amber-500 italic">Non assigné</span>
-                          </div>
-                        )}
-                      </td>
-                      {/* Date */}
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-1.5">
-                          <Calendar size={13} className="text-slate-300" />
-                          <span className="text-sm text-slate-500 font-medium">{item.date.split('-').reverse().join('/')}</span>
-                        </div>
-                      </td>
-                      {/* Progression */}
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-1">
-                          {[1,2,3,4,5].map(step => (
-                            <div
-                              key={step}
-                              className={`w-5 h-1.5 rounded-full transition-all ${
-                                step <= currentStep ? 'bg-[#0052CC]' : 'bg-slate-100'
-                              }`}
-                            />
-                          ))}
-                        </div>
-                        <p className="text-[10px] font-semibold text-slate-400 mt-1">Étape {currentStep}/5</p>
-                      </td>
-                      {/* Actions */}
-                      <td className="px-6 py-4 text-right">
-                        <div className="relative inline-block text-left">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setShowActions(showActions === item.id ? null : item.id) }}
-                            className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-400 hover:text-slate-700"
-                          >
-                            <MoreVertical size={16} />
-                          </button>
-                          {showActions === item.id && (
-                            <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 z-10 py-2 overflow-hidden">
-                              <div className="px-4 pb-2 mb-1 border-b border-slate-50">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dossier {item.id}</p>
-                                <p className="text-[10px] text-slate-300 font-semibold mt-0.5">{cfg.label}</p>
+                            <div>
+                              <p className="text-[13px] font-black text-slate-900 leading-none mb-1.5 group-hover:text-blue-600 transition-colors">{item.machine}</p>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-tight">{item.id}</span>
+                                <span className="w-1 h-1 bg-slate-200 rounded-full" />
+                                <span className="text-[9px] font-black uppercase text-[#004a77]">{ty.label}</span>
                               </div>
-                              <button
-                                onClick={() => { setShowActions(null); navigate(`/interventions/${item.id}`) }}
-                                className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition font-medium"
-                              >
-                                <Eye size={15} className="text-[#0052CC]" /> Consulter le dossier
-                              </button>
-                              <button
-                                onClick={() => { setShowActions(null); navigate(`/interventions/${item.id}`) }}
-                                className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition font-medium"
-                              >
-                                <Edit2 size={15} className="text-slate-500" /> Modifier le dossier
-                              </button>
-                              {item.status === 'PENDING' && (
-                                <button className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-blue-700 hover:bg-blue-50 transition font-medium">
-                                  <UserPlus size={15} className="text-blue-500" /> Affecter à un employé
-                                </button>
-                              )}
-                              <div className="border-t border-slate-100 my-1.5 mx-3"></div>
-                              <button className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition font-medium">
-                                <Trash2 size={15} /> Supprimer le dossier
-                              </button>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 border-r border-slate-50 last:border-0">
+                          <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                            <Building2 size={14} className="text-slate-300" />
+                            {item.client}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-center border-r border-slate-50 last:border-0">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black border-2 uppercase tracking-wider ${st.color}`}>
+                            <span className={`w-2 h-2 rounded-full shadow-sm ${st.dot}`} />
+                            {st.label}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 border-r border-slate-50 last:border-0">
+                          <div className="flex items-center gap-2 text-xs font-black text-slate-600">
+                            <Calendar size={16} className="text-blue-500" />
+                            {item.date}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 border-r border-slate-50 last:border-0">
+                          {item.assignee ? (
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[10px] font-black shadow-md shadow-blue-100">
+                                {item.assignee.split(' ').map(n => n[0]).join('')}
+                              </div>
+                              <span className="text-xs font-bold text-slate-800">{item.assignee}</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 text-amber-500">
+                              <AlertTriangle size={12} />
+                              <span className="text-[10px] font-black uppercase tracking-wider italic">Non affecté</span>
                             </div>
                           )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-center gap-2">
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); handleNavigate('details', item.id) }}
+                              className="flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white rounded-xl transition-all shadow-sm border border-[#004a77]/10 active:scale-95"
+                            >
+                              <Eye size={12} strokeWidth={3} />
+                              Consulter
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); handleNavigate('edit', item.id) }}
+                              className="flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white rounded-xl transition-all shadow-sm border border-[#004a77]/10 active:scale-95"
+                            >
+                              <Edit2 size={12} strokeWidth={3} />
+                              Modifier
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); handleNavigate('assign', item.id) }}
+                              className="flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white rounded-xl transition-all shadow-sm border border-[#004a77]/10 active:scale-95"
+                            >
+                              <UserCheck2 size={12} strokeWidth={3} />
+                              Affecter
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {paginatedData.length === 0 && (
+                    <tr>
+                      <td colSpan="6" className="px-6 py-20 text-center">
+                        <div className="flex flex-col items-center gap-4">
+                          <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-200 border-2 border-dashed border-slate-100">
+                            <Search size={40} />
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-lg font-black text-slate-400">Aucune intervention trouvée</p>
+                            <p className="text-sm text-slate-300 font-bold">Modifiez vos filtres ou effectuez une nouvelle recherche</p>
+                          </div>
+                          <button onClick={() => { setStartDate(''); setEndDate(''); setSearch(''); setTypeFilter('ALL'); setStatusFilter('ALL'); }} className="mt-2 px-6 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all">EFFACER LES FILTRES</button>
                         </div>
                       </td>
                     </tr>
-                  )
-                })
-              ) : (
-                <tr>
-                  <td colSpan="9" className="px-6 py-20 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center">
-                        <Wrench size={28} className="text-slate-300" />
-                      </div>
-                      <p className="font-bold text-slate-500">Aucun dossier trouvé</p>
-                      <p className="text-sm text-slate-400 max-w-xs">Modifiez vos critères de filtrage ou créez une nouvelle intervention.</p>
-                      <button
-                        onClick={() => navigate('/interventions/create')}
-                        className="mt-2 flex items-center gap-2 text-sm font-bold text-[#0052CC] hover:underline"
-                      >
-                        <Plus size={16} /> Créer une intervention
-                      </button>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Page {currentPage} sur {totalPages}</span>
+                  <div className="h-4 w-px bg-slate-200 mx-2" />
+                  <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">{filtered.length} résultats au total</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => prev - 1)}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-blue-200 hover:text-blue-600 disabled:opacity-30 disabled:pointer-events-none transition-all"
+                  >
+                    <ChevronLeft size={14} strokeWidth={3} /> Précédent
+                  </button>
+                  <button
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                    className="flex items-center gap-2 px-6 py-2 bg-[#0052CC] text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-100 hover:bg-blue-700 disabled:opacity-30 disabled:pointer-events-none transition-all group"
+                  >
+                    Suivant <ChevronRightIcon size={14} strokeWidth={3} className="group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Kanban View */}
+        {viewMode === 'kanban' && (
+          <div className="flex gap-6 overflow-x-auto pb-6 no-scrollbar min-h-[500px]">
+            {Object.entries(statusConfig).map(([statusKey, st]) => {
+              const items = filtered.filter(i => i.status === statusKey)
+              return (
+                <div key={statusKey} className="flex-shrink-0 w-80 flex flex-col gap-4">
+                  <div className="flex items-center justify-between px-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${st.dot}`} />
+                      <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">{st.label}</h3>
+                      <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">{items.length}</span>
                     </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-3">
-          <p className="text-sm font-semibold text-slate-500">
-            {filteredInterventions.length} dossier{filteredInterventions.length > 1 ? 's' : ''} affiché{filteredInterventions.length > 1 ? 's' : ''}
-            <span className="text-slate-400 font-normal ml-1">sur {mockInterventions.length} au total</span>
-          </p>
-          <div className="flex gap-2">
-            <button disabled className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-400 text-sm font-semibold cursor-not-allowed">Précédent</button>
-            <span className="px-4 py-2 rounded-xl bg-[#0052CC] text-white text-sm font-bold shadow-sm">1</span>
-            <button disabled className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-400 text-sm font-semibold cursor-not-allowed">Suivant</button>
+                  </div>
+                  
+                  <div className="flex-1 flex flex-col gap-3">
+                    {items.map(item => {
+                      const ty = typeConfig[item.type]
+                      return (
+                        <div 
+                          key={item.id} 
+                          onClick={() => handleNavigate('details', item.id)}
+                          className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-blue-300 hover:shadow-md transition-all cursor-pointer group relative overflow-hidden"
+                        >
+                          <div className={`absolute top-0 left-0 w-1 h-full ${st.bar}`} />
+                          <div className="flex items-start justify-between mb-3">
+                            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-tighter">{item.id}</span>
+                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-lg border uppercase tracking-wider ${ty.color}`}>
+                              {ty.label}
+                            </span>
+                          </div>
+                          <h4 className="text-sm font-black text-slate-900 leading-tight mb-1.5 group-hover:text-blue-600 transition-colors">{item.machine}</h4>
+                          <div className="space-y-2 mb-4">
+                            <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500">
+                              <Building2 size={12} className="text-slate-300" />
+                              {item.client}
+                            </div>
+                            <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400">
+                              <Calendar size={12} className="text-slate-300" />
+                              {item.date}
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between pt-3 border-t border-slate-50">
+                            {item.assignee ? (
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center text-[8px] font-black border border-blue-100">
+                                  {item.assignee.split(' ').map(n => n[0]).join('')}
+                                </div>
+                                <span className="text-[10px] font-bold text-slate-600">{item.assignee.split(' ')[0]}</span>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] font-bold text-amber-500 bg-amber-50 px-2 py-0.5 rounded-md">À affecter</span>
+                            )}
+                            <div className="flex items-center gap-1">
+                              <ActionMenu id={item.id} onNavigate={handleNavigate} />
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {items.length === 0 && (
+                      <div className="h-24 border-2 border-dashed border-slate-100 rounded-2xl flex flex-col items-center justify-center bg-slate-50/30">
+                        <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Vide</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
           </div>
-        </div>
-      </div>
-
-      {/* ── WORKFLOW LEGEND ── */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-6 py-5">
-        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-4">Légende du workflow</h4>
-        <div className="flex flex-wrap items-center gap-6">
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div>
-            <span className="text-xs font-semibold text-slate-600">En attente — Nouvellement créée, aucun employé assigné</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
-            <span className="text-xs font-semibold text-slate-600">Affectée — Employé assigné via une mission</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div>
-            <span className="text-xs font-semibold text-slate-600">En cours — Intervention en cours d’exécution</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-purple-500"></div>
-            <span className="text-xs font-semibold text-slate-600">En test — Essais de validation</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
-            <span className="text-xs font-semibold text-slate-600">Clôturé — Dossier validé et clôturé</span>
-          </div>
-        </div>
-      </div>
+        )}
+      </main>
     </div>
   )
 }

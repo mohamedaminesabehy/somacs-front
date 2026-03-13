@@ -156,8 +156,10 @@ function MissionTableInner(props, ref) {
   const [formEmployee, setFormEmployee] = useState('')
   const [formPriority, setFormPriority] = useState('Moyenne')
   const [formDueDate, setFormDueDate] = useState('')
-  const [formDuration, setFormDuration] = useState('')
-  
+  const [formDueTime, setFormDueTime] = useState('')
+  const [formNotes, setFormNotes] = useState('')
+  const [formStatus, setFormStatus] = useState('À faire')
+
   const [missionType, setMissionType] = useState('Normal')
   const [selectedInterventionId, setSelectedInterventionId] = useState('')
   const [formSite, setFormSite] = useState('')
@@ -186,7 +188,9 @@ function MissionTableInner(props, ref) {
     setFormEmployee(employeeOptions[0] || '')
     setFormPriority('Moyenne')
     setFormDueDate('')
-    setFormDuration('')
+    setFormDueTime('')
+    setFormNotes('')
+    setFormStatus('À faire')
     setMissionType('Normal')
     setSelectedInterventionId('')
     setFormSite('')
@@ -202,7 +206,9 @@ function MissionTableInner(props, ref) {
     setFormEmployee(mission.employee)
     setFormPriority(mission.priority)
     setFormDueDate(mission.dueDate)
-    setFormDuration(mission.duration)
+    setFormDueTime(mission.dueTime || '')
+    setFormNotes(mission.notes || '')
+    setFormStatus(mission.status || 'À faire')
     setMissionType(mission.type || 'Normal')
     setFormSite(mission.site || '')
     setFormAddress(mission.address || '')
@@ -240,13 +246,15 @@ function MissionTableInner(props, ref) {
             : formPriority === 'Moyenne'
               ? 'yellow'
               : 'gray',
-      status: modalMode === 'create' ? 'À faire' : missions.find((mission) => mission.id === formMissionId)?.status || 'À faire',
+      status: modalMode === 'create' ? 'À faire' : formStatus,
       statusColor:
         modalMode === 'create'
           ? 'blue'
-          : missions.find((mission) => mission.id === formMissionId)?.statusColor || 'blue',
+          : (formStatus === 'En cours' ? 'yellow' : formStatus === 'Terminée' ? 'green' : formStatus === 'Bloquée' ? 'red' : 'blue'),
       dueDate: formDueDate || "Aujourd'hui",
-      duration: formDuration || '1h',
+      dueTime: formDueTime || null,
+      duration: null,
+      notes: formNotes,
       icon: missionType === 'Intervention' ? Wrench : ClipboardList,
       type: missionType,
       site: missionType === 'Normal' ? formSite : selectedIntervention?.client,
@@ -300,9 +308,8 @@ function MissionTableInner(props, ref) {
               <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Employé</th>
               <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Priorité</th>
               <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Statut</th>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Intervention</th>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Date limite</th>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Durée</th>
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Type de mission</th>
+              <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Date mission</th>
               <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
             </tr>
           </thead>
@@ -355,21 +362,21 @@ function MissionTableInner(props, ref) {
                   </span>
                 </td>
                 <td className="px-4 sm:px-6 py-4">
-                  {mission.interventionId ? (
-                    <span className="inline-flex items-center gap-1.5 font-mono text-xs font-bold text-[#0052CC] bg-blue-50 px-2.5 py-1 rounded-lg">
-                      <Link2 size={12} />
-                      {mission.interventionId}
+                  {mission.type === 'Intervention' ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold text-[#0052CC] bg-blue-50 border border-blue-100">
+                      <Wrench size={12} />
+                      Intervention S.A.V
                     </span>
                   ) : (
-                    <span className="text-xs text-gray-400 italic">—</span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold text-slate-600 bg-slate-100 border border-slate-200">
+                      <ClipboardList size={12} />
+                      Normal
+                    </span>
                   )}
                 </td>
                 <td className="px-4 sm:px-6 py-4">
                   <p className="text-sm font-medium text-gray-900">{mission.dueDate}</p>
                   {mission.dueTime && <p className="text-sm text-red-600">{mission.dueTime}</p>}
-                </td>
-                <td className="px-4 sm:px-6 py-4">
-                  <span className="text-sm text-gray-600">{mission.duration}</span>
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-2">
@@ -648,6 +655,17 @@ function MissionTableInner(props, ref) {
                       </div>
                     </div>
                   )}
+
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-gray-700">Notes supplémentaires (optionnel)</label>
+                    <textarea
+                      rows={2}
+                      value={formNotes}
+                      onChange={(e) => setFormNotes(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC] resize-none transition-all hover:border-gray-300"
+                      placeholder="Consignes particulières, précautions, contacts sur place..."
+                    />
+                  </div>
                 </section>
 
                 {/* Assignment & Timing Section */}
@@ -674,6 +692,21 @@ function MissionTableInner(props, ref) {
                           ))}
                         </select>
                       </div>
+                      {modalMode === 'edit' && (
+                        <div className="space-y-1.5">
+                          <label className="block text-sm font-medium text-gray-700">Statut</label>
+                          <select
+                            value={formStatus}
+                            onChange={(e) => setFormStatus(e.target.value)}
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC] bg-white transition-all hover:border-gray-300"
+                          >
+                            <option value="À faire">À faire</option>
+                            <option value="En cours">En cours</option>
+                            <option value="Terminée">Terminée</option>
+                            <option value="Bloquée">Bloquée</option>
+                          </select>
+                        </div>
+                      )}
                       <div className="space-y-1.5">
                         <label className="block text-sm font-medium text-gray-700">Priorité</label>
                         <div className="grid grid-cols-2 gap-2">
@@ -697,7 +730,7 @@ function MissionTableInner(props, ref) {
 
                     <div className="space-y-4">
                       <div className="space-y-1.5">
-                        <label className="block text-sm font-medium text-gray-700">Date limite</label>
+                        <label className="block text-sm font-medium text-gray-700">Date de mission</label>
                         <div className="relative">
                           <input
                             type="date"
@@ -708,16 +741,17 @@ function MissionTableInner(props, ref) {
                         </div>
                       </div>
                       <div className="space-y-1.5">
-                        <label className="block text-sm font-medium text-gray-700">Durée estimée</label>
+                        <label className="block text-sm font-medium text-gray-700 flex items-center gap-1.5">
+                          <Clock size={14} className="text-gray-400" />
+                          Heure de début
+                        </label>
                         <div className="relative">
                           <input
-                            type="text"
-                            value={formDuration}
-                            onChange={(event) => setFormDuration(event.target.value)}
-                            placeholder="Ex: 4h, 2h30"
+                            type="time"
+                            value={formDueTime}
+                            onChange={(event) => setFormDueTime(event.target.value)}
                             className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC] transition-all hover:border-gray-300"
                           />
-                          <Clock size={16} className="absolute right-4 top-3 text-gray-400" />
                         </div>
                       </div>
                     </div>

@@ -89,7 +89,6 @@ export default function AssignMission() {
   const [priority, setPriority] = useState('Moyenne')
   const [dueDate, setDueDate] = useState('')
   const [dueTime, setDueTime] = useState('')
-  const [duration, setDuration] = useState('')
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -551,12 +550,12 @@ export default function AssignMission() {
               </div>
             </div>
 
-            {/* Date & duration */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Date */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-3 group">
                 <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-[#0052CC] transition-colors">
                   <Calendar size={14} className="text-[#0052CC]" />
-                  Date d'intervention
+                  Date de mission
                 </label>
                 <input
                   type="date"
@@ -575,19 +574,6 @@ export default function AssignMission() {
                   type="time"
                   value={dueTime}
                   onChange={(e) => setDueTime(e.target.value)}
-                  className="w-full px-5 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all font-bold text-slate-700 shadow-sm hover:border-slate-300"
-                />
-              </div>
-              <div className="space-y-3 group">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-[#0052CC] transition-colors">
-                  <Clock size={14} className="text-slate-400" />
-                  Duree estimee
-                </label>
-                <input
-                  type="text"
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
-                  placeholder="Ex: 3h, 1h30"
                   className="w-full px-5 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all font-bold text-slate-700 shadow-sm hover:border-slate-300"
                 />
               </div>
@@ -687,15 +673,6 @@ export default function AssignMission() {
                         <div className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
                           <Clock size={13} className="text-orange-300" />
                           {dueTime}
-                        </div>
-                      </div>
-                    )}
-                    {duration && (
-                      <div>
-                        <p className="text-[10px] font-bold text-orange-500 uppercase tracking-wider mb-1">Duree</p>
-                        <div className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
-                          <Clock size={13} className="text-orange-300" />
-                          {duration}
                         </div>
                       </div>
                     )}

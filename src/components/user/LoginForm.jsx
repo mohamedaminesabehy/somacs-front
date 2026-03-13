@@ -1,7 +1,8 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, AlertCircle, ArrowRight } from 'lucide-react'
 import logo from '../../assets/logo.jpg'
+import machines from '../../assets/login.jpg'
 
 export default function LoginForm({ onLoginSuccess }) {
   const [showPassword, setShowPassword] = useState(false)
@@ -17,102 +18,244 @@ export default function LoginForm({ onLoginSuccess }) {
     setIsLoading(true)
     try {
       const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
-      const response = await fetch(`${baseUrl}/auth/login`, {
+      const response = await fetch(baseUrl + '/auth/login', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       })
-
       if (!response.ok) {
         setError('Identifiants incorrects. Veuillez réessayer.')
       } else {
         const data = await response.json()
-        if (data?.accessToken && data?.user) {
-          if (onLoginSuccess) {
-            onLoginSuccess(data.accessToken, data.user)
-          }
+        if (data && data.accessToken && data.user) {
+          if (onLoginSuccess) onLoginSuccess(data.accessToken, data.user)
           navigate('/', { replace: true })
         } else {
           setError('Réponse du serveur invalide.')
         }
       }
-    } catch {
-      setError("Erreur de connexion au serveur. Vérifiez que l'API est disponible.")
+    } catch (err) {
+      setError('Impossible de joindre le serveur.')
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="w-full">
-      <div className="mb-6 sm:mb-8 text-center">
-        <div className="flex justify-center mb-4">
-          <img src={logo} alt="Logo SOMACS" className="h-20 sm:h-24 w-auto rounded-full shadow-lg" />
+    <div style={{ position: 'relative', minHeight: '100vh', width: '100%', overflow: 'hidden' }}>
+
+      {/* ── BACKGROUND IMAGE ── */}
+      <img
+        src={machines}
+        alt=""
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          objectPosition: 'center',
+        }}
+      />
+
+      {/* ── OVERLAY ── */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(160deg, rgba(2,6,23,0.88) 0%, rgba(4,20,40,0.82) 50%, rgba(7,26,47,0.88) 100%)',
+          backdropFilter: 'blur(2px)',
+          WebkitBackdropFilter: 'blur(2px)',
+        }}
+      />
+
+      {/* ── AMBIENT GLOWS ── */}
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+        <div style={{ position: 'absolute', top: '-10%', right: '-5%', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle,rgba(220,38,38,0.20) 0%,transparent 65%)' }} />
+        <div style={{ position: 'absolute', bottom: '-10%', left: '-5%', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle,rgba(0,82,204,0.18) 0%,transparent 65%)' }} />
+      </div>
+
+      {/* ── CONTENT ── */}
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 10,
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '2rem 1.25rem',
+        }}
+      >
+        {/* Card */}
+        <div
+          style={{
+            width: '100%',
+            maxWidth: 420,
+            background: 'rgba(10, 15, 30, 0.72)',
+            border: '1px solid rgba(255,255,255,0.10)',
+            borderRadius: 20,
+            padding: '2.25rem 2rem',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            boxShadow: '0 8px 48px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.06) inset',
+          }}
+        >
+          {/* Logo + product name */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginBottom: '1.75rem' }}>
+            <div style={{ width: 56, height: 56, borderRadius: 14, overflow: 'hidden', flexShrink: 0, boxShadow: '0 0 0 1px rgba(255,255,255,0.15), 0 4px 16px rgba(0,0,0,0.4)' }}>
+              <img src={logo} alt="Logo SOMACS" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ color: '#fff', fontWeight: 700, fontSize: 19, letterSpacing: '0.02em' }}>SOMACS</span>
+            </div>
+          </div>
+
+          {/* Heading */}
+          <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
+            <h1 style={{ color: '#fff', fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>
+              Connexion
+            </h1>
+            <p style={{ color: '#94a3b8', fontSize: 13, marginTop: 6 }}>
+              Bienvenue — accédez à votre espace de travail.
+            </p>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#fca5a5', fontSize: 13, marginBottom: '1.25rem' }}>
+              <AlertCircle size={15} style={{ marginTop: 1, flexShrink: 0 }} />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Username */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ color: '#cbd5e1', fontSize: 13, fontWeight: 500 }}>
+                Nom d'utilisateur
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="ex : jean.dupont"
+                required
+                autoComplete="username"
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: 10,
+                  padding: '10px 14px',
+                  color: '#f1f5f9',
+                  fontSize: 14,
+                  outline: 'none',
+                  transition: 'border-color 0.2s',
+                  width: '100%',
+                  boxSizing: 'border-box',
+                }}
+                onFocus={(e) => { e.target.style.borderColor = 'rgba(59,130,246,0.6)' }}
+                onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.12)' }}
+              />
+            </div>
+
+            {/* Password */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ color: '#cbd5e1', fontSize: 13, fontWeight: 500 }}>
+                Mot de passe
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  autoComplete="current-password"
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: 10,
+                    padding: '10px 44px 10px 14px',
+                    color: '#f1f5f9',
+                    fontSize: 14,
+                    outline: 'none',
+                    transition: 'border-color 0.2s',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                  }}
+                  onFocus={(e) => { e.target.style.borderColor = 'rgba(59,130,246,0.6)' }}
+                  onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.12)' }}
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 0, display: 'flex', alignItems: 'center' }}
+                >
+                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={isLoading}
+              style={{
+                marginTop: 4,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                padding: '11px 20px',
+                borderRadius: 10,
+                background: 'linear-gradient(135deg,#0052CC 0%,#1a6eff 100%)',
+                boxShadow: '0 2px 16px rgba(0,82,204,0.40)',
+                color: '#fff',
+                fontSize: 14,
+                fontWeight: 600,
+                border: 'none',
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                opacity: isLoading ? 0.65 : 1,
+                transition: 'opacity 0.2s',
+                width: '100%',
+              }}
+            >
+              {isLoading ? (
+                <>
+                  <div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                  Connexion en cours...
+                </>
+              ) : (
+                <>
+                  Se connecter
+                  <ArrowRight size={16} />
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Footer */}
+          <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.07)', textAlign: 'center' }}>
+            <p style={{ color: '#475569', fontSize: 12, lineHeight: 1.6 }}>
+              Accès réservé aux membres de l'organisation SOMACS.<br />
+              Contactez votre administrateur en cas de problème.
+            </p>
+          </div>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Bienvenue</h1>
-        <p className="text-gray-300 text-xs sm:text-sm">
-          Connectez-vous pour accéder en toute sécurité à votre espace SOMACS.
+
+        {/* Bottom tagline */}
+        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 11, marginTop: 20, textAlign: 'center' }}>
+          © {new Date().getFullYear()} SOMACS · Tous droits réservés
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
-        {error && (
-          <div className="px-3 py-2 rounded-md bg-red-600/20 border border-red-500 text-xs sm:text-sm text-red-200">
-            {error}
-          </div>
-        )}
-        <div>
-          <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="Nom d’utilisateur"
-            className="w-full px-3 py-3 sm:px-4 bg-gray-900/60 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition"
-            required
-          />
-        </div>
+      {/* Spin keyframe */}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-        <div>
-          <div className="relative">
-            <input
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Mot de passe"
-              className="w-full px-3 py-3 sm:px-4 bg-gray-900/60 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition pr-12"
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300 transition"
-            >
-              {showPassword ? (
-                <EyeOff className="w-5 h-5" />
-              ) : (
-                <Eye className="w-5 h-5" />
-              )}
-            </button>
-          </div>
-        </div>
-
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg transition duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-6 shadow-lg shadow-red-900/40"
-        >
-          {isLoading ? (
-            <>
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              Connexion en cours...
-            </>
-          ) : (
-            'Se connecter'
-          )}
-        </button>
-      </form>
     </div>
   )
 }

@@ -13,7 +13,6 @@ import InterventionDetails from './pages/intervention/InterventionDetails'
 import InterventionHistory from './pages/intervention/InterventionHistory'
 import AssignMission from './pages/mission/AssignMission'
 import LoginForm from './components/user/LoginForm'
-import loginBackground from './assets/login.jpg'
 
 function AppLayout({
   children,
@@ -106,18 +105,7 @@ export default function App() {
               <UserManagement currentUser={currentUser} />
             </AppLayout>
           ) : (
-            <div
-              className="min-h-screen w-full flex items-center justify-center px-4 sm:px-6 py-8 sm:py-10"
-              style={{
-                backgroundImage: `url(${loginBackground})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-              }}
-            >
-              <div className="w-full max-w-md mx-auto bg-black/70 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-700/60 px-5 sm:px-8 py-7 sm:py-9">
-                <LoginForm onLoginSuccess={handleLoginSuccess} />
-              </div>
-            </div>
+            <LoginForm onLoginSuccess={handleLoginSuccess} />
           )
         }
       />

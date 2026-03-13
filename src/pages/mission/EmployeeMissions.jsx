@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ClipboardList, Wrench, AlertTriangle, CheckCircle2, Clock,
@@ -17,10 +17,10 @@ const PRIORITY_BAR = {
 }
 
 const STATUS_CONFIG = {
-  'À faire':  { icon: ClipboardList, badge: 'bg-blue-50 text-blue-700 border border-blue-200',     dot: 'bg-blue-500',   color: 'text-blue-600',   calBg: 'bg-blue-50 border-blue-200' },
-  'En cours': { icon: Loader2,       badge: 'bg-amber-50 text-amber-700 border border-amber-200',  dot: 'bg-amber-500',  color: 'text-amber-600',  calBg: 'bg-amber-50 border-amber-200' },
-  'Terminée': { icon: CheckCircle2,  badge: 'bg-green-50 text-green-700 border border-green-200',  dot: 'bg-green-500',  color: 'text-green-600',  calBg: 'bg-green-50 border-green-200' },
-  'Bloquée':  { icon: XCircle,       badge: 'bg-red-50 text-red-700 border border-red-200',        dot: 'bg-red-500',    color: 'text-red-600',    calBg: 'bg-red-50 border-red-200' },
+  'À faire':  { icon: ClipboardList, badge: 'bg-blue-50 text-blue-700 border border-blue-200',     dot: 'bg-blue-500',   color: 'text-blue-600',   calBg: 'bg-blue-100 border-blue-300 text-blue-800' },
+  'En cours': { icon: Loader2,       badge: 'bg-amber-50 text-amber-700 border border-amber-200',  dot: 'bg-amber-500',  color: 'text-amber-600',  calBg: 'bg-amber-100 border-amber-300 text-amber-800' },
+  'Terminée': { icon: CheckCircle2,  badge: 'bg-green-50 text-green-700 border border-green-200',  dot: 'bg-green-500',  color: 'text-green-600',  calBg: 'bg-green-100 border-green-300 text-green-800' },
+  'Bloquée':  { icon: XCircle,       badge: 'bg-red-50 text-red-700 border border-red-200',        dot: 'bg-red-500',    color: 'text-red-600',    calBg: 'bg-red-100 border-red-300 text-red-800' },
 }
 
 // ── Utilitaire : parse "DD Mois YYYY" / "Aujourd'hui" → Date ──────────────────
@@ -189,102 +189,115 @@ function MissionCalendar({ missions, onOpen, onStatusChange }) {
 
   const selectedMissions = selected ? getMissionsForDay(selected) : []
 
+  // Fermer le modal avec Échap
+  useEffect(() => {
+    if (!selected) return
+    const handler = (e) => { if (e.key === 'Escape') setSelected(null) }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [selected])
+
   return (
     <div className="space-y-5 animate-in fade-in zoom-in-95 duration-500">
 
       {/* Calendar card */}
-      <div className="bg-white rounded-2xl border-2 border-slate-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden">
 
         {/* Nav */}
-        <div className="px-6 py-5 border-b-2 border-slate-50 flex items-center justify-between">
+        <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between bg-white gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#0052CC] rounded-xl flex items-center justify-center">
-              <CalendarDays size={18} className="text-white" />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#0052CC] rounded-xl flex items-center justify-center shadow-md shadow-blue-200 shrink-0">
+              <CalendarDays size={18} className="text-white w-[15px] h-[15px] sm:w-[18px] sm:h-[18px]" />
             </div>
             <div>
-              <h2 className="text-base font-black text-slate-900">
-                {MONTHS_LABEL[calMonth]} {calYear}
+              <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-none">
+                {MONTHS_LABEL[calMonth]} <span className="text-slate-500 font-bold">{calYear}</span>
               </h2>
-              <p className="text-xs text-slate-400 font-medium">Cliquez sur un jour pour voir les missions</p>
+              <p className="text-[10px] sm:text-[11px] text-slate-500 font-semibold mt-0.5">Cliquez sur un jour pour voir les missions</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 self-end sm:self-auto">
             <button
               onClick={prevMonth}
-              className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all active:scale-95"
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 border border-slate-200 hover:border-[#0052CC]/40 hover:bg-[#0052CC]/5 text-slate-600 hover:text-[#0052CC] transition-all active:scale-95"
             >
-              <ChevronLeft size={16} strokeWidth={2.5} />
+              <ChevronLeft size={15} strokeWidth={2.5} />
             </button>
             <button
               onClick={() => { setCalYear(today.getFullYear()); setCalMonth(today.getMonth()); setSelected(today) }}
-              className="px-3 py-1.5 rounded-xl text-[11px] font-black text-[#0052CC] bg-[#0052CC]/10 hover:bg-[#0052CC]/20 transition-all uppercase tracking-wider"
+              className="px-3 py-1.5 rounded-lg text-[10px] sm:text-[11px] font-black text-[#0052CC] bg-[#0052CC]/10 hover:bg-[#0052CC]/20 transition-all uppercase tracking-wider border border-[#0052CC]/30"
             >
               Aujourd'hui
             </button>
             <button
               onClick={nextMonth}
-              className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all active:scale-95"
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 border border-slate-200 hover:border-[#0052CC]/40 hover:bg-[#0052CC]/5 text-slate-600 hover:text-[#0052CC] transition-all active:scale-95"
             >
-              <ChevronRight size={16} strokeWidth={2.5} />
+              <ChevronRight size={15} strokeWidth={2.5} />
             </button>
           </div>
         </div>
 
         {/* Grid header */}
-        <div className="grid grid-cols-7 border-b border-slate-100">
+        <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-100">
           {DAYS_FR.map((d) => (
-            <div key={d} className="py-2 text-center text-[11px] font-black text-slate-400 uppercase tracking-wider">
-              {d}
+            <div key={d} className="py-2 sm:py-2.5 text-center text-[9px] sm:text-[11px] font-black text-slate-600 uppercase tracking-widest truncate px-0.5">
+              <span className="hidden sm:inline">{d}</span>
+              <span className="sm:hidden">{d.charAt(0)}</span>
             </div>
           ))}
         </div>
 
         {/* Grid cells */}
-        <div className="grid grid-cols-7">
+        <div className="grid grid-cols-7 divide-x divide-slate-100">
           {days.map((date, idx) => {
             const dayMissions = date ? getMissionsForDay(date) : []
             const isToday     = date && isSameDay(date, today)
             const isSelected  = date && selected && isSameDay(date, selected)
-            const hasMissions = dayMissions.length > 0
 
             return (
               <div
                 key={idx}
-                onClick={() => date && setSelected(isSelected ? null : date)}
-                className={`min-h-[80px] border-b border-r border-slate-50 p-1.5 flex flex-col transition-all ${
-                  !date ? 'bg-slate-50/50' :
-                  isSelected ? 'bg-[#0052CC]/5 cursor-pointer' :
-                  'hover:bg-slate-50 cursor-pointer'
+                onClick={() => date && setSelected(date)}
+                className={`min-h-[50px] sm:min-h-[90px] border-b border-slate-100 p-1 sm:p-2 flex flex-col transition-colors ${
+                  !date      ? 'bg-slate-50' :
+                  isSelected ? 'bg-blue-50 cursor-pointer' :
+                               'bg-white hover:bg-slate-50 cursor-pointer'
                 }`}
               >
                 {date && (
                   <>
-                    <span className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-black mb-1 mx-auto transition-all ${
+                    <span className={`w-5 h-5 sm:w-7 sm:h-7 flex items-center justify-center rounded-full text-[10px] sm:text-xs font-black mb-1 sm:mb-1.5 mx-auto transition-all ${
                       isToday
                         ? 'bg-[#0052CC] text-white shadow-md shadow-blue-200'
                         : isSelected
-                          ? 'bg-[#0052CC]/20 text-[#0052CC]'
-                          : 'text-slate-600 hover:bg-slate-100'
+                          ? 'bg-[#0052CC]/20 text-[#0052CC] font-black'
+                          : 'text-slate-700 hover:bg-slate-200'
                     }`}>
                       {date.getDate()}
                     </span>
-                    {/* Mission dots / chips */}
+                    {/* Mission chips */}
                     <div className="flex flex-col gap-0.5 overflow-hidden">
                       {dayMissions.slice(0, 2).map((m) => {
                         const cfg = STATUS_CONFIG[m.status] || STATUS_CONFIG['À faire']
                         return (
                           <div
                             key={m.id}
-                            onClick={(e) => { e.stopPropagation(); onOpen(m.id) }}
+                            onClick={(e) => { e.stopPropagation(); setSelected(date) }}
                             title={m.title}
-                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md truncate border leading-tight hover:opacity-80 transition-opacity ${cfg.calBg}`}
+                            className={`text-[8px] sm:text-[9px] font-bold px-1 sm:px-1.5 py-[2px] sm:py-[3px] rounded truncate border leading-tight hover:brightness-95 transition-all w-full text-center sm:text-left ${cfg.calBg}`}
                           >
-                            {m.title}
+                            <span className="hidden sm:block truncate">{m.title}</span>
                           </div>
                         )
                       })}
                       {dayMissions.length > 2 && (
-                        <span className="text-[9px] font-black text-slate-400 px-1.5">+{dayMissions.length - 2}</span>
+                        <span
+                          onClick={(e) => { e.stopPropagation(); setSelected(date) }}
+                          className="text-[8px] sm:text-[9px] font-black text-slate-500 px-1 cursor-pointer hover:text-slate-700 text-center sm:text-left truncate"
+                        >
+                          +{dayMissions.length - 2} <span className="hidden sm:inline">autres</span>
+                        </span>
                       )}
                     </div>
                   </>
@@ -295,54 +308,170 @@ function MissionCalendar({ missions, onOpen, onStatusChange }) {
         </div>
 
         {/* Legend */}
-        <div className="px-6 py-3 border-t border-slate-50 flex items-center gap-5">
+        <div className="px-3 sm:px-6 py-2.5 sm:py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-center sm:justify-start gap-3 sm:gap-5 flex-wrap">
           {Object.entries(STATUS_CONFIG).map(([label, cfg]) => (
-            <span key={label} className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
-              <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />{label}
+            <span key={label} className="flex items-center gap-1 sm:gap-1.5 text-[9px] sm:text-[11px] font-bold text-slate-600">
+              <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${cfg.dot}`} />{label}
             </span>
           ))}
         </div>
       </div>
 
-      {/* Selected day panel */}
+      {/* ── Modal jour sélectionné ── */}
       {selected && (
-        <div className="bg-white rounded-2xl border-2 border-[#0052CC]/20 shadow-sm overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
-          <div className="px-6 py-4 border-b-2 border-blue-50 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#0052CC] text-white rounded-xl flex items-center justify-center font-black text-sm">
-                {selected.getDate()}
-              </div>
-              <div>
-                <p className="text-sm font-black text-slate-900">
-                  {selected.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                </p>
-                <p className="text-xs text-slate-400 font-medium">
-                  {selectedMissions.length} mission{selectedMissions.length !== 1 ? 's' : ''} ce jour
-                </p>
-              </div>
-            </div>
-            <button onClick={() => setSelected(null)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors">
-              <XCircle size={16} />
-            </button>
-          </div>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => setSelected(null)}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
 
-          {selectedMissions.length === 0 ? (
-            <div className="px-6 py-10 text-center">
-              <CalendarDays size={32} className="text-slate-200 mx-auto mb-2" />
-              <p className="text-slate-400 font-bold text-sm">Aucune mission ce jour</p>
+          {/* Panel */}
+          <div
+            className="relative z-10 w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            style={{ maxHeight: '85vh' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+
+            {/* ── Header (couleur sidebar = slate-900) ── */}
+            <div className="bg-slate-900 px-5 pt-5 pb-4 shrink-0">
+
+              {/* Top row : date block + close */}
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex items-center gap-3.5">
+                  {/* Mini calendar block */}
+                  <div className="w-14 h-14 bg-white/10 border border-white/20 rounded-xl flex flex-col items-center justify-center shrink-0">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">
+                      {selected.toLocaleDateString('fr-FR', { month: 'short' })}
+                    </span>
+                    <span className="text-3xl font-black text-white leading-tight">{selected.getDate()}</span>
+                  </div>
+                  <div>
+                    <p className="text-white font-black text-[15px] leading-snug capitalize">
+                      {selected.toLocaleDateString('fr-FR', { weekday: 'long' })}
+                    </p>
+                    <p className="text-slate-400 text-xs font-semibold">
+                      {selected.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelected(null)}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-slate-400 hover:text-white border border-white/10 transition-all shrink-0 mt-0.5"
+                >
+                  <XCircle size={16} />
+                </button>
+              </div>
+
+              {/* Stats row */}
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 border border-white/15 rounded-lg text-[11px] font-black text-white">
+                  <ClipboardList size={11} className="text-slate-400" />
+                  {selectedMissions.length} mission{selectedMissions.length !== 1 ? 's' : ''}
+                </span>
+                {selectedMissions.filter(m => m.status === 'En cours').length > 0 && (
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 border border-amber-500/30 rounded-lg text-[11px] font-black text-amber-300">
+                    <Loader2 size={11} /> {selectedMissions.filter(m => m.status === 'En cours').length} en cours
+                  </span>
+                )}
+                {selectedMissions.some(m => m.priority === 'Critique') && (
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/20 border border-red-500/30 rounded-lg text-[11px] font-black text-red-300">
+                    <Zap size={11} /> Critique
+                  </span>
+                )}
+              </div>
             </div>
-          ) : (
-            <div className="p-4 space-y-3">
-              {selectedMissions.map((m) => (
-                <MissionRow
-                  key={m.id}
-                  mission={m}
-                  onStatusChange={onStatusChange}
-                  onOpen={onOpen}
-                />
-              ))}
+
+            {/* ── Body ── */}
+            <div className="flex-1 overflow-y-auto scrollbar-gray bg-slate-50">
+              {selectedMissions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+                  <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 border border-slate-200 shadow-sm">
+                    <CalendarDays size={26} className="text-slate-300" />
+                  </div>
+                  <p className="text-slate-700 font-black text-sm">Aucune mission ce jour</p>
+                  <p className="text-slate-400 text-xs mt-1">Aucune tâche planifiée pour cette date.</p>
+                </div>
+              ) : (
+                <div className="p-3 space-y-2">
+                  {selectedMissions.map((m) => {
+                    const cfg = STATUS_CONFIG[m.status] || STATUS_CONFIG['À faire']
+                    const intervention = m.interventionId
+                      ? interventionsList.find((iv) => iv.id === m.interventionId)
+                      : null
+                    return (
+                      <div
+                        key={m.id}
+                        onClick={() => { setSelected(null); onOpen(m.id) }}
+                        className="group bg-white border border-slate-200 hover:border-slate-300 rounded-xl cursor-pointer hover:shadow-md transition-all overflow-hidden"
+                      >
+                        {/* Top: priority stripe */}
+                        <div className={`h-1 w-full ${PRIORITY_BAR[m.priorityColor] || 'bg-slate-200'}`} />
+
+                        <div className="px-4 py-3">
+                          {/* Row 1: badges + status */}
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {m.type === 'Intervention' && (
+                                <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-slate-900/10 text-slate-700 uppercase tracking-wider">SAV</span>
+                              )}
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${priorityColors[m.priorityColor] || 'bg-slate-100 text-slate-600'}`}>
+                                {m.priority}
+                              </span>
+                            </div>
+                            <StatusBadge status={m.status} spin />
+                          </div>
+
+                          {/* Row 2: title */}
+                          <p className="font-black text-slate-900 text-sm leading-snug">{m.title}</p>
+
+                          {/* Row 3: description */}
+                          {m.description && (
+                            <p className="text-[11px] text-slate-400 font-medium mt-0.5 line-clamp-1">{m.description}</p>
+                          )}
+
+                          {/* Row 4: meta */}
+                          <div className="flex items-center gap-3 mt-2 flex-wrap">
+                            {m.site && (
+                              <span className="flex items-center gap-1 text-[10px] text-slate-400 font-semibold">
+                                <Building2 size={10} className="text-slate-300" />{m.site}
+                              </span>
+                            )}
+                            {intervention && (
+                              <span className="flex items-center gap-1 text-[10px] text-slate-700 font-black font-mono">
+                                <Link2 size={10} className="text-slate-400" />{intervention.id}
+                              </span>
+                            )}
+                            <span className="ml-auto flex items-center gap-1 text-[10px] text-slate-400 font-semibold group-hover:text-slate-600 transition-colors">
+                              Voir les détails <ChevronRight size={11} />
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
-          )}
+
+            {/* ── Footer ── */}
+            <div className="px-5 py-3.5 border-t border-slate-200 bg-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3 flex-wrap">
+                {Object.entries(STATUS_CONFIG).map(([label, cfg]) => (
+                  <span key={label} className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
+                    <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />{label}
+                  </span>
+                ))}
+              </div>
+              <button
+                onClick={() => setSelected(null)}
+                className="px-3.5 py-1.5 text-xs font-black text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all"
+              >
+                Fermer
+              </button>
+            </div>
+
+          </div>
         </div>
       )}
     </div>
@@ -398,36 +527,36 @@ export default function EmployeeMissions() {
   const hasActiveFilters = search || filterStatus !== 'Tous' || filterType !== 'Tous'
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50">
+    <div className="flex flex-col min-h-screen lg:h-screen lg:overflow-hidden bg-slate-50">
 
       {/* ═══════════════════ HEADER ═══════════════════ */}
-      <div className="bg-white border-b-2 border-slate-200 px-6 py-4 flex items-center justify-between shrink-0 shadow-sm">
+      <div className="bg-white border-b-2 border-slate-200 px-4 lg:px-6 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shrink-0 shadow-sm z-10">
         <div className="flex items-center gap-4">
-          <div className="w-10 h-10 bg-gradient-to-br from-[#0052CC] to-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
+          <div className="w-10 h-10 bg-gradient-to-br from-[#0052CC] to-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 shrink-0">
             <ClipboardList size={18} className="text-white" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-lg font-black text-slate-900 tracking-tight">Mes Missions</h1>
               <span className="px-2 py-0.5 bg-[#0052CC]/10 text-[#0052CC] text-[10px] font-black rounded-full uppercase tracking-wider">
                 Technicien
               </span>
             </div>
-            <p className="text-slate-400 text-xs font-semibold flex items-center gap-1">
-              <User size={10} /> Jean Dupont — {today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+            <p className="text-slate-400 text-xs font-semibold flex items-center gap-1 mt-0.5">
+              <User size={10} /> Jean Dupont <span className="hidden sm:inline">— {today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
             </p>
           </div>
         </div>
 
         {/* KPI inline dans le header */}
-        <div className="hidden lg:flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 lg:pb-0 scrollbar-hide w-full lg:w-auto">
           {[
             { label: 'Total',     value: total,     bg: 'bg-blue-50',   text: 'text-blue-600'  },
             { label: 'En cours',  value: enCours,   bg: 'bg-amber-50',  text: 'text-amber-600' },
             { label: 'Terminées', value: terminees, bg: 'bg-green-50',  text: 'text-green-600' },
             { label: 'Bloquées',  value: bloquees,  bg: 'bg-red-50',    text: 'text-red-600'   },
           ].map(({ label, value, bg, text }) => (
-            <div key={label} className={`flex items-center gap-2 px-3 py-2 ${bg} rounded-xl`}>
+            <div key={label} className={`flex items-center gap-2 px-3 py-2 ${bg} rounded-xl shrink-0`}>
               <span className={`text-lg font-black ${text}`}>{value}</span>
               <span className="text-[11px] font-bold text-slate-500">{label}</span>
             </div>
@@ -435,11 +564,11 @@ export default function EmployeeMissions() {
         </div>
       </div>
 
-      {/* ═══════════════════ BODY : 2 colonnes fixes ═══════════════════ */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* ═══════════════════ BODY : 2 colonnes ═══════════════════ */}
+      <div className="flex-1 flex flex-col lg:flex-row overflow-visible lg:overflow-hidden">
 
         {/* ── COLONNE GAUCHE : Calendrier ── */}
-        <div className="flex flex-col flex-1 min-w-0 overflow-y-auto border-r-2 border-slate-100 bg-white">
+        <div className="flex flex-col w-full lg:flex-1 min-w-0 lg:overflow-y-auto scrollbar-gray border-b-2 lg:border-b-0 lg:border-r-2 border-slate-100 bg-white">
 
           {/* Alerte urgente */}
           {nextUrgent && (
@@ -459,7 +588,7 @@ export default function EmployeeMissions() {
           )}
 
           {/* Calendrier */}
-          <div className="flex-1 p-4">
+          <div className="flex-1 p-4 sm:p-6 lg:p-4">
             <MissionCalendar
               missions={missions}
               onOpen={(id) => navigate('/missions/' + id)}
@@ -469,15 +598,17 @@ export default function EmployeeMissions() {
         </div>
 
         {/* ── COLONNE DROITE : Liste missions ── */}
-        <div className="w-[380px] shrink-0 flex flex-col bg-slate-50 overflow-hidden">
+        <div className="w-full lg:w-[380px] shrink-0 flex flex-col bg-slate-50 lg:overflow-hidden">
 
           {/* En-tête colonne droite */}
-          <div className="px-4 pt-4 pb-3 border-b border-slate-100 shrink-0 bg-white">
+          <div className="px-4 pt-4 pb-3 border-b border-slate-100 shrink-0 bg-white sm:bg-slate-50/60 transition-all sticky top-0 z-10 lg:static">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-black text-slate-900 flex items-center gap-1.5">
-                <LayoutList size={15} className="text-[#0052CC]" />
+              <h2 className="text-sm font-black text-slate-800 flex items-center gap-2 tracking-tight">
+                <div className="w-6 h-6 bg-[#0052CC] rounded-md flex items-center justify-center shrink-0">
+                  <LayoutList size={13} className="text-white" />
+                </div>
                 Toutes les missions
-                <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded-md text-[10px] font-black">{filtered.length}</span>
+                <span className="px-2 py-0.5 bg-[#0052CC]/10 text-[#0052CC] rounded-md text-[10px] font-black">{filtered.length}</span>
               </h2>
               {hasActiveFilters && (
                 <button
@@ -525,7 +656,7 @@ export default function EmployeeMissions() {
           </div>
 
           {/* Liste scrollable */}
-          <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
+          <div className="flex-1 lg:overflow-y-auto scrollbar-gray px-3 py-3 space-y-2 pb-10 lg:pb-3">
             {filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center py-12">
                 <div className="w-12 h-12 bg-white border-2 border-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
