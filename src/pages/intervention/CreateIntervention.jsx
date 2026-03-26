@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { apiFetch } from '../../api/apiClient'
 import { 
   ChevronRight, 
   ChevronLeft, 
@@ -24,9 +25,13 @@ import {
   Calendar,
   UserCheck,
   Eye,
-  Plus
+  Plus,
+  Search,
+  Users
 } from 'lucide-react'
 import logo from '../../assets/logo.jpg'
+import ClientSelectionModal from '../../components/client/ClientSelectionModal'
+import MachineSelectionModal from '../../components/machine/MachineSelectionModal'
 
 const steps = [
   { id: 1, title: 'Client', description: 'Identification', icon: User },
@@ -35,8 +40,8 @@ const steps = [
   { id: 4, title: 'Validation', description: 'Clôture dossier', icon: ClipboardCheck },
 ]
 
-// ── Shared fiche content for both desktop preview and mobile modal ──
-function FicheCreateContent({ formData, logo }) {
+// ── Shared fiche content (identical layout for both desktop preview and mobile modal) ──
+function FicheContent({ interventionData, parts, laborPrice, logo }) {
   return (
     <>
       <div className="flex justify-between items-center pb-3 mb-3" style={{ borderBottom: '1px solid #000' }}>
@@ -60,17 +65,17 @@ function FicheCreateContent({ formData, logo }) {
               <p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Date de l'intervention</p>
             </td>
             <td className="border border-slate-900 p-1 text-center w-[20%]">
-              <span style={{ fontSize: '9px', fontWeight: '400' }}>{formData.interventionDate ? formData.interventionDate.split('-').reverse().join('/') : '....../....../2026'}</span>
+              <span style={{ fontSize: '9px', fontWeight: '400' }}>{interventionData.interventionDate ? interventionData.interventionDate.split('-').reverse().join('/') : '....../....../2026'}</span>
             </td>
             <td className="border border-slate-900 bg-slate-50 p-1 w-[15%]">
               <p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Heure d'entrée</p>
             </td>
             <td className="border border-slate-900 p-1 text-center w-[13%]">
-              <span style={{ fontSize: '9px', fontWeight: '400' }}>{formData.startTime || '........h..........'}</span>
+              <span style={{ fontSize: '9px', fontWeight: '400' }}>{interventionData.startTime || '........h..........'}</span>
             </td>
             <td className="border border-slate-900 bg-slate-50 p-1 text-center" rowSpan="3" style={{ width: '18%', verticalAlign: 'top' }}>
               <p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Prise en charge par</p>
-              <p style={{ fontSize: '9px', fontWeight: '400', marginTop: '6px' }}>{formData.technicianName || ''}</p>
+              <p style={{ fontSize: '9px', fontWeight: '400', marginTop: '6px' }}>{interventionData.technicianName || ''}</p>
             </td>
           </tr>
           <tr>
@@ -78,13 +83,13 @@ function FicheCreateContent({ formData, logo }) {
               <p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Numéro de la fiche</p>
             </td>
             <td className="border border-slate-900 p-1 text-center">
-              <span style={{ fontSize: '9px', fontWeight: '400' }}>{formData.ficheNumber}</span>
+              <span style={{ fontSize: '9px', fontWeight: '400' }}>{interventionData.ficheNumber}</span>
             </td>
             <td className="border border-slate-900 bg-slate-50 p-1">
               <p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Heure de sortie</p>
             </td>
             <td className="border border-slate-900 p-1 text-center">
-              <span style={{ fontSize: '9px', fontWeight: '400' }}>{formData.endTime || '........h..........'}</span>
+              <span style={{ fontSize: '9px', fontWeight: '400' }}>{interventionData.endTime || '........h..........'}</span>
             </td>
           </tr>
           <tr>
@@ -92,13 +97,13 @@ function FicheCreateContent({ formData, logo }) {
               <p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Site</p>
             </td>
             <td className="border border-slate-900 p-1 text-center">
-              <span style={{ fontSize: '9px', fontWeight: '400' }}>{formData.siteName || '..............................'}</span>
+              <span style={{ fontSize: '9px', fontWeight: '400' }}>{interventionData.siteName || '..............................'}</span>
             </td>
             <td className="border border-slate-900 bg-slate-50 p-1">
               <p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>TOTAL</p>
             </td>
             <td className="border border-slate-900 p-1 text-center">
-              <span style={{ fontSize: '9px', fontWeight: '400' }}>{formData.totalTime || '..............................'}</span>
+              <span style={{ fontSize: '9px', fontWeight: '400' }}>{interventionData.totalTime || '..............................'}</span>
             </td>
           </tr>
         </tbody>
@@ -122,7 +127,7 @@ function FicheCreateContent({ formData, logo }) {
             <td className="border border-slate-900 bg-slate-50 p-1"></td>
             {['Devis', 'Livraison', 'Formation', 'Installation', 'Réparation', 'Garantie'].map((type) => (
               <td key={type} className="border border-slate-900 p-1 text-center" style={{ height: '20px' }}>
-                <span style={{ fontSize: '11px', fontWeight: '700' }}>{formData.interventionType === type ? 'X' : ''}</span>
+                <span style={{ fontSize: '11px', fontWeight: '700' }}>{interventionData.interventionType === type ? 'X' : ''}</span>
               </td>
             ))}
           </tr>
@@ -137,43 +142,43 @@ function FicheCreateContent({ formData, logo }) {
           <tbody>
             <tr>
               <td className="border-b border-r border-slate-900 bg-slate-50 p-1 w-[18%]"><p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Client</p></td>
-              <td className="border-b border-r border-slate-900 p-1 w-[42%]"><span style={{ fontSize: '9px', fontWeight: '400' }}>{formData.clientName || ''}</span></td>
+              <td className="border-b border-r border-slate-900 p-1 w-[42%]"><span style={{ fontSize: '9px', fontWeight: '400' }}>{interventionData.clientName || ''}</span></td>
               <td className="border-b border-r border-slate-900 bg-slate-50 p-1 w-[16%]"><p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Code client</p></td>
-              <td className="border-b border-slate-900 p-1 w-[24%]"><span style={{ fontSize: '9px', fontWeight: '400' }}>{formData.clientCode || ''}</span></td>
+              <td className="border-b border-slate-900 p-1 w-[24%]"><span style={{ fontSize: '9px', fontWeight: '400' }}>{interventionData.clientCode || ''}</span></td>
             </tr>
             <tr>
               <td className="border-b border-r border-slate-900 bg-slate-50 p-1"><p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Adresse</p></td>
-              <td className="border-b border-slate-900 p-1" colSpan="3"><span style={{ fontSize: '9px', fontWeight: '400' }}>{formData.clientAddress || ''}</span></td>
+              <td className="border-b border-slate-900 p-1" colSpan="3"><span style={{ fontSize: '9px', fontWeight: '400' }}>{interventionData.clientAddress || ''}</span></td>
             </tr>
             <tr>
               <td className="border-b border-r border-slate-900 bg-slate-50 p-1"><p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Demandeur</p></td>
-              <td className="border-b border-r border-slate-900 p-1"><span style={{ fontSize: '9px', fontWeight: '400' }}>{formData.requestorName || ''}</span></td>
+              <td className="border-b border-r border-slate-900 p-1"><span style={{ fontSize: '9px', fontWeight: '400' }}>{interventionData.requestorName || ''}</span></td>
               <td className="border-b border-r border-slate-900 bg-slate-50 p-1"><p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Téléphone</p></td>
-              <td className="border-b border-slate-900 p-1"><span style={{ fontSize: '9px', fontWeight: '400' }}>{formData.clientPhone || ''}</span></td>
+              <td className="border-b border-slate-900 p-1"><span style={{ fontSize: '9px', fontWeight: '400' }}>{interventionData.clientPhone || ''}</span></td>
             </tr>
             <tr>
               <td className="border-b border-r border-slate-900 bg-slate-50 p-1"><p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>E-mail</p></td>
-              <td className="border-b border-slate-900 p-1" colSpan="3"><span style={{ fontSize: '9px', fontWeight: '400' }}>{formData.clientEmail || ''}</span></td>
+              <td className="border-b border-slate-900 p-1" colSpan="3"><span style={{ fontSize: '9px', fontWeight: '400' }}>{interventionData.clientEmail || ''}</span></td>
             </tr>
             <tr>
               <td className="border-b border-r border-slate-900 bg-slate-50 p-1"><p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Equipement</p></td>
-              <td className="border-b border-slate-900 p-1" colSpan="3"><span style={{ fontSize: '9px', fontWeight: '400' }}>{formData.machineType || ''}</span></td>
+              <td className="border-b border-slate-900 p-1" colSpan="3"><span style={{ fontSize: '9px', fontWeight: '400' }}>{interventionData.machineType || ''}</span></td>
             </tr>
             <tr>
               <td className="border-b border-r border-slate-900 bg-slate-50 p-1"><p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Marque</p></td>
-              <td className="border-b border-slate-900 p-1" colSpan="3"><span style={{ fontSize: '9px', fontWeight: '400' }}>{formData.machineBrand || ''}</span></td>
+              <td className="border-b border-slate-900 p-1" colSpan="3"><span style={{ fontSize: '9px', fontWeight: '400' }}>{interventionData.machineBrand || ''}</span></td>
             </tr>
             <tr>
               <td className="border-b border-r border-slate-900 bg-slate-50 p-1"><p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Modèle</p></td>
-              <td className="border-b border-slate-900 p-1" colSpan="3"><span style={{ fontSize: '9px', fontWeight: '400' }}>{formData.machineModel || ''}</span></td>
+              <td className="border-b border-slate-900 p-1" colSpan="3"><span style={{ fontSize: '9px', fontWeight: '400' }}>{interventionData.machineModel || ''}</span></td>
             </tr>
             <tr>
               <td className="border-b border-r border-slate-900 bg-slate-50 p-1"><p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Numéro de série</p></td>
-              <td className="border-b border-slate-900 p-1" colSpan="3"><span style={{ fontSize: '9px', fontWeight: '400', fontFamily: 'monospace', letterSpacing: '0.05em' }}>{formData.serialNumber || ''}</span></td>
+              <td className="border-b border-slate-900 p-1" colSpan="3"><span style={{ fontSize: '9px', fontWeight: '400', fontFamily: 'monospace', letterSpacing: '0.05em' }}>{interventionData.serialNumber || ''}</span></td>
             </tr>
             <tr>
               <td className="border-r border-slate-900 bg-slate-50 p-1"><p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Type de panne</p></td>
-              <td className="p-1" colSpan="3"><span style={{ fontSize: '9px', fontWeight: '400' }}>{formData.problemDescription ? formData.problemDescription.substring(0, 80) : ''}</span></td>
+              <td className="p-1" colSpan="3"><span style={{ fontSize: '9px', fontWeight: '400' }}>{interventionData.problemDescription ? interventionData.problemDescription.substring(0, 80) : ''}</span></td>
             </tr>
           </tbody>
         </table>
@@ -185,14 +190,14 @@ function FicheCreateContent({ formData, logo }) {
         </div>
         <div className="border-b border-slate-900 p-1 bg-white">
           <p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', textDecoration: 'underline', margin: 0 }}>
-            Diagnostic téléphonique : <span style={{ fontWeight: '400', textTransform: 'none', textDecoration: 'none', marginLeft: '5px' }}>{formData.telephoneDiagnostic || ''}</span>
+            Diagnostic téléphonique : <span style={{ fontWeight: '400', textTransform: 'none', textDecoration: 'none', marginLeft: '5px' }}>{interventionData.telephoneDiagnostic || ''}</span>
           </p>
         </div>
         <div className="relative h-[125px]" style={{ background: 'repeating-linear-gradient(to bottom, white 0px, white 13px, #cbd5e1 13px, #cbd5e1 13.5px)' }}>
           <div className="p-1.5">
             <p style={{ fontSize: '8px', fontStyle: 'italic', color: '#1e40af', lineHeight: '13.5px', margin: 0 }}>
               <span style={{ fontWeight: '700', textTransform: 'uppercase', textDecoration: 'underline', fontStyle: 'normal', color: '#000', marginRight: '5px' }}>Solution d'intervention :</span>
-              {formData.interventionDetail || ''}
+              {interventionData.interventionDetail || ''}
             </p>
           </div>
           <div className="absolute bottom-0 left-0 right-0 flex">
@@ -201,7 +206,7 @@ function FicheCreateContent({ formData, logo }) {
                 <p style={{ fontSize: '8px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Nombre d'essai</p>
               </div>
               <div className="px-3 py-0.5 flex items-center justify-center min-w-[30px]">
-                <span style={{ fontSize: '9px', fontWeight: '400' }}>{formData.numEssai || ''}</span>
+                <span style={{ fontSize: '9px', fontWeight: '400' }}>{interventionData.numEssai || ''}</span>
               </div>
             </div>
             <div className="flex-1"></div>
@@ -209,10 +214,10 @@ function FicheCreateContent({ formData, logo }) {
               <div className="bg-slate-50 border-r border-slate-900 px-1.5 py-0.5 flex items-center">
                 <p style={{ fontSize: '8px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Essai concluant</p>
               </div>
-              <div className={`border-r border-slate-900 px-2 py-0.5 flex items-center justify-center ${formData.essaiConcluant === true ? 'bg-green-100' : ''}`}>
+              <div className={`border-r border-slate-900 px-2 py-0.5 flex items-center justify-center ${interventionData.essaiConcluant === true ? 'bg-green-100' : ''}`}>
                 <span style={{ fontSize: '8px', fontWeight: '700' }}>Oui</span>
               </div>
-              <div className={`px-2 py-0.5 flex items-center justify-center ${formData.essaiConcluant === false ? 'bg-red-100' : ''}`}>
+              <div className={`px-2 py-0.5 flex items-center justify-center ${interventionData.essaiConcluant === false ? 'bg-red-100' : ''}`}>
                 <span style={{ fontSize: '8px', fontWeight: '700' }}>Non</span>
               </div>
             </div>
@@ -233,34 +238,47 @@ function FicheCreateContent({ formData, logo }) {
             </tr>
           </thead>
           <tbody>
-            {[1,2,3,4,5,6].map((row) => (
-              <tr key={row}>
-                <td className={`${row < 6 ? 'border-b' : ''} border-r border-slate-900 p-1 h-[14px]`}></td>
-                <td className={`${row < 6 ? 'border-b' : ''} border-r border-slate-900 p-1 h-[14px]`}></td>
-                <td className={`${row < 6 ? 'border-b' : ''} border-slate-900 p-1 h-[14px]`}></td>
-              </tr>
-            ))}
+            {[0,1,2,3,4,5].map((row) => {
+              const part = parts[row]
+              return (
+                <tr key={row}>
+                  <td className={`${row < 5 ? 'border-b' : ''} border-r border-slate-900 p-1 h-[14px]`}>
+                    {part && <span style={{ fontSize: '8px', fontWeight: '400' }}>{part.reference}</span>}
+                  </td>
+                  <td className={`${row < 5 ? 'border-b' : ''} border-r border-slate-900 p-1 h-[14px]`}>
+                    {part && <span style={{ fontSize: '8px', fontWeight: '400' }}>{part.designation}</span>}
+                  </td>
+                  <td className={`${row < 5 ? 'border-b' : ''} border-slate-900 p-1 h-[14px] text-center`}>
+                    {part && <span style={{ fontSize: '8px', fontWeight: '400' }}>{part.quantity}</span>}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
 
-      <div className="flex justify-between items-end gap-4 mb-[6px]" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-        <div className="flex-1 border border-slate-900">
-          <div className="bg-slate-50 border-b border-slate-900 p-1 text-center">
-            <p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Signature du technicien</p>
-          </div>
-          <div className="h-[50px] flex items-center justify-center">
-            <p style={{ fontSize: '7px', color: '#e2e8f0', fontStyle: 'italic' }}>{formData.technicianName || ''}</p>
-          </div>
-        </div>
+      <div className="flex justify-center mb-[8px]" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
         <div className="border border-slate-900 flex">
           <div className="bg-slate-50 px-4 py-1.5 border-r border-slate-900 flex items-center">
             <p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Prix M.O (HT) :</p>
           </div>
           <div className="px-8 py-1.5 flex items-center justify-center min-w-[80px]">
-            <span style={{ fontSize: '9px', fontWeight: '400' }}>{formData.laborPrice || ''}</span>
+            <span style={{ fontSize: '9px', fontWeight: '400' }}>{laborPrice || ''}</span>
           </div>
         </div>
+      </div>
+
+      <div className="flex gap-0 mb-[6px]" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+        <div className="flex-1 border border-slate-900">
+          <div className="bg-slate-50 border-b border-slate-900 p-1 text-center">
+            <p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Signature du technicien</p>
+          </div>
+          <div className="h-[50px] flex items-center justify-center">
+            <p style={{ fontSize: '7px', color: '#e2e8f0', fontStyle: 'italic' }}>{interventionData.technicianName || ''}</p>
+          </div>
+        </div>
+        <div className="w-[30px]"></div>
         <div className="flex-1 border border-slate-900">
           <div className="bg-slate-50 border-b border-slate-900 p-1 text-center">
             <p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Signature et cachet client</p>
@@ -277,9 +295,9 @@ function FicheCreateContent({ formData, logo }) {
   )
 }
 
-// ── Mobile preview modal with CSS scale responsive ──
-function MobileCreatePreviewModal({ onClose, formData, logo }) {
-  const FICHE_WIDTH = 560
+// ── Mobile preview modal: renders the exact same fiche, scaled to fit screen width ──
+function MobilePreviewModal({ onClose, interventionData, parts, laborPrice, logo }) {
+  const FICHE_WIDTH = 560 // intrinsic width of the fiche card (matches desktop px-7 padding)
   const wrapperRef = useRef(null)
   const [scale, setScale] = useState(1)
 
@@ -318,9 +336,15 @@ function MobileCreatePreviewModal({ onClose, formData, logo }) {
         {/* Scrollable fiche area */}
         <div ref={wrapperRef} className="flex-1 overflow-y-auto bg-slate-100 no-scrollbar p-3">
           <div style={{ width: `${FICHE_WIDTH * scale}px`, height: `${Math.round(FICHE_WIDTH * scale * 1.414)}px`, margin: '0 auto' }}>
-            <div style={{ width: `${FICHE_WIDTH}px`, transformOrigin: 'top left', transform: `scale(${scale})` }}>
+            <div
+              style={{
+                width: `${FICHE_WIDTH}px`,
+                transformOrigin: 'top left',
+                transform: `scale(${scale})`,
+              }}
+            >
               <div className="bg-white shadow-2xl px-7 pt-5 pb-8 relative overflow-hidden border border-slate-300 text-slate-900 leading-none" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-                <FicheCreateContent formData={formData} logo={logo} />
+                <FicheContent interventionData={interventionData} parts={parts} laborPrice={laborPrice} logo={logo} />
               </div>
             </div>
           </div>
@@ -344,7 +368,10 @@ export default function CreateIntervention() {
   const navigate = useNavigate()
   const [currentStep, setCurrentStep] = useState(1)
   const [showMobilePreview, setShowMobilePreview] = useState(false)
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false)
+  const [isMachineModalOpen, setIsMachineModalOpen] = useState(false)
   const [formData, setFormData] = useState({
+    clientId: '',
     clientName: '',
     clientCode: '',
     clientPhone: '',
@@ -352,6 +379,7 @@ export default function CreateIntervention() {
     clientAddress: '',
     siteName: '',
     requestorName: '',
+    machineId: '',
     machineType: '',
     machineBrand: '',
     machineModel: '',
@@ -361,28 +389,101 @@ export default function CreateIntervention() {
     interventionDetail: '',
     interventionType: 'Réparation',
     interventionDate: new Date().toISOString().split('T')[0],
-    startTime: '',
-    endTime: '',
     totalTime: '',
-    ficheNumber: '2026/02/09 122757',
+    ficheNumber: '',
     technicianName: '',
     numEssai: '',
     essaiConcluant: null,
     laborPrice: ''
   })
+  const previewInterventionData = {
+    ...formData,
+    startTime: '',
+    endTime: '',
+  }
+  const previewParts = []
+  const previewLaborPrice = Number(formData.laborPrice) || ''
+
+  useEffect(() => {
+    if (formData.ficheNumber) return
+    const d = new Date()
+    const yyyy = String(d.getFullYear())
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    const HH = String(d.getHours()).padStart(2, '0')
+    const MM = String(d.getMinutes()).padStart(2, '0')
+    const SS = String(d.getSeconds()).padStart(2, '0')
+    setFormData((prev) => ({ ...prev, ficheNumber: `${yyyy}/${mm}/${dd} ${HH}${MM}${SS}` }))
+  }, [formData.ficheNumber])
 
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
+  const handleClientSelect = (client) => {
+    setFormData(prev => ({
+      ...prev,
+      clientId: client.id,
+      clientName: client.name,
+      clientCode: client.code,
+      clientPhone: client.phone,
+      clientEmail: client.email,
+      clientAddress: `${client.city}${client.zone ? `, ${client.zone}` : ''}`
+    }))
+  }
+
+  const handleMachineSelect = (machine) => {
+    setFormData(prev => ({
+      ...prev,
+      machineId: machine.id,
+      machineType: machine.designation,
+      machineBrand: machine.brand,
+      machineModel: machine.year, // Using year as model as requested or appropriate
+      serialNumber: machine.serialNumber,
+      siteName: machine.site
+    }))
+  }
+
   const nextStep = () => setCurrentStep(prev => Math.min(prev + 1, steps.length))
   const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1))
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    alert('✅ Dossier d\'intervention créé avec succès !\n\nStatut : En attente\nEmployé assigné : Non assigné\n\nVous pouvez maintenant créer une mission pour affecter un employé à cette intervention.')
-    navigate('/interventions')
+  const createIntervention = async () => {
+    try {
+      const response = await apiFetch('/interventions', {
+        method: 'POST',
+        body: {
+          status: 'PENDING',
+          technicianName: formData.technicianName,
+          interventionDate: formData.interventionDate,
+          ficheNumber: formData.ficheNumber,
+          totalTime: formData.totalTime,
+          siteName: formData.siteName,
+          clientAddress: formData.clientAddress,
+          requestorName: formData.requestorName,
+          machineModel: formData.machineModel,
+          problemDescription: formData.problemDescription,
+          telephoneDiagnostic: formData.telephoneDiagnostic,
+          interventionType: formData.interventionType,
+          interventionDetail: formData.interventionDetail,
+          numEssai: formData.numEssai,
+          essaiConcluant: formData.essaiConcluant,
+          laborPrice: formData.laborPrice,
+          clientId: formData.clientId || null,
+          machineId: formData.machineId || null,
+        },
+      })
+      if (!response.ok) {
+        alert('Erreur lors de la création du dossier.')
+        return
+      }
+      const created = await response.json().catch(() => null)
+      const createdId = created?.id
+      const highlight = createdId ? `?highlight=${encodeURIComponent(createdId)}&toast=created` : '?toast=created'
+      navigate(`/interventions${highlight}`, { state: { createdInterventionId: createdId } })
+    } catch (error) {
+      alert('Impossible de joindre le serveur.')
+    }
   }
 
   const renderStepContent = () => {
@@ -390,12 +491,22 @@ export default function CreateIntervention() {
       case 1:
         return (
           <div className="space-y-10 animate-in fade-in zoom-in-95 duration-500">
-            <div className="pb-6 border-b-2 border-slate-100">
-              <h2 className="text-2xl font-black text-slate-900 mb-2 flex items-center gap-3">
-                <Building2 className="text-[#0052CC]" size={28} />
-                Informations Client
-              </h2>
-              <p className="text-sm text-slate-500 font-medium">Renseignez les coordonnées complètes du client et le lieu d'intervention</p>
+            <div className="pb-6 border-b-2 border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-black text-slate-900 mb-2 flex items-center gap-3">
+                  <Building2 className="text-[#0052CC]" size={28} />
+                  Informations Client
+                </h2>
+                <p className="text-sm text-slate-500 font-medium">Renseignez les coordonnées complètes du client et le lieu d'intervention</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsClientModalOpen(true)}
+                className="flex items-center justify-center gap-2 px-6 py-3.5 bg-[#0052CC] hover:bg-blue-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl shadow-blue-100 shrink-0"
+              >
+                <Users size={18} />
+                Créer / Sélectionner Client
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -412,6 +523,7 @@ export default function CreateIntervention() {
                     name="clientName"
                     value={formData.clientName}
                     onChange={handleChange}
+                    readOnly={Boolean(formData.clientId)}
                     placeholder="Ex: Garage Automobile Central"
                     className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
                     required
@@ -430,6 +542,7 @@ export default function CreateIntervention() {
                     name="clientCode"
                     value={formData.clientCode}
                     onChange={handleChange}
+                    readOnly={Boolean(formData.clientId)}
                     placeholder="CLT-2026-001"
                     className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
                   />
@@ -481,6 +594,7 @@ export default function CreateIntervention() {
                     name="clientEmail"
                     value={formData.clientEmail}
                     onChange={handleChange}
+                    readOnly={Boolean(formData.clientId)}
                     placeholder="contact@exemple.com"
                     className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
                   />
@@ -524,12 +638,22 @@ export default function CreateIntervention() {
       case 2:
         return (
           <div className="space-y-10 animate-in fade-in zoom-in-95 duration-500">
-            <div className="pb-6 border-b-2 border-slate-100">
-              <h2 className="text-2xl font-black text-slate-900 mb-2 flex items-center gap-3">
-                <Settings className="text-orange-500" size={28} />
-                Fiche Technique Machine
-              </h2>
-              <p className="text-sm text-slate-500 font-medium">Identifiez précisément l'équipement concerné par l'intervention</p>
+            <div className="pb-6 border-b-2 border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-black text-slate-900 mb-2 flex items-center gap-3">
+                  <Settings className="text-orange-500" size={28} />
+                  Fiche Technique Machine
+                </h2>
+                <p className="text-sm text-slate-500 font-medium">Identifiez précisément l'équipement concerné par l'intervention</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMachineModalOpen(true)}
+                className="flex items-center justify-center gap-2 px-6 py-3.5 bg-orange-600 hover:bg-orange-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl shadow-orange-100 shrink-0"
+              >
+                <Cpu size={18} />
+                Créer / Choisir Machine
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -546,6 +670,7 @@ export default function CreateIntervention() {
                     name="machineType"
                     value={formData.machineType}
                     onChange={handleChange}
+                    readOnly={Boolean(formData.machineId)}
                     placeholder="Ex: Pont Élévateur 4 Colonnes"
                     className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
                     required
@@ -563,6 +688,7 @@ export default function CreateIntervention() {
                     name="machineBrand"
                     value={formData.machineBrand}
                     onChange={handleChange}
+                    readOnly={Boolean(formData.machineId)}
                     placeholder="Ex: Ravaglioli, Hofmann, etc."
                     className="w-full px-5 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
                   />
@@ -579,6 +705,7 @@ export default function CreateIntervention() {
                     name="machineModel"
                     value={formData.machineModel}
                     onChange={handleChange}
+                    readOnly={Boolean(formData.machineId)}
                     placeholder="Ex: RAV-3000, KPH-370"
                     className="w-full px-5 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
                   />
@@ -596,6 +723,7 @@ export default function CreateIntervention() {
                     name="serialNumber"
                     value={formData.serialNumber}
                     onChange={handleChange}
+                    readOnly={Boolean(formData.machineId)}
                     placeholder="SN-123456789"
                     className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-slate-800 font-bold font-mono placeholder:text-slate-400 placeholder:font-normal tracking-wider shadow-sm hover:border-slate-300"
                   />
@@ -679,67 +807,112 @@ export default function CreateIntervention() {
                   <ClipboardCheck size={28} />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-black text-slate-900">Récapitulatif & Validation</h2>
-                  <p className="text-sm text-slate-500 font-medium">Vérifiez les informations avant l'enregistrement définitif</p>
+                  <h2 className="text-2xl font-black text-slate-900">Validation</h2>
+                  <p className="text-sm text-slate-500 font-medium">Vérifiez les informations saisies avant de créer le dossier</p>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border-2 border-blue-100 shadow-sm">
-                  <div className="flex items-center gap-3 mb-4 pb-3 border-b-2 border-blue-200">
-                    <Building2 className="text-blue-600" size={22} />
-                    <span className="text-xs font-black uppercase tracking-wider text-blue-900">Informations Client</span>
-                  </div>
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-1">Client</p>
-                      <p className="text-sm font-bold text-slate-900">{formData.clientName || 'Non renseigné'}</p>
-                    </div>
-                  </div>
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between gap-4">
+                <div className="w-14 h-14 shrink-0">
+                  <img src={logo} alt="Logo Left" className="w-full h-full object-contain grayscale opacity-80" />
                 </div>
-
-                <div className="bg-gradient-to-br from-orange-50 to-amber-50 p-6 rounded-2xl border-2 border-orange-100 shadow-sm">
-                  <div className="flex items-center gap-3 mb-4 pb-3 border-b-2 border-orange-200">
-                    <Settings className="text-orange-600" size={22} />
-                    <span className="text-xs font-black uppercase tracking-wider text-orange-900">Détails Machine</span>
-                  </div>
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-[10px] font-bold text-orange-600 uppercase tracking-wider mb-1">Équipement</p>
-                      <p className="text-sm font-bold text-slate-900">{formData.machineType || 'Inconnu'}</p>
-                    </div>
-                  </div>
+                <div className="text-center flex-1 px-2">
+                  <p className="text-sm font-black uppercase tracking-wider text-slate-900">Fiche d’intervention de S.A.V</p>
+                  <p className="text-xs italic text-slate-500 mt-1">Nous vous garantissons la qualité</p>
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-700 mt-1">SOMACS SERVICE S.A.R.L</p>
+                </div>
+                <div className="w-14 h-14 shrink-0">
+                  <img src={logo} alt="Logo Right" className="w-full h-full object-contain grayscale opacity-80" />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="space-y-3 group">
-                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-green-600 transition-colors">
-                    <Clock size={16} className="text-green-600" />
-                    Heure d'entrée
-                  </label>
-                  <input
-                    type="time"
-                    name="startTime"
-                    value={formData.startTime}
-                    onChange={handleChange}
-                    className="w-full px-5 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-green-600 focus:ring-4 focus:ring-green-600/10 outline-none transition-all text-slate-800 font-bold shadow-sm hover:border-slate-300"
-                  />
+              <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-blue-600">
+                      <Building2 size={18} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Client / Site</p>
+                      <p className="text-sm font-black text-slate-900">Coordonnées</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="sm:col-span-2">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Client</p>
+                      <p className="text-sm font-black text-slate-900">{formData.clientName || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Code client</p>
+                      <p className="text-sm font-semibold text-slate-700">{formData.clientCode || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Téléphone</p>
+                      <p className="text-sm font-semibold text-slate-700">{formData.clientPhone || '—'}</p>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Adresse</p>
+                      <p className="text-sm font-semibold text-slate-700 break-words">{formData.clientAddress || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Site</p>
+                      <p className="text-sm font-semibold text-slate-700">{formData.siteName || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Demandeur</p>
+                      <p className="text-sm font-semibold text-slate-700">{formData.requestorName || '—'}</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-3 group">
-                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-green-600 transition-colors">
-                    <Clock size={16} className="text-green-600" />
-                    Heure de sortie
-                  </label>
-                  <input
-                    type="time"
-                    name="endTime"
-                    value={formData.endTime}
-                    onChange={handleChange}
-                    className="w-full px-5 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-green-600 focus:ring-4 focus:ring-green-600/10 outline-none transition-all text-slate-800 font-bold shadow-sm hover:border-slate-300"
-                  />
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-indigo-600">
+                      <Cpu size={18} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Machine</p>
+                      <p className="text-sm font-black text-slate-900">Fiche technique</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="sm:col-span-2">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Type</p>
+                      <p className="text-sm font-black text-slate-900">{formData.machineType || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Marque</p>
+                      <p className="text-sm font-semibold text-slate-700">{formData.machineBrand || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Modèle</p>
+                      <p className="text-sm font-semibold text-slate-700">{formData.machineModel || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">N° Série</p>
+                      <p className="text-sm font-semibold text-slate-700 break-words">{formData.serialNumber || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Date</p>
+                      <p className="text-sm font-semibold text-slate-700">{formData.interventionDate || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">N° Fiche</p>
+                      <p className="text-sm font-semibold text-slate-700 break-words">{formData.ficheNumber || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Technicien</p>
+                      <p className="text-sm font-semibold text-slate-700">{formData.technicianName || 'Non assigné'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Temps total</p>
+                      <p className="text-sm font-semibold text-slate-700">{formData.totalTime || '—'}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -857,55 +1030,67 @@ export default function CreateIntervention() {
         {/* ── Form area ── */}
         <div className="flex-1 overflow-y-auto no-scrollbar bg-white flex flex-col">
           <div className="flex-1 px-4 sm:px-8 md:px-12 py-8 sm:py-12 md:py-16 max-w-4xl mx-auto w-full">
-            <form onSubmit={handleSubmit} className="h-full flex flex-col">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+              }}
+              className="h-full flex flex-col"
+            >
               <div className="flex-1">
                 {renderStepContent()}
               </div>
 
               {/* ── Navigation buttons ── */}
-              <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t-2 border-slate-200 flex items-center justify-between shrink-0 gap-3">
-                <button
-                  type="button"
-                  onClick={prevStep}
-                  disabled={currentStep === 1}
-                  className={`flex items-center gap-2 px-5 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider transition-all ${
-                    currentStep === 1
-                      ? 'text-slate-300 cursor-not-allowed'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:scale-95 shadow-sm hover:shadow-md'
-                  }`}
-                >
-                  <ChevronLeft size={18} />
-                  <span className="hidden sm:inline">Étape </span>Précédente
-                </button>
+              <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t-2 border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between shrink-0 gap-4 sm:gap-3">
+                {/* Right side buttons (Continuer/Valider) placed first on mobile via order */}
+                <div className="order-1 sm:order-2">
+                  {currentStep < steps.length ? (
+                    <button
+                      type="button"
+                      onClick={nextStep}
+                      className="w-full sm:w-auto group flex items-center justify-center gap-2 sm:gap-3 bg-gradient-to-r from-slate-900 to-slate-800 hover:from-[#0052CC] hover:to-blue-700 text-white px-6 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-xl shadow-slate-300 hover:shadow-blue-300 active:scale-95"
+                    >
+                      Continuer
+                      <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" strokeWidth={3} />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={createIntervention}
+                      className="w-full sm:w-auto flex items-center justify-center gap-2 sm:gap-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 sm:px-12 py-4 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-xl shadow-green-300 active:scale-95"
+                    >
+                      <Check size={18} strokeWidth={3} />
+                      Valider
+                    </button>
+                  )}
+                </div>
 
-                {/* Aperçu button — mobile/tablet only */}
-                <button
-                  type="button"
-                  onClick={() => setShowMobilePreview(true)}
-                  className="xl:hidden flex items-center gap-2 px-4 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl font-black text-xs uppercase tracking-wider transition-all active:scale-95 border border-indigo-200"
-                >
-                  <Eye size={16} />
-                  Aperçu
-                </button>
-
-                {currentStep < steps.length ? (
+                {/* Left side buttons (Précédente/Aperçu) placed second on mobile via order */}
+                <div className="flex items-center justify-between sm:justify-start gap-3 order-2 sm:order-1">
                   <button
                     type="button"
-                    onClick={nextStep}
-                    className="group flex items-center gap-2 sm:gap-3 bg-gradient-to-r from-slate-900 to-slate-800 hover:from-[#0052CC] hover:to-blue-700 text-white px-6 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-xl shadow-slate-300 hover:shadow-blue-300 active:scale-95"
+                    onClick={prevStep}
+                    disabled={currentStep === 1}
+                    className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider transition-all ${
+                      currentStep === 1
+                        ? 'text-slate-300 cursor-not-allowed bg-slate-50'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:scale-95 shadow-sm hover:shadow-md border border-slate-200'
+                    }`}
                   >
-                    Continuer
-                    <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" strokeWidth={3} />
+                    <ChevronLeft size={18} />
+                    <span className="hidden sm:inline">Étape </span>Précédente
                   </button>
-                ) : (
+
+                  {/* Aperçu button — mobile/tablet only */}
                   <button
-                    type="submit"
-                    className="flex items-center gap-2 sm:gap-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 sm:px-12 py-4 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-xl shadow-green-300 active:scale-95"
+                    type="button"
+                    onClick={() => setShowMobilePreview(true)}
+                    className="xl:hidden flex-1 flex items-center justify-center gap-2 px-4 py-3.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl font-black text-xs uppercase tracking-wider transition-all active:scale-95 border border-indigo-200"
                   >
-                    <Check size={18} strokeWidth={3} />
-                    Valider
+                    <Eye size={16} />
+                    Aperçu
                   </button>
-                )}
+                </div>
               </div>
             </form>
           </div>
@@ -921,8 +1106,8 @@ export default function CreateIntervention() {
               </div>
             </div>
 
-            <div className="w-full bg-white shadow-2xl rounded-none px-7 pt-5 pb-8 relative overflow-hidden border border-slate-300 text-slate-900 leading-none" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-              <FicheCreateContent formData={formData} logo={logo} />
+            <div className="w-full bg-white shadow-2xl rounded-none px-7 pt-5 pb-8 relative transition-all duration-700 overflow-hidden border border-slate-300 text-slate-900 leading-none" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+              <FicheContent interventionData={previewInterventionData} parts={previewParts} laborPrice={previewLaborPrice} logo={logo} />
             </div>
           </div>
         </div>
@@ -931,12 +1116,28 @@ export default function CreateIntervention() {
 
       {/* ── Mobile preview modal ── */}
       {showMobilePreview && (
-        <MobileCreatePreviewModal
+        <MobilePreviewModal
           onClose={() => setShowMobilePreview(false)}
-          formData={formData}
+          interventionData={previewInterventionData}
+          parts={previewParts}
+          laborPrice={previewLaborPrice}
           logo={logo}
         />
       )}
+
+      {/* ── Client Selection Modal ── */}
+      <ClientSelectionModal 
+        isOpen={isClientModalOpen}
+        onClose={() => setIsClientModalOpen(false)}
+        onSelect={handleClientSelect}
+      />
+
+      {/* ── Machine Selection Modal ── */}
+      <MachineSelectionModal 
+        isOpen={isMachineModalOpen}
+        onClose={() => setIsMachineModalOpen(false)}
+        onSelect={handleMachineSelect}
+      />
     </div>
   )
 }

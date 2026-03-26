@@ -7,9 +7,8 @@ import {
   ChevronLeft, LayoutList, CalendarDays, MapPin,
   TrendingUp, Zap,
 } from 'lucide-react'
-import { getMissionStore, updateMissionInStore, interventionsList, statusList, priorityColors, getStatusColor } from '../../data/missionsData'
+import { apiFetch } from '../../api/apiClient'
 
-const CURRENT_EMPLOYEE_ID = 1
 const PRIORITY_ORDER = { Critique: 1, Haute: 2, Moyenne: 3, Basse: 4 }
 
 const PRIORITY_BAR = {
@@ -23,6 +22,39 @@ const STATUS_CONFIG = {
   'Bloquée':  { icon: XCircle,       badge: 'bg-red-50 text-red-700 border border-red-200',        dot: 'bg-red-500',    color: 'text-red-600',    calBg: 'bg-red-100 border-red-300 text-red-800' },
 }
 
+const statusList = ['À faire', 'En cours', 'Terminée', 'Bloquée']
+
+const priorityColors = {
+  red: 'bg-red-100 text-red-700',
+  orange: 'bg-orange-100 text-orange-700',
+  yellow: 'bg-yellow-100 text-yellow-700',
+  green: 'bg-green-100 text-green-700',
+  blue: 'bg-blue-100 text-blue-700',
+  gray: 'bg-gray-100 text-gray-700',
+}
+
+function getAvatarFromName(name) {
+  if (!name) return ''
+  const parts = name.split(' ').filter(Boolean)
+  if (parts.length === 0) return ''
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+  return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase()
+}
+
+function getPriorityColor(priority) {
+  if (priority === 'Critique') return 'red'
+  if (priority === 'Haute') return 'orange'
+  if (priority === 'Moyenne') return 'yellow'
+  return 'gray'
+}
+
+function getStatusColorKey(status) {
+  if (status === 'En cours') return 'yellow'
+  if (status === 'Terminée') return 'green'
+  if (status === 'Bloquée') return 'red'
+  return 'blue'
+}
+
 // ── Utilitaire : parse "DD Mois YYYY" / "Aujourd'hui" → Date ──────────────────
 const MONTHS_FR = {
   janvier: 0, février: 1, mars: 2, avril: 3, mai: 4, juin: 5,
@@ -33,6 +65,18 @@ function parseDueDate(str) {
   if (!str) return null
   const lower = str.toLowerCase().trim()
   if (lower === "aujourd'hui" || lower === 'aujourd\'hui') return new Date()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(lower)) {
+    const [y, m, d] = lower.split('-').map((n) => parseInt(n, 10))
+    if (!Number.isNaN(y) && !Number.isNaN(m) && !Number.isNaN(d)) {
+      return new Date(y, m - 1, d)
+    }
+  }
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(lower)) {
+    const [dd, mm, yyyy] = lower.split('/').map((n) => parseInt(n, 10))
+    if (!Number.isNaN(dd) && !Number.isNaN(mm) && !Number.isNaN(yyyy)) {
+      return new Date(yyyy, mm - 1, dd)
+    }
+  }
   // "DD Mois YYYY"
   const parts = lower.split(' ')
   if (parts.length === 3) {
@@ -65,9 +109,9 @@ function StatusBadge({ status, spin }) {
 }
 
 // ── Composant : carte liste ───────────────────────────────────────────────────
-function MissionRow({ mission, onStatusChange, onOpen }) {
+function MissionRow({ mission, interventions, onStatusChange, onOpen }) {
   const intervention = mission.interventionId
-    ? interventionsList.find((i) => i.id === mission.interventionId)
+    ? interventions.find((i) => i.id === mission.interventionId)
     : null
   const cfg = STATUS_CONFIG[mission.status] || STATUS_CONFIG['À faire']
 
@@ -90,9 +134,15 @@ function MissionRow({ mission, onStatusChange, onOpen }) {
         {/* Main info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-0.5">
-            {mission.type === 'Intervention' && (
-              <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-[#0052CC]/10 text-[#0052CC] uppercase tracking-wider">SAV</span>
-            )}
+            <span
+              className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                mission.type === 'Intervention'
+                  ? 'bg-[#0052CC]/10 text-[#0052CC]'
+                  : 'bg-slate-100 text-slate-700'
+              }`}
+            >
+              {mission.type === 'Intervention' ? 'Intervention' : 'Normal'}
+            </span>
             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${priorityColors[mission.priorityColor] || 'bg-slate-100 text-slate-600'}`}>
               {mission.priority}
             </span>
@@ -142,7 +192,7 @@ const MONTHS_LABEL = [
   'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
 ]
 
-function MissionCalendar({ missions, onOpen, onStatusChange }) {
+function MissionCalendar({ missions, interventions = [], onOpen, onStatusChange }) {
   const today = new Date()
   const [calYear,  setCalYear]  = useState(today.getFullYear())
   const [calMonth, setCalMonth] = useState(today.getMonth())
@@ -397,7 +447,7 @@ function MissionCalendar({ missions, onOpen, onStatusChange }) {
                   {selectedMissions.map((m) => {
                     const cfg = STATUS_CONFIG[m.status] || STATUS_CONFIG['À faire']
                     const intervention = m.interventionId
-                      ? interventionsList.find((iv) => iv.id === m.interventionId)
+                      ? interventions.find((iv) => iv.id === m.interventionId)
                       : null
                     return (
                       <div
@@ -412,9 +462,15 @@ function MissionCalendar({ missions, onOpen, onStatusChange }) {
                           {/* Row 1: badges + status */}
                           <div className="flex items-center justify-between gap-2 mb-2">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              {m.type === 'Intervention' && (
-                                <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-slate-900/10 text-slate-700 uppercase tracking-wider">SAV</span>
-                              )}
+                              <span
+                                className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                                  m.type === 'Intervention'
+                                    ? 'bg-[#0052CC]/10 text-[#0052CC]'
+                                    : 'bg-slate-100 text-slate-700'
+                                }`}
+                              >
+                                {m.type === 'Intervention' ? 'Intervention' : 'Normal'}
+                              </span>
                               <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${priorityColors[m.priorityColor] || 'bg-slate-100 text-slate-600'}`}>
                                 {m.priority}
                               </span>
@@ -482,22 +538,89 @@ export default function EmployeeMissions() {
   const navigate = useNavigate()
   const today    = new Date()
 
-  const [missions, setMissions] = useState(() =>
-    getMissionStore().filter((m) => m.employeeId === CURRENT_EMPLOYEE_ID)
-  )
+  const currentUserName = useMemo(() => {
+    if (typeof window === 'undefined') return ''
+    const raw = window.localStorage.getItem('auth_user')
+    if (!raw) return ''
+    try {
+      const parsed = JSON.parse(raw)
+      return String(parsed?.name || '').trim()
+    } catch {
+      return ''
+    }
+  }, [])
+
+  const [missions, setMissions] = useState([])
+  const [interventions, setInterventions] = useState([])
   const [search,       setSearch]       = useState('')
   const [filterStatus, setFilterStatus] = useState('Tous')
   const [filterType,   setFilterType]   = useState('Tous')
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const response = await apiFetch('/missions', { auth: false })
+        if (!response.ok) return
+        const data = await response.json()
+        const rows = Array.isArray(data) ? data : []
+        const filteredByUser = currentUserName
+          ? rows.filter((m) => String(m.employee || '').trim() === currentUserName)
+          : rows
+
+        const normalized = filteredByUser.map((m) => ({
+          ...m,
+          avatar: getAvatarFromName(m.employee),
+          priorityColor: getPriorityColor(m.priority),
+          statusColor: getStatusColorKey(m.status),
+        }))
+        setMissions(normalized)
+      } catch {}
+    })()
+  }, [currentUserName])
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const response = await apiFetch('/interventions', { auth: false })
+        if (!response.ok) return
+        const data = await response.json()
+        const rows = Array.isArray(data) ? data : []
+        const normalized = rows.map((i) => ({
+          id: i.id,
+          client: i.client || i.clientName || '',
+          machine: i.machine || i.machineType || '',
+          type: i.type || '',
+          status: i.status || '',
+          statusLabel: i.status || '',
+          date: i.date || i.interventionDate || '',
+          phone: i.phone || i.clientPhone || '',
+          clientCode: i.clientCode || '',
+          address: i.clientAddress || '',
+          request: i.request || i.problemDescription || '',
+          assignedTo: i.assignedTo || i.assignee || i.technicianName || null,
+        }))
+        setInterventions(normalized)
+      } catch {}
+    })()
+  }, [])
 
   const handleStatusChange = (missionId, newStatus) => {
     setMissions((prev) =>
       prev.map((m) => {
         if (m.id !== missionId) return m
-        const updated = { ...m, status: newStatus, statusColor: getStatusColor(newStatus) }
-        updateMissionInStore(updated)
-        return updated
-      })
+        return { ...m, status: newStatus, statusColor: getStatusColorKey(newStatus) }
+      }),
     )
+
+    ;(async () => {
+      try {
+        await apiFetch(`/missions/${missionId}`, {
+          method: 'PATCH',
+          body: { status: newStatus },
+          auth: false,
+        })
+      } catch {}
+    })()
   }
 
   const filtered = useMemo(() => {
@@ -543,7 +666,7 @@ export default function EmployeeMissions() {
               </span>
             </div>
             <p className="text-slate-400 text-xs font-semibold flex items-center gap-1 mt-0.5">
-              <User size={10} /> Jean Dupont <span className="hidden sm:inline">— {today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+              <User size={10} /> {currentUserName || '—'} <span className="hidden sm:inline">— {today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
             </p>
           </div>
         </div>
@@ -591,6 +714,7 @@ export default function EmployeeMissions() {
           <div className="flex-1 p-4 sm:p-6 lg:p-4">
             <MissionCalendar
               missions={missions}
+              interventions={interventions}
               onOpen={(id) => navigate('/missions/' + id)}
               onStatusChange={handleStatusChange}
             />
@@ -670,6 +794,7 @@ export default function EmployeeMissions() {
                 <MissionRow
                   key={m.id}
                   mission={m}
+                  interventions={interventions}
                   onStatusChange={handleStatusChange}
                   onOpen={(id) => navigate('/missions/' + id)}
                 />

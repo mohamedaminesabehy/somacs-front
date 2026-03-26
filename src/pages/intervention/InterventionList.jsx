@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { apiFetch } from '../../api/apiClient'
 import {
   Search, Plus, MoreVertical, Eye, Edit2, Trash2, Wrench,
   CheckCircle2, FileText, ChevronRight, UserPlus, Hourglass,
@@ -26,6 +27,20 @@ const typeConfig = {
   INSTALLATION: { label: 'Installation',  color: 'bg-[#004a77]/5 text-[#004a77] border-[#004a77]/10', icon: Plus           },
   REPARATION:   { label: 'Réparation',    color: 'bg-[#004a77]/5 text-[#004a77] border-[#004a77]/10', icon: Wrench         },
   GARANTIE:     { label: 'Garantie',     color: 'bg-[#004a77]/5 text-[#004a77] border-[#004a77]/10', icon: ShieldAlert    },
+}
+
+const fallbackStatus = statusConfig.PENDING
+const fallbackType = typeConfig.REPARATION
+
+function normalizeTypeKey(value) {
+  const base = String(value || '').trim()
+  if (!base) return ''
+  return base
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^0-9a-zA-Z]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toUpperCase()
 }
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
@@ -75,7 +90,7 @@ function StatCard({ label, count, total, icon: Icon, active, onClick, colorClass
   )
 }
 
-function ActionMenu({ id, onNavigate }) {
+function ActionMenu({ item, onNavigate }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
@@ -98,20 +113,20 @@ function ActionMenu({ id, onNavigate }) {
           <div className="px-3 py-2 border-b border-slate-50">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Actions dossier</p>
           </div>
-          <button onClick={() => { onNavigate('details', id); setOpen(false) }}
+          <button onClick={() => { onNavigate('details', item); setOpen(false) }}
             className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-[#0052CC] transition-colors">
             <Eye size={14} /> Consulter le dossier
           </button>
-          <button onClick={() => { onNavigate('edit', id); setOpen(false) }}
+          <button onClick={() => { onNavigate('edit', item); setOpen(false) }}
             className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-[#0052CC] transition-colors">
             <Edit2 size={14} /> Modifier les infos
           </button>
-          <button onClick={() => { onNavigate('assign', id); setOpen(false) }}
+          <button onClick={() => { onNavigate('assign', item); setOpen(false) }}
             className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-[#0052CC] transition-colors">
             <UserCheck2 size={14} /> Affecter technicien
           </button>
           <div className="border-t border-slate-50" />
-          <button onClick={() => { alert('Supprimer ' + id); setOpen(false) }}
+          <button onClick={() => { onNavigate('delete', item); setOpen(false) }}
             className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors">
             <Trash2 size={14} /> Supprimer dossier
           </button>
@@ -123,10 +138,18 @@ function ActionMenu({ id, onNavigate }) {
 
 export default function InterventionList() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [typeFilter, setTypeFilter] = useState('ALL')
   const [viewMode, setViewMode] = useState('list')
+  const [interventions, setInterventions] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [toast, setToast] = useState({ open: false, message: '' })
+  const toastTimerRef = useRef(null)
+  const [highlightId, setHighlightId] = useState('')
+  const highlightTimerRef = useRef(null)
+  const highlightRowRef = useRef(null)
   
   // Date Filters
   const [startDate, setStartDate] = useState('')
@@ -136,15 +159,131 @@ export default function InterventionList() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 6
 
-  const handleNavigate = (action, id) => {
-    if (action === 'details') navigate(`/interventions/${id}`)
-    else if (action === 'edit') navigate(`/interventions/${id}/edit`)
-    else if (action === 'assign') navigate(`/interventions/${id}/assign`)
+  const fetchInterventions = async () => {
+    setLoading(true)
+    try {
+      const response = await apiFetch('/interventions', { auth: false })
+      if (response.ok) {
+        const data = await response.json()
+        const normalized = Array.isArray(data)
+          ? data.map((i) => ({
+              id: i.id,
+              client: i.client || i.clientName || '',
+              machine: i.machine || i.machineType || '',
+              type: i.type || '',
+              status: i.status || 'PENDING',
+              date: i.date || i.interventionDate || '',
+              assignee: i.assignee || i.assignedTo || i.technicianName || null,
+              priority: i.priority || 'Moyenne',
+            }))
+          : []
+        setInterventions(normalized)
+      }
+    } catch (error) {
+      console.error('Error fetching interventions:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
+  useEffect(() => {
+    fetchInterventions()
+  }, [])
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search || '')
+    const highlight = params.get('highlight') || location.state?.createdInterventionId || ''
+    const toastKey = params.get('toast') || ''
+    if (!highlight && !toastKey) return
+
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current)
+      toastTimerRef.current = null
+    }
+    if (highlightTimerRef.current) {
+      window.clearTimeout(highlightTimerRef.current)
+      highlightTimerRef.current = null
+    }
+
+    if (toastKey === 'created') {
+      setToast({
+        open: true,
+        message:
+          "Dossier d’intervention créé avec succès !\n" +
+          "Statut : En attente\n" +
+          "Employé assigné : Non assigné\n" +
+          "Vous pouvez maintenant créer une mission pour affecter un employé à cette intervention.",
+      })
+      toastTimerRef.current = window.setTimeout(() => {
+        setToast({ open: false, message: '' })
+        toastTimerRef.current = null
+      }, 3000)
+    }
+
+    if (highlight) {
+      setViewMode('list')
+      setHighlightId(String(highlight))
+      window.setTimeout(() => {
+        if (highlightRowRef.current?.scrollIntoView) {
+          highlightRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }, 80)
+      highlightTimerRef.current = window.setTimeout(() => {
+        setHighlightId('')
+        highlightTimerRef.current = null
+      }, 1800)
+    }
+
+    if (location.search || location.state?.createdInterventionId) {
+      navigate({ pathname: location.pathname, search: '' }, { replace: true, state: {} })
+    }
+
+    return () => {
+      if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
+      toastTimerRef.current = null
+      if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current)
+      highlightTimerRef.current = null
+    }
+  }, [location.pathname, location.search, location.state, navigate])
+
+  const handleNavigate = (action, itemOrId) => {
+    const item = typeof itemOrId === 'object' && itemOrId !== null ? itemOrId : null
+    const id = item ? item.id : itemOrId
+
+    if (action === 'details') {
+      navigate(`/interventions/${id}`, {
+        state: { assignedTechnicianName: item?.assignee || null }
+      })
+      return
+    }
+
+    if (action === 'edit') navigate(`/interventions/${id}/edit`)
+    else if (action === 'assign') navigate('/missions/assign', { state: { prefillInterventionId: id } })
+    else if (action === 'delete') {
+      const confirmed = window.confirm(`Supprimer le dossier ${id} ?`)
+      if (!confirmed) return
+      ;(async () => {
+        try {
+          const response = await apiFetch(`/interventions/${id}`, {
+            method: 'DELETE',
+            auth: false,
+          })
+          if (response.ok) {
+            fetchInterventions()
+          }
+        } catch (error) {
+          console.error('Error deleting intervention:', error)
+        }
+      })()
+    }
+  }
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, statusFilter, typeFilter, startDate, endDate])
+
   const filtered = useMemo(() => {
-    setCurrentPage(1) // Reset pagination on filter change
-    return mockInterventions.filter(i => {
+    return interventions.filter(i => {
       const matchSearch = [i.id, i.client, i.machine].some(v => v.toLowerCase().includes(search.toLowerCase()))
       const matchStatus = statusFilter === 'ALL' || i.status === statusFilter
       const matchType   = typeFilter   === 'ALL' || i.type   === typeFilter
@@ -165,11 +304,19 @@ export default function InterventionList() {
 
       return matchSearch && matchStatus && matchType && matchDate
     })
-  }, [search, statusFilter, typeFilter, startDate, endDate])
+  }, [interventions, search, statusFilter, typeFilter, startDate, endDate])
 
-  const total = mockInterventions.length
+  useEffect(() => {
+    if (!highlightId) return
+    const idx = filtered.findIndex((i) => String(i.id) === String(highlightId))
+    if (idx < 0) return
+    const page = Math.floor(idx / itemsPerPage) + 1
+    if (page !== currentPage) setCurrentPage(page)
+  }, [filtered, highlightId, itemsPerPage, currentPage])
+
+  const total = interventions.length
   const kpiData = Object.entries(statusConfig).map(([key, cfg]) => ({
-    key, ...cfg, count: mockInterventions.filter(i => i.status === key).length
+    key, ...cfg, count: interventions.filter(i => i.status === key).length
   }))
 
   // Pagination logic
@@ -181,6 +328,24 @@ export default function InterventionList() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
+      {toast.open && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center pointer-events-none animate-in fade-in duration-200">
+          <div className="w-full max-w-xl px-4">
+            <div className="bg-slate-900 text-white border border-slate-700 rounded-2xl shadow-2xl overflow-hidden">
+              <div className="px-6 py-4 flex items-start gap-4">
+                <div className="w-10 h-10 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center shrink-0">
+                  <CheckCircle2 size={20} className="text-green-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-300">Interventions</p>
+                  <p className="text-sm font-black whitespace-pre-line leading-relaxed mt-1">{toast.message}</p>
+                </div>
+              </div>
+              <div className="h-1 bg-gradient-to-r from-emerald-400 via-green-400 to-lime-300" />
+            </div>
+          </div>
+        </div>
+      )}
       {/* ── Top Bar ── */}
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200">
         <div className="max-w-[1600px] mx-auto px-6 h-20 flex items-center justify-between">
@@ -201,6 +366,13 @@ export default function InterventionList() {
           <div className="flex items-center gap-3">
             <button className="hidden sm:flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all">
               <Download size={16} /> Export
+            </button>
+            <button
+              onClick={fetchInterventions}
+              className="hidden sm:flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all"
+              disabled={loading}
+            >
+              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Actualiser
             </button>
             <button
               onClick={() => navigate('/interventions/create')}
@@ -345,11 +517,22 @@ export default function InterventionList() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {paginatedData.map((item, idx) => {
-                    const st = statusConfig[item.status]
-                    const ty = typeConfig[item.type]
-                    const TyIcon = ty.icon
+                    const normalizedType = normalizeTypeKey(item.type)
+                    const st = statusConfig[item.status] || fallbackStatus
+                    const ty = typeConfig[normalizedType] || fallbackType
+                    const TyIcon = ty.icon || Wrench
+                    const isHighlighted = String(item.id) === String(highlightId)
                     return (
-                      <tr key={item.id} className={`hover:bg-blue-50/50 transition-colors group cursor-pointer ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`} onClick={() => handleNavigate('details', item.id)}>
+                      <tr
+                        key={item.id}
+                        ref={isHighlighted ? highlightRowRef : null}
+                        className={`transition-colors group cursor-pointer ${
+                          isHighlighted
+                            ? 'bg-emerald-50 ring-2 ring-emerald-200 animate-pulse'
+                            : `hover:bg-blue-50/50 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`
+                        }`}
+                        onClick={() => handleNavigate('details', item)}
+                      >
                         <td className="px-6 py-4 border-r border-slate-50 last:border-0">
                           <div className="flex items-center gap-3">
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${ty.color}`}>
@@ -401,21 +584,21 @@ export default function InterventionList() {
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-center gap-2">
                             <button 
-                              onClick={(e) => { e.stopPropagation(); handleNavigate('details', item.id) }}
+                              onClick={(e) => { e.stopPropagation(); handleNavigate('details', item) }}
                               className="flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white rounded-xl transition-all shadow-sm border border-[#004a77]/10 active:scale-95"
                             >
                               <Eye size={12} strokeWidth={3} />
                               Consulter
                             </button>
                             <button 
-                              onClick={(e) => { e.stopPropagation(); handleNavigate('edit', item.id) }}
+                              onClick={(e) => { e.stopPropagation(); handleNavigate('edit', item) }}
                               className="flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white rounded-xl transition-all shadow-sm border border-[#004a77]/10 active:scale-95"
                             >
                               <Edit2 size={12} strokeWidth={3} />
                               Modifier
                             </button>
                             <button 
-                              onClick={(e) => { e.stopPropagation(); handleNavigate('assign', item.id) }}
+                              onClick={(e) => { e.stopPropagation(); handleNavigate('assign', item) }}
                               className="flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white rounded-xl transition-all shadow-sm border border-[#004a77]/10 active:scale-95"
                             >
                               <UserCheck2 size={12} strokeWidth={3} />
@@ -496,7 +679,7 @@ export default function InterventionList() {
                       return (
                         <div 
                           key={item.id} 
-                          onClick={() => handleNavigate('details', item.id)}
+                          onClick={() => handleNavigate('details', item)}
                           className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-blue-300 hover:shadow-md transition-all cursor-pointer group relative overflow-hidden"
                         >
                           <div className={`absolute top-0 left-0 w-1 h-full ${st.bar}`} />
@@ -529,7 +712,7 @@ export default function InterventionList() {
                               <span className="text-[10px] font-bold text-amber-500 bg-amber-50 px-2 py-0.5 rounded-md">À affecter</span>
                             )}
                             <div className="flex items-center gap-1">
-                              <ActionMenu id={item.id} onNavigate={handleNavigate} />
+                              <ActionMenu item={item} onNavigate={handleNavigate} />
                             </div>
                           </div>
                         </div>

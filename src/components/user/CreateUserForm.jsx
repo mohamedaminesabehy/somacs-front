@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Users } from 'lucide-react'
 
-export default function CreateUserForm({ currentUser, onUserCreated }) {
+export default function CreateUserForm({ currentUser, onUserCreated, onAction }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
@@ -99,6 +99,9 @@ export default function CreateUserForm({ currentUser, onUserCreated }) {
       setConfirmPassword('')
       if (onUserCreated) {
         onUserCreated()
+      }
+      if (onAction) {
+        onAction("Utilisateur ajouté")
       }
     } catch {
       setError("Erreur lors de la création de l'utilisateur.")

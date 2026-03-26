@@ -1,120 +1,7 @@
-import { forwardRef, useImperativeHandle, useState } from 'react'
-import { AlertCircle, Package, ClipboardList, Users, Eye, Edit, Trash2, MapPin, Building2, Phone, Calendar, Wrench, Paperclip, FileText, Clock, UserCheck, Hourglass, Link2, Settings } from 'lucide-react'
-
-const initialMissions = [
-  {
-    id: 1,
-    icon: AlertCircle,
-    title: 'Réparation urgente pompe hydraulique',
-    description: 'Intervention client prioritaire - Site Marseille',
-    employee: 'Marc Dubois',
-    avatar: 'M',
-    priority: 'Critique',
-    priorityColor: 'red',
-    status: 'En cours',
-    statusColor: 'yellow',
-    dueDate: "Aujourd'hui",
-    dueTime: '18:00',
-    duration: '4h',
-    type: 'Normal',
-    interventionId: null,
-  },
-  {
-    id: 2,
-    icon: Package,
-    title: 'Inventaire pièces détachées Q4',
-    description: 'Vérification stock et mise à jour base de données',
-    employee: 'Sarah Martin',
-    avatar: 'S',
-    priority: 'Haute',
-    priorityColor: 'orange',
-    status: 'À faire',
-    statusColor: 'blue',
-    dueDate: '25 Oct 2024',
-    duration: '6h',
-    type: 'Normal',
-    interventionId: null,
-  },
-  {
-    id: 3,
-    icon: ClipboardList,
-    title: 'Rédaction rapport mensuel octobre',
-    description: 'Synthèse activités et KPIs du mois',
-    employee: 'Jean Dupont',
-    avatar: 'J',
-    priority: 'Moyenne',
-    priorityColor: 'gray',
-    status: 'Terminée',
-    statusColor: 'green',
-    dueDate: '23 Oct 2024',
-    duration: '3h',
-    type: 'Normal',
-    interventionId: null,
-  },
-  {
-    id: 4,
-    icon: AlertCircle,
-    title: 'Installation nouveau système CRM',
-    description: 'En attente validation direction',
-    employee: 'Jean Dupont',
-    avatar: 'J',
-    priority: 'Haute',
-    priorityColor: 'orange',
-    status: 'Bloquée',
-    statusColor: 'red',
-    dueDate: '30 Oct 2024',
-    duration: '12h',
-    type: 'Normal',
-    interventionId: null,
-  },
-  {
-    id: 5,
-    icon: Wrench,
-    title: "Réparation Pont Élévateur - Garage Central",
-    description: 'Intervention liée au dossier INT-2026-001',
-    employee: 'Jean Dupont',
-    avatar: 'J',
-    priority: 'Critique',
-    priorityColor: 'red',
-    status: 'En cours',
-    statusColor: 'yellow',
-    dueDate: "Aujourd'hui",
-    duration: '4h',
-    type: 'Intervention',
-    interventionId: 'INT-2026-001',
-  },
-  {
-    id: 6,
-    icon: Wrench,
-    title: "Réparation Chariot Élévateur - Logistique Express",
-    description: 'Intervention liée au dossier INT-2026-003',
-    employee: 'Pierre Martin',
-    avatar: 'P',
-    priority: 'Haute',
-    priorityColor: 'orange',
-    status: 'À faire',
-    statusColor: 'blue',
-    dueDate: '04 Mars 2026',
-    duration: '3h',
-    type: 'Intervention',
-    interventionId: 'INT-2026-003',
-  },
-]
-
-// ── Interventions list matching InterventionList.jsx data ──
-// Only PENDING and ASSIGNED interventions are available for linking
-const interventionsList = [
-  { id: 'INT-2026-001', client: 'Garage Central',     machine: 'Pont Élévateur 4T',      type: 'Réparation',   status: 'IN_PROGRESS', statusLabel: 'En cours',    date: '01/03/2026', phone: '99184688', clientCode: 'CLT-882', request: 'Fuite hydraulique vérin gauche', assignedTo: 'Jean Dupont' },
-  { id: 'INT-2026-002', client: 'Usine MetalPlus',    machine: 'Compresseur Industriel', type: 'Installation',  status: 'PENDING',     statusLabel: 'En attente',  date: '02/03/2026', phone: '71445566', clientCode: 'CLT-445', request: 'Installation compresseur nouvelle ligne', assignedTo: null },
-  { id: 'INT-2026-003', client: 'Logistique Express', machine: 'Chariot Élévateur',      type: 'Réparation',   status: 'ASSIGNED',    statusLabel: 'Affectée',    date: '02/03/2026', phone: '55667788', clientCode: 'CLT-116', request: 'Panne système de levage', assignedTo: 'Pierre Martin' },
-  { id: 'INT-2026-004', client: 'BTP Service',        machine: 'Générateur 50kVA',       type: 'Devis',         status: 'CLOSED',      statusLabel: 'Clôturé',     date: '28/02/2026', phone: '22334455', clientCode: 'CLT-290', request: 'Établissement devis remplacement', assignedTo: 'Jean Dupont' },
-  { id: 'INT-2026-005', client: 'AgriTech SA',        machine: "Système d'Irrigation",   type: 'Réparation',   status: 'TESTING',     statusLabel: 'En test',     date: '01/03/2026', phone: '99112233', clientCode: 'CLT-512', request: 'Fuite circuit principal', assignedTo: 'Marie Curie' },
-  { id: 'INT-2026-006', client: 'Clinique Moderne',   machine: 'Ascenseur Bloc B',       type: 'Garantie',      status: 'PENDING',     statusLabel: 'En attente',  date: '03/03/2026', phone: '71889900', clientCode: 'CLT-780', request: 'Maintenance préventive ascenseur', assignedTo: null },
-  { id: 'INT-2026-007', client: 'MegaDistrib SA',     machine: 'Porte Automatique',      type: 'Réparation',   status: 'ASSIGNED',    statusLabel: 'Affectée',    date: '03/03/2026', phone: '55443322', clientCode: 'CLT-331', request: 'Porte automatique bloquée', assignedTo: 'Sarah Martin' },
-]
-
-// Only show PENDING and ASSIGNED interventions in the "Lier à une intervention" dropdown
-const linkableInterventions = interventionsList.filter(i => i.status === 'PENDING' || i.status === 'ASSIGNED')
+import { forwardRef, useImperativeHandle, useState, useEffect, useCallback } from 'react'
+import { AlertCircle, Package, ClipboardList, Users, Eye, Edit, Trash2, MapPin, Building2, Phone, Calendar, Wrench, Paperclip, FileText, Clock, UserCheck, Hourglass, Link2, Settings, Download } from 'lucide-react'
+import { apiFetch } from '../../api/apiClient'
+import technicien from '../../assets/technicien.avif'
 
 const priorityColors = {
   red: 'bg-red-100 text-red-700',
@@ -147,7 +34,9 @@ function getAvatarFromName(name) {
 }
 
 function MissionTableInner(props, ref) {
-  const [missions, setMissions] = useState(initialMissions)
+  const { missions: missionsProp, onMissionsChanged } = props || {}
+  const [missions, setMissions] = useState([])
+  const [interventionsList, setInterventionsList] = useState([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState('create')
   const [formMissionId, setFormMissionId] = useState(null)
@@ -165,20 +54,59 @@ function MissionTableInner(props, ref) {
   const [formSite, setFormSite] = useState('')
   const [formAddress, setFormAddress] = useState('')
 
+  const [existingAttachments, setExistingAttachments] = useState([])
+  const [newAttachments, setNewAttachments] = useState([])
+
   const [isViewOpen, setIsViewOpen] = useState(false)
   const [viewMission, setViewMission] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 5
 
-  const employeeOptions = Array.from(new Set(missions.map((mission) => mission.employee)))
+  const displayMissions = Array.isArray(missionsProp) ? missionsProp : missions
+
+  const fetchMissions = useCallback(async () => {
+    try {
+      const response = await apiFetch('/missions', { auth: false })
+      if (response.ok) {
+        const data = await response.json()
+        setMissions(data)
+      }
+    } catch (error) {
+      console.error('Error fetching missions:', error)
+    }
+  }, [])
+
+  const fetchInterventions = useCallback(async () => {
+    try {
+      const response = await apiFetch('/interventions', { auth: false })
+      if (response.ok) {
+        const data = await response.json()
+        setInterventionsList(data)
+      }
+    } catch (error) {
+      console.error('Error fetching interventions:', error)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!Array.isArray(missionsProp)) {
+      fetchMissions()
+    }
+    fetchInterventions()
+  }, [fetchMissions, fetchInterventions, missionsProp])
+
+  // Only show PENDING and ASSIGNED interventions in the "Lier à une intervention" dropdown
+  const linkableInterventions = interventionsList.filter(i => i.status === 'PENDING' || i.status === 'ASSIGNED')
+
+  const employeeOptions = Array.from(new Set(displayMissions.map((mission) => mission.employee)))
   const selectedIntervention = linkableInterventions.find(i => i.id === selectedInterventionId)
 
-  const totalMissions = missions.length
+  const totalMissions = displayMissions.length
   const totalPages = Math.max(1, Math.ceil(totalMissions / pageSize))
   const safeCurrentPage = Math.min(currentPage, totalPages)
   const startIndex = (safeCurrentPage - 1) * pageSize
   const endIndex = startIndex + pageSize
-  const paginatedMissions = missions.slice(startIndex, endIndex)
+  const paginatedMissions = displayMissions.slice(startIndex, endIndex)
 
   const handleOpenCreateModal = () => {
     setModalMode('create')
@@ -195,6 +123,8 @@ function MissionTableInner(props, ref) {
     setSelectedInterventionId('')
     setFormSite('')
     setFormAddress('')
+    setExistingAttachments([])
+    setNewAttachments([])
     setIsModalOpen(true)
   }
 
@@ -213,6 +143,8 @@ function MissionTableInner(props, ref) {
     setFormSite(mission.site || '')
     setFormAddress(mission.address || '')
     setSelectedInterventionId(mission.interventionId || '')
+    setExistingAttachments(Array.isArray(mission.attachments) ? mission.attachments : [])
+    setNewAttachments([])
     setIsModalOpen(true)
   }
 
@@ -220,7 +152,42 @@ function MissionTableInner(props, ref) {
     setIsModalOpen(false)
   }
 
-  const handleSubmitModal = (event) => {
+  const handlePickAttachments = (event) => {
+    const files = Array.from(event.target.files || [])
+    if (files.length === 0) return
+
+    const maxBytes = 10 * 1024 * 1024
+    const allowed = files.filter((f) => f.size <= maxBytes)
+    if (allowed.length !== files.length) {
+      alert('Certains fichiers dépassent 10MB et ont été ignorés.')
+    }
+
+    setNewAttachments((prev) => {
+      const next = [...prev, ...allowed].slice(0, 10)
+      const uniq = new Map()
+      for (const f of next) {
+        const key = `${f.name}_${f.size}_${f.lastModified}`
+        if (!uniq.has(key)) uniq.set(key, f)
+      }
+      return Array.from(uniq.values())
+    })
+
+    event.target.value = ''
+  }
+
+  const removeNewAttachment = (file) => {
+    setNewAttachments((prev) =>
+      prev.filter(
+        (f) => !(f.name === file.name && f.size === file.size && f.lastModified === file.lastModified),
+      ),
+    )
+  }
+
+  const removeExistingAttachment = (publicId) => {
+    setExistingAttachments((prev) => prev.filter((a) => a.publicId !== publicId))
+  }
+
+  const handleSubmitModal = async (event) => {
     event.preventDefault()
 
     if (!formTitle || !formDescription || !formEmployee) {
@@ -236,52 +203,62 @@ function MissionTableInner(props, ref) {
       title: formTitle,
       description: formDescription,
       employee: formEmployee,
-      avatar: getAvatarFromName(formEmployee),
       priority: formPriority,
-      priorityColor:
-        formPriority === 'Critique'
-          ? 'red'
-          : formPriority === 'Haute'
-            ? 'orange'
-            : formPriority === 'Moyenne'
-              ? 'yellow'
-              : 'gray',
       status: modalMode === 'create' ? 'À faire' : formStatus,
-      statusColor:
-        modalMode === 'create'
-          ? 'blue'
-          : (formStatus === 'En cours' ? 'yellow' : formStatus === 'Terminée' ? 'green' : formStatus === 'Bloquée' ? 'red' : 'blue'),
       dueDate: formDueDate || "Aujourd'hui",
       dueTime: formDueTime || null,
-      duration: null,
       notes: formNotes,
-      icon: missionType === 'Intervention' ? Wrench : ClipboardList,
       type: missionType,
       site: missionType === 'Normal' ? formSite : selectedIntervention?.client,
       address: missionType === 'Normal' ? formAddress : 'N/A',
       interventionId: missionType === 'Intervention' ? selectedInterventionId : null,
     }
 
-    if (modalMode === 'create') {
-      const nextId = missions.length ? Math.max(...missions.map((mission) => mission.id)) + 1 : 1
-      const newMission = {
-        id: nextId,
-        ...baseMission,
-      }
-      setMissions((prev) => [newMission, ...prev])
-    } else {
-      setMissions((prev) =>
-        prev.map((mission) => {
-          if (mission.id !== formMissionId) return mission
-          return {
-            ...mission,
-            ...baseMission,
-          }
-        }),
+    try {
+      const response = await apiFetch(
+        modalMode === 'create' ? '/missions' : `/missions/${formMissionId}`,
+        {
+          method: modalMode === 'create' ? 'POST' : 'PATCH',
+          body: modalMode === 'edit' ? { ...baseMission, attachments: existingAttachments } : baseMission,
+          auth: false,
+        },
       )
-    }
 
-    setIsModalOpen(false)
+      if (response.ok) {
+        const saved = await response.json().catch(() => null)
+        const missionId = saved?.id || formMissionId
+
+        if (missionId && newAttachments.length > 0) {
+          const form = new FormData()
+          for (const file of newAttachments) {
+            form.append('files', file)
+          }
+          const uploadRes = await apiFetch(`/missions/${missionId}/attachments`, {
+            method: 'POST',
+            body: form,
+            auth: false,
+          })
+          if (!uploadRes.ok) {
+            alert('Mission enregistrée, mais erreur lors de l’upload des fichiers.')
+          }
+        }
+
+        // Si c'est une intervention, on met à jour son statut dans le backend aussi
+        if (missionType === 'Intervention' && selectedInterventionId) {
+          await apiFetch(`/interventions/${selectedInterventionId}`, {
+            method: 'PATCH',
+            body: { status: 'ASSIGNED', assignedTo: formEmployee },
+            auth: false,
+          })
+          fetchInterventions()
+        }
+        if (typeof onMissionsChanged === 'function') onMissionsChanged()
+        else fetchMissions()
+        setIsModalOpen(false)
+      }
+    } catch (error) {
+      console.error('Error saving mission:', error)
+    }
   }
 
   useImperativeHandle(ref, () => ({
@@ -289,7 +266,23 @@ function MissionTableInner(props, ref) {
   }))
 
   const handleOpenViewModal = (mission) => {
-    setViewMission(mission)
+    const priorityColor =
+      mission.priority === 'Critique'
+        ? 'red'
+        : mission.priority === 'Haute'
+          ? 'orange'
+          : mission.priority === 'Moyenne'
+            ? 'yellow'
+            : 'gray'
+    const statusColor =
+      mission.status === 'En cours'
+        ? 'yellow'
+        : mission.status === 'Terminée'
+          ? 'green'
+          : mission.status === 'Bloquée'
+            ? 'red'
+            : 'blue'
+    setViewMission({ ...mission, priorityColor, statusColor })
     setIsViewOpen(true)
   }
 
@@ -314,8 +307,26 @@ function MissionTableInner(props, ref) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
+          {paginatedMissions.length === 0 ? (
+            <tr>
+              <td colSpan={7} className="px-6 py-12">
+                <div className="flex flex-col items-center justify-center text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center mb-3">
+                    <AlertCircle size={22} className="text-gray-400" />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Il n&apos;y a pas de mission correspondant à vos filtres.
+                  </p>
+                </div>
+              </td>
+            </tr>
+          ) : null}
           {paginatedMissions.map((mission) => {
-            const IconComponent = mission.icon
+            const IconComponent = mission.type === 'Intervention' ? Wrench : ClipboardList
+            const priorityColor = mission.priority === 'Critique' ? 'red' : mission.priority === 'Haute' ? 'orange' : mission.priority === 'Moyenne' ? 'yellow' : 'gray'
+            const statusColor = mission.status === 'En cours' ? 'yellow' : mission.status === 'Terminée' ? 'green' : mission.status === 'Bloquée' ? 'red' : 'blue'
+            const avatar = getAvatarFromName(mission.employee)
+
             return (
               <tr key={mission.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 sm:px-6 py-4">
@@ -337,13 +348,13 @@ function MissionTableInner(props, ref) {
                 <td className="px-4 sm:px-6 py-4">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full bg-[#0052CC] text-white flex items-center justify-center text-xs font-bold">
-                      {mission.avatar}
+                      {avatar}
                     </div>
                     <span className="text-sm text-gray-900">{mission.employee}</span>
                   </div>
                 </td>
                 <td className="px-4 sm:px-6 py-4">
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${priorityColors[mission.priorityColor]}`}>
+                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${priorityColors[priorityColor]}`}>
                     {mission.priority === 'Critique' && '⚠️ '}
                     {mission.priority === 'Haute' && '↗ '}
                     {mission.priority === 'Moyenne' && '– '}
@@ -352,7 +363,7 @@ function MissionTableInner(props, ref) {
                   </span>
                 </td>
                 <td className="px-4 sm:px-6 py-4">
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${statusColors[mission.statusColor]}`}>
+                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${statusColors[statusColor]}`}>
                     {mission.status === 'En cours' && '●'}
                     {mission.status === 'À faire' && '●'}
                     {mission.status === 'Terminée' && '✓'}
@@ -397,7 +408,22 @@ function MissionTableInner(props, ref) {
                     <button
                       type="button"
                       className="p-1 text-gray-500 hover:text-red-700 hover:bg-red-50 rounded"
-                      onClick={() => alert('Suppression de la mission simulée (aucune API connectée).')}
+                      onClick={async () => {
+                        if (window.confirm('Êtes-vous sûr de vouloir supprimer cette mission ?')) {
+                          try {
+                            const response = await apiFetch(`/missions/${mission.id}`, {
+                              method: 'DELETE',
+                              auth: false,
+                            })
+                            if (response.ok) {
+                              if (typeof onMissionsChanged === 'function') onMissionsChanged()
+                              else fetchMissions()
+                            }
+                          } catch (error) {
+                            console.error('Error deleting mission:', error)
+                          }
+                        }
+                      }}
                     >
                       <Trash2 size={18} />
                     </button>
@@ -764,7 +790,18 @@ function MissionTableInner(props, ref) {
                     <Paperclip size={14} />
                     Pièces jointes
                   </h3>
-                  <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center hover:border-[#0052CC] hover:bg-blue-50/50 transition-all cursor-pointer group bg-gray-50/50">
+                  <input
+                    type="file"
+                    multiple
+                    accept=".pdf,.png,.jpg,.jpeg,image/png,image/jpeg,application/pdf"
+                    className="hidden"
+                    id="mission-table-attachments"
+                    onChange={handlePickAttachments}
+                  />
+                  <label
+                    htmlFor="mission-table-attachments"
+                    className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center hover:border-[#0052CC] hover:bg-blue-50/50 transition-all cursor-pointer group bg-gray-50/50 block"
+                  >
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center text-gray-400 group-hover:text-[#0052CC] transition-colors">
                         <FileText size={24} />
@@ -776,7 +813,69 @@ function MissionTableInner(props, ref) {
                         <p className="text-xs text-gray-500">PDF, JPG, PNG (Max 10MB)</p>
                       </div>
                     </div>
-                  </div>
+                  </label>
+
+                  {modalMode === 'edit' && existingAttachments.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Documents existants</p>
+                      {existingAttachments.map((a) => (
+                        <div
+                          key={a.publicId}
+                          className="flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-lg px-4 py-2 shadow-sm"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-gray-800 truncate">
+                              {a.originalFilename || a.publicId}
+                            </p>
+                            <p className="text-[10px] text-gray-500 truncate">{a.url}</p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <a
+                              href={a.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[10px] font-bold text-[#0052CC] hover:underline"
+                            >
+                              Ouvrir
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => removeExistingAttachment(a.publicId)}
+                              className="text-[10px] font-bold text-red-600 hover:text-red-700"
+                            >
+                              Retirer
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {newAttachments.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Nouveaux fichiers</p>
+                      {newAttachments.map((file) => (
+                        <div
+                          key={`${file.name}_${file.size}_${file.lastModified}`}
+                          className="flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-lg px-4 py-2 shadow-sm"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-gray-800 truncate">{file.name}</p>
+                            <p className="text-[10px] text-gray-500">{Math.ceil(file.size / 1024)} KB</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeNewAttachment(file)}
+                            className="text-[10px] font-bold text-red-600 hover:text-red-700"
+                          >
+                            Retirer
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </section>
               </form>
             </div>
@@ -809,9 +908,12 @@ function MissionTableInner(props, ref) {
             {/* View Header */}
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-[#0052CC] text-white flex items-center justify-center text-lg font-bold shadow-inner">
-                  {viewMission.avatar}
-                </div>
+                <img
+                  src={technicien}
+                  alt=""
+                  aria-hidden="true"
+                  className="w-12 h-12 rounded-full object-cover shadow-inner"
+                />
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">{viewMission.employee}</h2>
                   <p className="text-xs text-gray-500 font-medium">Responsable de la mission</p>
@@ -887,14 +989,82 @@ function MissionTableInner(props, ref) {
                   </div>
                   <div className="flex items-start gap-3">
                     <div className="mt-1 p-2 bg-orange-50 rounded-lg">
-                      <Clock size={16} className="text-orange-500" />
+                      <FileText size={16} className="text-orange-500" />
                     </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Temps estimé</p>
-                      <p className="text-sm font-semibold text-gray-900">{viewMission.duration}</p>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Note technicien</p>
+                      <p className="text-sm font-semibold text-gray-900 break-words">
+                        {viewMission.notes || '—'}
+                      </p>
                     </div>
                   </div>
                 </div>
+
+                {Array.isArray(viewMission.attachments) && viewMission.attachments.length > 0 && (
+                  <div className="pt-4 border-t border-gray-100">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Documents</p>
+                      <div className="text-[10px] font-bold text-gray-400 truncate">
+                        {viewMission.employee} · {viewMission.dueDate}{viewMission.dueTime ? ` ${viewMission.dueTime}` : ''}
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      {viewMission.attachments.map((a) => (
+                        <div
+                          key={a.publicId}
+                          className="flex items-center justify-between gap-3 bg-white p-3 rounded-xl border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-11 h-11 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center shrink-0">
+                              {a.resourceType === 'image' ? (
+                                <img
+                                  src={a.url}
+                                  alt={a.originalFilename || ''}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <FileText size={18} className="text-gray-500" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-gray-900 truncate">
+                                {a.originalFilename || a.publicId}
+                              </p>
+                              <p className="text-[10px] text-gray-500 truncate">
+                                Mission: {viewMission.title}
+                              </p>
+                              <div className="flex items-center gap-2 text-[10px] text-gray-400 mt-0.5">
+                                <span className="truncate">{a.bytes ? `${Math.ceil(a.bytes / 1024)} KB` : '—'}</span>
+                                <span className="w-1 h-1 bg-gray-200 rounded-full" />
+                                <span className="truncate">{a.createdAt ? new Date(a.createdAt).toLocaleDateString('fr-FR') : '—'}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <a
+                              href={a.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-100 transition-all"
+                              title="Ouvrir"
+                            >
+                              <Eye size={16} />
+                            </a>
+                            <a
+                              href={a.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-100 transition-all"
+                              title="Télécharger"
+                            >
+                              <Download size={16} />
+                            </a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {(viewMission.site || viewMission.address) && (
                   <div className="pt-4 border-t border-gray-100 flex items-center gap-4">

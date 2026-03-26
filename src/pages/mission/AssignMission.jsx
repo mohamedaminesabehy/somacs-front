@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   ChevronRight,
   ChevronLeft,
@@ -27,29 +27,24 @@ import {
   Target,
   Send
 } from 'lucide-react'
+import { apiFetch } from '../../api/apiClient'
 
-// ── Shared mock data ──────────────────────────────────────────────────────────
-const interventionsList = [
-  { id: 'INT-2026-001', client: 'Garage Central',     machine: 'Pont Elevateur 4T',       type: 'Reparation',   status: 'IN_PROGRESS', statusLabel: 'En cours',   date: '01/03/2026', phone: '99184688', clientCode: 'CLT-882', request: 'Fuite hydraulique verin gauche - Intervention urgente demandee.', assignedTo: 'Jean Dupont' },
-  { id: 'INT-2026-002', client: 'Usine MetalPlus',    machine: 'Compresseur Industriel',  type: 'Installation',  status: 'PENDING',     statusLabel: 'En attente', date: '02/03/2026', phone: '71445566', clientCode: 'CLT-445', request: 'Installation compresseur nouvelle ligne de production.', assignedTo: null },
-  { id: 'INT-2026-003', client: 'Logistique Express', machine: 'Chariot Elevateur',       type: 'Reparation',   status: 'ASSIGNED',    statusLabel: 'Affectee',   date: '02/03/2026', phone: '55667788', clientCode: 'CLT-116', request: 'Panne systeme de levage - chariot bloque.', assignedTo: 'Pierre Martin' },
-  { id: 'INT-2026-005', client: 'AgriTech SA',        machine: "Systeme d'Irrigation",   type: 'Reparation',   status: 'TESTING',     statusLabel: 'En test',    date: '01/03/2026', phone: '99112233', clientCode: 'CLT-512', request: 'Fuite circuit principal - arrosage arrete.', assignedTo: 'Marie Curie' },
-  { id: 'INT-2026-006', client: 'Clinique Moderne',   machine: 'Ascenseur Bloc B',        type: 'Garantie',      status: 'PENDING',     statusLabel: 'En attente', date: '03/03/2026', phone: '71889900', clientCode: 'CLT-780', request: 'Ascenseur bloque entre 2eme et 3eme etage.', assignedTo: null },
-  { id: 'INT-2026-007', client: 'MegaDistrib SA',     machine: 'Porte Automatique',       type: 'Reparation',   status: 'ASSIGNED',    statusLabel: 'Affectee',   date: '03/03/2026', phone: '55443322', clientCode: 'CLT-331', request: 'Motorisation porte - blocage a 70% de course.', assignedTo: 'Sarah Martin' },
-]
+function getAvatarFromName(name) {
+  if (!name) return ''
+  const parts = name.split(' ').filter(Boolean)
+  if (parts.length === 0) return ''
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+  return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase()
+}
 
-const linkableInterventions = interventionsList.filter(
-  (i) => i.status === 'PENDING' || i.status === 'ASSIGNED'
-)
-
-const employeeList = [
-  { id: 1, name: 'Jean Dupont',    role: 'Technicien Senior',  avatar: 'JD', active: 2 },
-  { id: 2, name: 'Pierre Martin',  role: 'Technicien SAV',     avatar: 'PM', active: 1 },
-  { id: 3, name: 'Sarah Martin',   role: 'Technicienne',       avatar: 'SM', active: 1 },
-  { id: 4, name: 'Marie Curie',    role: 'Technicienne Senior',avatar: 'MC', active: 3 },
-  { id: 5, name: 'Karim Bensalem', role: 'Technicien',         avatar: 'KB', active: 0 },
-  { id: 6, name: 'Nadia Slim',     role: 'Coordinatrice SAV',  avatar: 'NS', active: 0 },
-]
+function getStatusLabel(status) {
+  if (status === 'PENDING') return 'En attente'
+  if (status === 'ASSIGNED') return 'Affectée'
+  if (status === 'IN_PROGRESS') return 'En cours'
+  if (status === 'TESTING') return 'En test'
+  if (status === 'CLOSED') return 'Clôturé'
+  return status || ''
+}
 
 // ── Steps definition ──────────────────────────────────────────────────────────
 const steps = [
@@ -69,7 +64,11 @@ const statusColors = {
 
 export default function AssignMission() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [currentStep, setCurrentStep] = useState(1)
+  const [interventionsList, setInterventionsList] = useState([])
+  const [employeeList, setEmployeeList] = useState([])
+  const [attachments, setAttachments] = useState([])
 
   // Step 1 — Type
   const [missionType, setMissionType] = useState('') // 'Normal' | 'Intervention'
@@ -81,7 +80,6 @@ export default function AssignMission() {
     site: '',
     address: '',
     interventionId: '',
-    notes: '',
   })
 
   // Step 3 — Affectation
@@ -95,10 +93,87 @@ export default function AssignMission() {
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const response = await apiFetch('/interventions', { auth: false })
+        if (!response.ok) return
+        const data = await response.json()
+        const normalized = Array.isArray(data)
+          ? data.map((i) => ({
+              id: i.id,
+              client: i.client || i.clientName || '',
+              machine: i.machine || i.machineType || '',
+              type: i.type || i.interventionType || '',
+              status: i.status || 'PENDING',
+              statusLabel: getStatusLabel(i.status),
+              date: i.date || i.interventionDate || '',
+              phone: i.phone || i.clientPhone || '',
+              clientCode: i.clientCode || '',
+              request: i.request || i.problemDescription || '',
+              assignedTo: i.assignedTo || i.assignee || i.technicianName || null,
+            }))
+          : []
+        setInterventionsList(normalized)
+      } catch {}
+    })()
+  }, [])
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const response = await apiFetch('/users')
+        if (!response.ok) return
+        const data = await response.json()
+        const users = Array.isArray(data) ? data : []
+        const normalized = users
+          .filter((u) => u && u.isActive !== false)
+          .map((u) => ({
+            id: u.id,
+            name: u.name,
+            role: u.role,
+            avatar: getAvatarFromName(u.name),
+            active: 0,
+          }))
+        setEmployeeList(normalized)
+      } catch {}
+    })()
+  }, [])
+
+  const linkableInterventions = useMemo(
+    () => interventionsList.filter((i) => i.status === 'PENDING' || i.status === 'ASSIGNED'),
+    [interventionsList],
+  )
+
   const selectedIntervention = linkableInterventions.find(
     (i) => i.id === formData.interventionId
   )
   const selectedEmployeeObj = employeeList.find((e) => e.name === selectedEmployee)
+  const prefillDoneRef = useRef(false)
+  const prefillInterventionId = location.state?.prefillInterventionId || ''
+
+  useEffect(() => {
+    if (prefillDoneRef.current) return
+    if (!prefillInterventionId) return
+
+    prefillDoneRef.current = true
+    setMissionType('Intervention')
+    setCurrentStep(2)
+    setFormData((prev) => ({
+      ...prev,
+      interventionId: prefillInterventionId,
+      title: prev.title || `Intervention SAV — ${prefillInterventionId}`,
+    }))
+  }, [prefillInterventionId])
+
+  useEffect(() => {
+    if (!prefillInterventionId) return
+    if (!selectedIntervention) return
+    setFormData((prev) => ({
+      ...prev,
+      description: prev.description || selectedIntervention.request || '',
+    }))
+  }, [prefillInterventionId, selectedIntervention])
 
   const canGoNext = () => {
     if (currentStep === 1) return missionType !== ''
@@ -115,13 +190,99 @@ export default function AssignMission() {
   }
   const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 1))
 
-  const handleSubmit = () => {
+  const handlePickFiles = (e) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    const maxBytes = 10 * 1024 * 1024
+    const allowed = files.filter((f) => f.size <= maxBytes)
+    if (allowed.length !== files.length) {
+      alert('Certains fichiers dépassent 10MB et ont été ignorés.')
+    }
+    setAttachments((prev) => {
+      const next = [...prev, ...allowed].slice(0, 10)
+      const uniq = new Map()
+      for (const f of next) {
+        const key = `${f.name}_${f.size}_${f.lastModified}`
+        if (!uniq.has(key)) uniq.set(key, f)
+      }
+      return Array.from(uniq.values())
+    })
+    e.target.value = ''
+  }
+
+  const removeAttachment = (file) => {
+    setAttachments((prev) =>
+      prev.filter(
+        (f) => !(f.name === file.name && f.size === file.size && f.lastModified === file.lastModified),
+      ),
+    )
+  }
+
+  const handleSubmit = async () => {
     const empName = selectedEmployee
     const missionTitle = formData.title
-    alert(
-      `Mission affectee avec succes !\n\nMission : ${missionTitle}\nTechnicien : ${empName}\nPriorite : ${priority}\nDate : ${dueDate}`
-    )
-    navigate('/missions')
+    try {
+      const missionPayload = {
+        title: formData.title,
+        description:
+          missionType === 'Intervention'
+            ? (formData.description || selectedIntervention?.request || '')
+            : formData.description,
+        employee: empName,
+        priority,
+        status: 'À faire',
+        dueDate: dueDate || "Aujourd'hui",
+        dueTime: dueTime || null,
+        type: missionType,
+        interventionId: missionType === 'Intervention' ? formData.interventionId : null,
+        site: missionType === 'Intervention' ? selectedIntervention?.client : formData.site,
+        address: missionType === 'Intervention' ? 'N/A' : formData.address,
+      }
+
+      const response = await apiFetch('/missions', {
+        method: 'POST',
+        body: missionPayload,
+        auth: false,
+      })
+      if (!response.ok) {
+        alert('Erreur lors de la création de la mission.')
+        return
+      }
+      const createdMission = await response.json().catch(() => null)
+
+      if (missionType === 'Intervention' && formData.interventionId) {
+        await apiFetch(`/interventions/${formData.interventionId}`, {
+          method: 'PATCH',
+          body: { status: 'ASSIGNED', assignedTo: empName },
+          auth: false,
+        })
+      }
+
+      if (createdMission?.id && attachments.length > 0) {
+        const form = new FormData()
+        for (const file of attachments) {
+          form.append('files', file)
+        }
+        const uploadRes = await apiFetch(`/missions/${createdMission.id}/attachments`, {
+          method: 'POST',
+          body: form,
+          auth: false,
+        })
+        if (!uploadRes.ok) {
+          alert('Mission créée, mais erreur lors de l’upload des fichiers.')
+          navigate('/missions')
+          return
+        }
+      }
+
+      alert(
+        `Mission affectee avec succes !\n\nMission : ${missionTitle}\nTechnicien : ${empName}\nPriorite : ${priority}\nDate : ${dueDate}`
+      )
+      navigate('/missions')
+    } catch (error) {
+      alert('Impossible de joindre le serveur.')
+    }
   }
 
   // ── Priority config ───────────────────────────────────────────────────────
@@ -138,10 +299,10 @@ export default function AssignMission() {
       // ─────────────────────────────────────────────────────────────────────
       case 1:
         return (
-          <div className="space-y-10 animate-in fade-in zoom-in-95 duration-500">
-            <div className="pb-6 border-b-2 border-slate-100">
-              <h2 className="text-2xl font-black text-slate-900 mb-2 flex items-center gap-3">
-                <Target className="text-[#0052CC]" size={28} />
+          <div className="space-y-6 sm:space-y-10 animate-in fade-in zoom-in-95 duration-500">
+            <div className="pb-4 sm:pb-6 border-b-2 border-slate-100">
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-2 flex items-center gap-3">
+                <Target className="text-[#0052CC]" size={24} />
                 Choisissez le type de mission
               </h2>
               <p className="text-sm text-slate-500 font-medium">
@@ -154,16 +315,17 @@ export default function AssignMission() {
               <button
                 type="button"
                 onClick={() => setMissionType('Normal')}
-                className={`group relative flex flex-col items-start gap-5 p-8 rounded-3xl border-2 text-left transition-all duration-300 ${
+                className={`group relative flex flex-col items-start gap-4 sm:gap-5 p-5 sm:p-8 rounded-3xl border-2 text-left transition-all duration-300 ${
                   missionType === 'Normal'
                     ? 'border-[#0052CC] bg-[#0052CC]/5 shadow-xl shadow-blue-100'
                     : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-md'
                 }`}
               >
-                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all ${
+                <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center transition-all ${
                   missionType === 'Normal' ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-200' : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'
                 }`}>
-                  <ClipboardList size={32} />
+                  <ClipboardList size={24} className="sm:hidden" />
+                  <ClipboardList size={32} className="hidden sm:block" />
                 </div>
                 <div>
                   <h3 className="text-lg font-black text-slate-900 mb-2">Mission Normale</h3>
@@ -189,16 +351,17 @@ export default function AssignMission() {
               <button
                 type="button"
                 onClick={() => setMissionType('Intervention')}
-                className={`group relative flex flex-col items-start gap-5 p-8 rounded-3xl border-2 text-left transition-all duration-300 ${
+                className={`group relative flex flex-col items-start gap-4 sm:gap-5 p-5 sm:p-8 rounded-3xl border-2 text-left transition-all duration-300 ${
                   missionType === 'Intervention'
                     ? 'border-[#0052CC] bg-[#0052CC]/5 shadow-xl shadow-blue-100'
                     : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-md'
                 }`}
               >
-                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all ${
+                <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center transition-all ${
                   missionType === 'Intervention' ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-200' : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200'
                 }`}>
-                  <Wrench size={32} />
+                  <Wrench size={24} className="sm:hidden" />
+                  <Wrench size={32} className="hidden sm:block" />
                 </div>
                 <div>
                   <h3 className="text-lg font-black text-slate-900 mb-2">Intervention SAV</h3>
@@ -240,12 +403,12 @@ export default function AssignMission() {
       // ─────────────────────────────────────────────────────────────────────
       case 2:
         return (
-          <div className="space-y-10 animate-in fade-in zoom-in-95 duration-500">
-            <div className="pb-6 border-b-2 border-slate-100">
-              <h2 className="text-2xl font-black text-slate-900 mb-2 flex items-center gap-3">
+          <div className="space-y-6 sm:space-y-10 animate-in fade-in zoom-in-95 duration-500">
+            <div className="pb-4 sm:pb-6 border-b-2 border-slate-100">
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-2 flex items-center gap-3">
                 {missionType === 'Normal'
-                  ? <><ClipboardList className="text-[#0052CC]" size={28} /> Details de la mission</>
-                  : <><Wrench className="text-[#0052CC]" size={28} /> Details de l'intervention SAV</>
+                  ? <><ClipboardList className="text-[#0052CC]" size={24} /> Details de la mission</>
+                  : <><Wrench className="text-[#0052CC]" size={24} /> Details de l'intervention SAV</>
                 }
               </h2>
               <p className="text-sm text-slate-500 font-medium">
@@ -292,7 +455,7 @@ export default function AssignMission() {
                 {/* Intervention details card */}
                 {selectedIntervention && (
                   <div className="bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border-2 border-blue-100 rounded-2xl p-6 space-y-5">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-sm font-black text-[#0052CC] bg-blue-100 px-3 py-1.5 rounded-xl">
                           {selectedIntervention.id}
@@ -305,7 +468,7 @@ export default function AssignMission() {
                         {selectedIntervention.statusLabel}
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
                       <div>
                         <p className="text-[10px] font-black text-blue-400 uppercase tracking-wider mb-1">Client</p>
                         <p className="text-sm font-bold text-slate-900">{selectedIntervention.client}</p>
@@ -329,14 +492,14 @@ export default function AssignMission() {
                           {selectedIntervention.date}
                         </div>
                       </div>
-                      <div className="col-span-2">
+                      <div className="sm:col-span-2">
                         <p className="text-[10px] font-black text-blue-400 uppercase tracking-wider mb-1">Demande / Probleme</p>
                         <p className="text-sm text-slate-700 bg-white/60 p-3 rounded-xl border border-blue-50 italic leading-relaxed">
                           "{selectedIntervention.request}"
                         </p>
                       </div>
                       {selectedIntervention.assignedTo && (
-                        <div className="col-span-2 flex items-center gap-2 pt-1">
+                        <div className="sm:col-span-2 flex items-center gap-2 pt-1">
                           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#0052CC] to-blue-700 text-white flex items-center justify-center text-[10px] font-black">
                             {selectedIntervention.assignedTo.split(' ').map((n) => n[0]).join('')}
                           </div>
@@ -429,30 +592,53 @@ export default function AssignMission() {
                 </div>
               )}
 
-              <div className="space-y-3 group">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2">
-                  <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
-                  Notes supplementaires (optionnel)
-                </label>
-                <textarea
-                  name="notes"
-                  value={formData.notes}
-                  onChange={handleChange}
-                  rows={2}
-                  placeholder="Consignes particulieres, precautions, contacts sur place..."
-                  className="w-full px-5 py-4 bg-white border-2 border-slate-200 rounded-xl focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-slate-800 font-medium resize-none leading-relaxed shadow-sm hover:border-slate-300"
-                />
-              </div>
-
               {/* Pièces jointes */}
               <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center hover:border-[#0052CC] hover:bg-blue-50/30 transition-all cursor-pointer group bg-slate-50/30">
+                <input
+                  type="file"
+                  multiple
+                  accept=".pdf,.png,.jpg,.jpeg,image/png,image/jpeg,application/pdf"
+                  className="hidden"
+                  id="mission-attachments"
+                  onChange={handlePickFiles}
+                />
                 <div className="flex flex-col items-center gap-2">
                   <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center text-slate-300 group-hover:text-[#0052CC] transition-colors">
                     <Paperclip size={24} />
                   </div>
-                  <p className="text-sm font-bold text-slate-500 group-hover:text-[#0052CC] transition-colors">Ajouter des pieces jointes</p>
+                  <label
+                    htmlFor="mission-attachments"
+                    className="text-sm font-bold text-slate-500 group-hover:text-[#0052CC] transition-colors cursor-pointer"
+                  >
+                    Ajouter des pieces jointes
+                  </label>
                   <p className="text-xs text-slate-400">PDF, JPG, PNG — Max 10MB</p>
                 </div>
+                {attachments.length > 0 && (
+                  <div className="mt-4 w-full max-w-md mx-auto text-left space-y-2">
+                    {attachments.map((file) => (
+                      <div
+                        key={`${file.name}_${file.size}_${file.lastModified}`}
+                        className="flex items-center justify-between gap-3 bg-white border border-slate-200 rounded-xl px-4 py-2 shadow-sm"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-slate-700 truncate">{file.name}</p>
+                          <p className="text-[10px] font-bold text-slate-400">
+                            {Math.ceil(file.size / 1024)} KB
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(file)}
+                          className="text-[10px] font-black text-red-600 hover:text-red-700"
+                        >
+                          Retirer
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -461,10 +647,10 @@ export default function AssignMission() {
       // ─────────────────────────────────────────────────────────────────────
       case 3:
         return (
-          <div className="space-y-10 animate-in fade-in zoom-in-95 duration-500">
-            <div className="pb-6 border-b-2 border-slate-100">
-              <h2 className="text-2xl font-black text-slate-900 mb-2 flex items-center gap-3">
-                <Users className="text-[#0052CC]" size={28} />
+          <div className="space-y-6 sm:space-y-10 animate-in fade-in zoom-in-95 duration-500">
+            <div className="pb-4 sm:pb-6 border-b-2 border-slate-100">
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-2 flex items-center gap-3">
+                <Users className="text-[#0052CC]" size={24} />
                 Affectation du technicien
               </h2>
               <p className="text-sm text-slate-500 font-medium">
@@ -584,14 +770,15 @@ export default function AssignMission() {
       // ─────────────────────────────────────────────────────────────────────
       case 4:
         return (
-          <div className="space-y-10 animate-in fade-in zoom-in-95 duration-500">
-            <div className="pb-6 border-b-2 border-slate-100">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-lg">
-                  <CheckCircle2 size={28} />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-black text-slate-900">Confirmation & validation</h2>
+          <div className="space-y-6 sm:space-y-10 animate-in fade-in zoom-in-95 duration-500">
+            <div className="pb-4 sm:pb-6 border-b-2 border-slate-100">
+              <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="w-11 h-11 sm:w-14 sm:h-14 bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-lg shrink-0">
+                    <CheckCircle2 size={22} className="sm:hidden" />
+                    <CheckCircle2 size={28} className="hidden sm:block" />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="text-xl sm:text-2xl font-black text-slate-900">Confirmation & validation</h2>
                   <p className="text-sm text-slate-500 font-medium">Verifiez les informations avant de confirmer l'affectation.</p>
                 </div>
               </div>
@@ -724,22 +911,23 @@ export default function AssignMission() {
     <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 to-slate-100">
 
       {/* ── TOP HEADER ── */}
-      <div className="bg-white border-b-2 border-slate-200 px-8 py-5 flex items-center justify-between shrink-0 shadow-sm">
-        <div className="flex items-center gap-5">
+      <div className="bg-white border-b-2 border-slate-200 px-4 sm:px-8 py-3 sm:py-5 flex items-center justify-between shrink-0 shadow-sm">
+        <div className="flex items-center gap-3 sm:gap-5 min-w-0">
           <button
             onClick={() => navigate('/missions')}
-            className="w-11 h-11 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 rounded-xl transition-all active:scale-95 shadow-sm"
+            className="w-9 h-9 sm:w-11 sm:h-11 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 rounded-xl transition-all active:scale-95 shadow-sm shrink-0"
           >
-            <ChevronLeft size={22} strokeWidth={2.5} />
+            <ChevronLeft size={20} strokeWidth={2.5} />
           </button>
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-[#0052CC] to-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
-                <Send size={18} className="text-white" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-[#0052CC] to-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 shrink-0">
+                <Send size={14} className="text-white sm:hidden" />
+                <Send size={18} className="text-white hidden sm:block" />
               </div>
-              <div>
-                <h1 className="text-2xl font-black text-slate-900 tracking-tight">Affecter une mission</h1>
-                <p className="text-xs text-slate-500 font-semibold">
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-2xl font-black text-slate-900 tracking-tight truncate">Affecter une mission</h1>
+                <p className="hidden sm:block text-xs text-slate-500 font-semibold">
                   {missionType === '' && 'Etape 1 sur 4 — Choisissez le type de mission'}
                   {missionType === 'Normal' && currentStep > 1 && 'Mission normale — ' + (currentStep === 2 ? 'Details' : currentStep === 3 ? 'Affectation' : 'Validation')}
                   {missionType === 'Intervention' && currentStep > 1 && 'Intervention SAV — ' + (currentStep === 2 ? 'Details' : currentStep === 3 ? 'Affectation' : 'Validation')}
@@ -748,18 +936,50 @@ export default function AssignMission() {
             </div>
           </div>
         </div>
-        <div className="hidden sm:flex items-center gap-2 text-sm text-slate-500 font-semibold">
+        <div className="flex items-center gap-2 text-sm text-slate-500 font-semibold shrink-0">
           <span className="text-[#0052CC] font-black">Etape {currentStep}</span>
           <span className="text-slate-300">/</span>
           <span>{steps.length}</span>
         </div>
       </div>
 
+      {/* ── MOBILE STEPPER (visible < md) ── */}
+      <div className="md:hidden bg-white border-b border-slate-100 px-4 py-3 shrink-0">
+        <div className="flex items-center max-w-xs mx-auto">
+          {steps.map((step, idx) => {
+            const isActive = currentStep === step.id
+            const isDone = currentStep > step.id
+            const Icon = step.icon
+            return (
+              <React.Fragment key={step.id}>
+                <div className="flex flex-col items-center gap-1 shrink-0">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
+                    isActive ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-200 scale-110'
+                    : isDone ? 'bg-green-500 text-white'
+                    : 'bg-slate-100 text-slate-400'
+                  }`}>
+                    {isDone ? <Check size={14} strokeWidth={3} /> : <Icon size={14} className={isActive ? 'stroke-[3px]' : 'stroke-[2px]'} />}
+                  </div>
+                  <span className={`text-[9px] font-black uppercase tracking-wide leading-none ${
+                    isActive ? 'text-[#0052CC]' : isDone ? 'text-green-500' : 'text-slate-300'
+                  }`}>{step.title}</span>
+                </div>
+                {idx < steps.length - 1 && (
+                  <div className={`flex-1 h-0.5 mx-1.5 rounded-full mb-3.5 transition-all duration-500 ${
+                    currentStep > step.id ? 'bg-[#0052CC]' : 'bg-slate-100'
+                  }`} />
+                )}
+              </React.Fragment>
+            )
+          })}
+        </div>
+      </div>
+
       {/* ── BODY ── */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* ── LEFT STEPPER ── */}
-        <div className="w-[300px] border-r border-slate-100 bg-slate-50/30 flex flex-col p-8 shrink-0">
+        {/* ── LEFT STEPPER (desktop only) ── */}
+        <div className="hidden md:flex md:w-[260px] lg:w-[300px] border-r border-slate-100 bg-slate-50/30 flex-col p-6 lg:p-8 shrink-0">
           <div className="space-y-2 mb-8">
             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Etapes</h4>
             <div className="h-1 w-12 bg-[#0052CC] rounded-full"></div>
@@ -836,25 +1056,25 @@ export default function AssignMission() {
 
         {/* ── CENTER FORM ── */}
         <div className="flex-1 overflow-y-auto no-scrollbar bg-white flex flex-col">
-          <div className="flex-1 px-12 py-14 max-w-4xl mx-auto w-full">
+          <div className="flex-1 px-4 py-6 sm:px-8 sm:py-10 lg:px-12 lg:py-14 max-w-4xl mx-auto w-full">
             <div className="h-full flex flex-col">
               <div className="flex-1">
                 {renderStep()}
               </div>
 
               {/* Navigation buttons */}
-              <div className="mt-12 pt-8 border-t-2 border-slate-200 flex items-center justify-between shrink-0">
+              <div className="mt-6 sm:mt-12 pt-5 sm:pt-8 border-t-2 border-slate-200 flex items-center justify-between shrink-0">
                 <button
                   type="button"
                   onClick={prevStep}
                   disabled={currentStep === 1}
-                  className={`flex items-center gap-2 px-8 py-4 rounded-xl font-bold text-sm uppercase tracking-wider transition-all ${
+                  className={`flex items-center gap-1.5 sm:gap-2 px-4 sm:px-8 py-3 sm:py-4 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider transition-all ${
                     currentStep === 1
                       ? 'text-slate-300 cursor-not-allowed'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:scale-95 shadow-sm hover:shadow-md'
                   }`}
                 >
-                  <ChevronLeft size={20} />
+                  <ChevronLeft size={18} />
                   Precedent
                 </button>
 
@@ -863,23 +1083,23 @@ export default function AssignMission() {
                     type="button"
                     onClick={nextStep}
                     disabled={!canGoNext()}
-                    className={`group flex items-center gap-3 px-10 py-5 rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-xl active:scale-95 ${
+                    className={`group flex items-center gap-2 sm:gap-3 px-6 sm:px-10 py-3 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-xl active:scale-95 ${
                       canGoNext()
                         ? 'bg-gradient-to-r from-slate-900 to-slate-800 hover:from-[#0052CC] hover:to-blue-700 text-white hover:shadow-blue-300 shadow-slate-300'
                         : 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
                     }`}
                   >
                     Continuer
-                    <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" strokeWidth={3} />
+                    <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" strokeWidth={3} />
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={handleSubmit}
-                    className="flex items-center gap-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-12 py-5 rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-xl shadow-green-300 active:scale-95"
+                    className="flex items-center gap-2 sm:gap-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 sm:px-12 py-3 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-xl shadow-green-300 active:scale-95"
                   >
-                    <Check size={20} strokeWidth={3} />
-                    Confirmer l'affectation
+                    <Check size={18} strokeWidth={3} />
+                    <span>Confirmer l'affectation</span>
                   </button>
                 )}
               </div>

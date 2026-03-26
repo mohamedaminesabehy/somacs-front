@@ -13,6 +13,9 @@ import InterventionDetails from './pages/intervention/InterventionDetails'
 import InterventionHistory from './pages/intervention/InterventionHistory'
 import AssignMission from './pages/mission/AssignMission'
 import LoginForm from './components/user/LoginForm'
+import DevisList from './pages/devis/DevisList'
+import DevisDetails from './pages/devis/DevisDetails'
+import CreateDevis from './pages/devis/CreateDevis'
 
 function AppLayout({
   children,
@@ -95,15 +98,19 @@ export default function App() {
         path="/"
         element={
           isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <UserManagement currentUser={currentUser} />
-            </AppLayout>
+            currentUser?.role === 'Technicien' ? (
+              <Navigate to="/missions/my" replace />
+            ) : (
+              <AppLayout
+                isSidebarOpen={isSidebarOpen}
+                onToggleSidebar={handleToggleSidebar}
+                onCloseSidebar={handleCloseSidebar}
+                currentUser={currentUser}
+                onLogout={handleLogout}
+              >
+                <UserManagement currentUser={currentUser} />
+              </AppLayout>
+            )
           ) : (
             <LoginForm onLoginSuccess={handleLoginSuccess} />
           )
@@ -276,6 +283,60 @@ export default function App() {
         }
       />
       <Route
+        path="/devis"
+        element={
+          isLoggedIn ? (
+            <AppLayout
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={handleToggleSidebar}
+              onCloseSidebar={handleCloseSidebar}
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            >
+              <DevisList />
+            </AppLayout>
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+      <Route
+        path="/devis/create"
+        element={
+          isLoggedIn ? (
+            <AppLayout
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={handleToggleSidebar}
+              onCloseSidebar={handleCloseSidebar}
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            >
+              <CreateDevis />
+            </AppLayout>
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+      <Route
+        path="/devis/*"
+        element={
+          isLoggedIn ? (
+            <AppLayout
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={handleToggleSidebar}
+              onCloseSidebar={handleCloseSidebar}
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            >
+              <DevisDetails />
+            </AppLayout>
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+      <Route
         path="/employees/:employeeId/history"
         element={
           isLoggedIn ? (
@@ -295,7 +356,17 @@ export default function App() {
       />
       <Route
         path="*"
-        element={<Navigate to="/" replace />}
+        element={
+          isLoggedIn ? (
+            currentUser?.role === 'Technicien' ? (
+              <Navigate to="/missions/my" replace />
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
       />
     </Routes>
   )

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, CheckCircle2, XCircle, Clock, Calendar, MapPin,
@@ -9,7 +9,7 @@ import {
   MoreVertical, Share2, Printer, Paperclip, File, Image, X,
   Download, Eye, Plus
 } from 'lucide-react'
-import { getMissionStore, updateMissionInStore, interventionsList, getStatusColor } from '../../data/missionsData'
+import { apiFetch } from '../../api/apiClient'
 
 const PRIORITY_CONFIG = {
   Critique: { label: 'Critique', bar: 'bg-red-500',    badge: 'bg-red-50 text-red-700 border-red-100',      dot: 'bg-red-500',    color: 'text-red-600' },
@@ -25,6 +25,13 @@ const STATUS_CONFIG = {
   'En cours': { icon: Loader2,       color: 'text-amber-600', bg: 'bg-amber-50',  border: 'border-amber-300',   badge: 'bg-amber-50 text-amber-700 border border-amber-200' },
   'Terminée': { icon: CheckCircle2,  color: 'text-green-600', bg: 'bg-green-50',  border: 'border-green-200',   badge: 'bg-green-50 text-green-700 border border-green-200' },
   'Bloquée':  { icon: XCircle,       color: 'text-red-600',   bg: 'bg-red-50',    border: 'border-red-200',     badge: 'bg-red-50 text-red-700 border border-red-200' },
+}
+
+const ACTIONS_SECTION_ACCENT = {
+  'À faire': 'border-blue-200',
+  'En cours': 'border-amber-300',
+  'Terminée': 'border-green-200',
+  'Bloquée': 'border-red-200',
 }
 
 function SectionHeader({ icon: Icon, title, children }) {
@@ -59,27 +66,127 @@ export default function MissionDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
 
-  const mission = getMissionStore().find((m) => m.id === Number(id))
+  const [mission, setMission] = useState(null)
+  const [intervention, setIntervention] = useState(null)
+  const [isLoadingMission, setIsLoadingMission] = useState(true)
+  const [showInterventionPreview, setShowInterventionPreview] = useState(false)
 
   const [status, setStatus] = useState(mission?.status || 'À faire')
   const [notes, setNotes]   = useState(mission?.notes || '')
   const [isSaving, setIsSaving] = useState(false)
   const [showSaveToast, setShowSaveToast] = useState(false)
-  
-  // Mock attachments state
-  const [attachments, setAttachments] = useState([
-    { id: 1, name: 'Plan_Technique.pdf', type: 'pdf', size: '2.4 MB', date: '08/03/2026' },
-    { id: 2, name: 'Photo_Site_Entree.jpg', type: 'image', size: '1.8 MB', date: '09/03/2026' }
-  ])
+  const refreshTimerRef = useRef(null)
+  const statusAnimTimerRef = useRef(null)
+  const [statusJustChangedTo, setStatusJustChangedTo] = useState('')
+  const statusAttentionTimerRef = useRef(null)
+  const lastStatusAttentionRef = useRef('')
+  const lastInterventionStatusRef = useRef('')
+  const [showStatusAttention, setShowStatusAttention] = useState(false)
+  const [statusAttentionText, setStatusAttentionText] = useState('')
 
-  useEffect(() => {
-    if (mission) {
-      setStatus(mission.status)
-      setNotes(mission.notes || '')
-    }
+  const attachments = useMemo(() => {
+    const list = Array.isArray(mission?.attachments) ? mission.attachments : []
+    return list.map((a, idx) => ({
+      id: a.publicId || String(idx),
+      name: a.originalFilename || a.publicId || `Fichier ${idx + 1}`,
+      type: a.resourceType === 'image' ? 'image' : 'file',
+      size: typeof a.bytes === 'number' ? `${Math.ceil(a.bytes / 1024)} KB` : '',
+      date: a.createdAt || '',
+      url: a.url,
+    }))
   }, [mission])
 
-  if (!mission) {
+  useEffect(() => {
+    ;(async () => {
+      setIsLoadingMission(true)
+      try {
+        const response = await apiFetch(`/missions/${id}`, { auth: false })
+        if (!response.ok) {
+          setMission(null)
+          return
+        }
+        const data = await response.json()
+        setMission(data)
+        setStatus(data?.status || 'À faire')
+        setNotes(data?.notes || '')
+      } catch {
+        setMission(null)
+      } finally {
+        setIsLoadingMission(false)
+      }
+    })()
+  }, [id])
+
+  useEffect(() => {
+    if (!mission?.interventionId) {
+      setIntervention(null)
+      return
+    }
+    ;(async () => {
+      try {
+        const response = await apiFetch(`/interventions/${mission.interventionId}`, { auth: false })
+        if (!response.ok) return
+        const data = await response.json()
+        setIntervention(data)
+      } catch {}
+    })()
+  }, [mission?.interventionId])
+
+  useEffect(() => {
+    if (!mission?.id) return
+
+    const refresh = async () => {
+      try {
+        const missionRes = await apiFetch(`/missions/${mission.id}`, { auth: false })
+        if (missionRes.ok) {
+          const data = await missionRes.json()
+          const nextStatus = data?.status || 'À faire'
+          setMission((prev) => (prev ? { ...prev, status: nextStatus } : prev))
+          setStatus((prev) => (prev !== nextStatus ? nextStatus : prev))
+        }
+        if (mission.interventionId) {
+          const interventionRes = await apiFetch(`/interventions/${mission.interventionId}`, { auth: false })
+          if (interventionRes.ok) {
+            const iv = await interventionRes.json()
+            setIntervention(iv)
+          }
+        }
+      } catch {}
+    }
+
+    const onFocus = () => refresh()
+    window.addEventListener('focus', onFocus)
+    refreshTimerRef.current = window.setInterval(refresh, 15000)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      if (refreshTimerRef.current) window.clearInterval(refreshTimerRef.current)
+      refreshTimerRef.current = null
+      if (statusAnimTimerRef.current) window.clearTimeout(statusAnimTimerRef.current)
+      statusAnimTimerRef.current = null
+      if (statusAttentionTimerRef.current) window.clearTimeout(statusAttentionTimerRef.current)
+      statusAttentionTimerRef.current = null
+    }
+  }, [mission?.id, mission?.interventionId])
+
+  useEffect(() => {
+    if (!status) return
+    const interventionStatus = intervention?.status || ''
+    const interventionChanged = interventionStatus && lastInterventionStatusRef.current !== interventionStatus
+    if (interventionChanged) lastInterventionStatusRef.current = interventionStatus
+
+    if (!interventionChanged && lastStatusAttentionRef.current === status) return
+    lastStatusAttentionRef.current = status
+
+    if (statusAttentionTimerRef.current) window.clearTimeout(statusAttentionTimerRef.current)
+    setStatusAttentionText(`Statut actuel : ${status}`)
+    setShowStatusAttention(true)
+    statusAttentionTimerRef.current = window.setTimeout(() => {
+      setShowStatusAttention(false)
+      statusAttentionTimerRef.current = null
+    }, 3500)
+  }, [status, intervention?.status])
+
+  if (!mission && !isLoadingMission) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4">
         <div className="w-20 h-20 bg-white rounded-3xl border-2 border-slate-200 flex items-center justify-center shadow-sm">
@@ -95,28 +202,61 @@ export default function MissionDetails() {
       </div>
     )
   }
-
-  const intervention = mission.interventionId
-    ? interventionsList.find((i) => i.id === mission.interventionId)
-    : null
+  if (!mission) {
+    return null
+  }
 
   const priority   = PRIORITY_CONFIG[mission.priority] || PRIORITY_CONFIG['Moyenne']
   const statusCfg  = STATUS_CONFIG[status] || STATUS_CONFIG['À faire']
   const StatusIcon = statusCfg.icon
 
   const handleStatusChange = (newStatus) => {
+    if (statusAnimTimerRef.current) {
+      window.clearTimeout(statusAnimTimerRef.current)
+      statusAnimTimerRef.current = null
+    }
     setStatus(newStatus)
-    updateMissionInStore({ ...mission, status: newStatus, statusColor: getStatusColor(newStatus) })
+    setMission((prev) => (prev ? { ...prev, status: newStatus } : prev))
+    ;(async () => {
+      try {
+        const response = await apiFetch(`/missions/${mission.id}`, {
+          method: 'PATCH',
+          body: { status: newStatus },
+          auth: false,
+        })
+        if (response.ok) {
+          setStatusJustChangedTo(newStatus)
+          statusAnimTimerRef.current = window.setTimeout(() => {
+            setStatusJustChangedTo('')
+            statusAnimTimerRef.current = null
+          }, 700)
+          setShowSaveToast(`Cette mission est ${newStatus}`)
+          setTimeout(() => setShowSaveToast(false), 3000)
+        }
+      } catch (error) {
+        console.error('Erreur MAJ statut:', error)
+      }
+    })()
   }
 
   const handleSave = () => {
     setIsSaving(true)
-    updateMissionInStore({ ...mission, status, notes })
-    setTimeout(() => {
+    ;(async () => {
+      try {
+        const response = await apiFetch(`/missions/${mission.id}`, {
+          method: 'PATCH',
+          body: { status, notes },
+          auth: false,
+        })
+        if (response.ok) {
+          const saved = await response.json().catch(() => null)
+          if (saved) setMission(saved)
+        }
+        setShowSaveToast(true)
+        setTimeout(() => setShowSaveToast(false), 3000)
+      } catch {}
       setIsSaving(false)
-      setShowSaveToast(true)
-      setTimeout(() => setShowSaveToast(false), 3000)
-    }, 600)
+    })()
   }
 
   const progressPct =
@@ -126,30 +266,40 @@ export default function MissionDetails() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
+      {/* TOAST NOTIFICATION */}
+      {showSaveToast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-4">
+          <div className="bg-slate-900 text-white border border-slate-700 px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3">
+            <CheckCircle2 size={20} className="text-green-400" />
+            <span className="text-sm font-bold tracking-wide">{typeof showSaveToast === 'string' ? showSaveToast : 'Statut mis à jour'}</span>
+          </div>
+        </div>
+      )}
+
       {/* ── Top Bar ── */}
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200">
-        <div className="max-w-[1600px] mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="max-w-[1600px] mx-auto px-3 sm:px-4 h-14 sm:h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <button
               onClick={() => navigate('/missions/my')}
-              className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors"
+              className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors shrink-0"
             >
-              <ArrowLeft size={20} />
+              <ArrowLeft size={18} />
             </button>
-            <div className="h-6 w-px bg-slate-200 mx-1" />
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            <div className="hidden sm:block h-6 w-px bg-slate-200 mx-1" />
+            <div className="min-w-0">
+              <div className="hidden sm:flex items-center gap-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                 <button onClick={() => navigate('/missions/my')} className="hover:text-[#0052CC]">Missions</button>
                 <ChevronRight size={10} />
                 <span className="text-slate-500">Détails</span>
               </div>
-              <h1 className="text-sm font-black text-slate-900 leading-none mt-1">
+              <h1 className="text-xs sm:text-sm font-black text-slate-900 leading-none mt-0.5 sm:mt-1 truncate">
                 {mission.title}
               </h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <div className="hidden sm:flex items-center gap-2 mr-4">
               <span className={`px-2.5 py-1 rounded-full text-[10px] font-black border ${priority.badge}`}>
                 {priority.label}
@@ -174,16 +324,16 @@ export default function MissionDetails() {
             
             {/* Mission Card */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+              <div className="p-4 sm:p-6">
+                <div className="flex items-start justify-between mb-4 sm:mb-6">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shrink-0 ${
                       mission.type === 'Intervention' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'
                     }`}>
-                      {mission.type === 'Intervention' ? <Wrench size={24} /> : <ClipboardList size={24} />}
+                      {mission.type === 'Intervention' ? <Wrench size={20} /> : <ClipboardList size={20} />}
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="text-[10px] font-black text-[#0052CC] bg-blue-50 px-2 py-0.5 rounded uppercase tracking-wider">
                           {mission.type}
                         </span>
@@ -191,7 +341,7 @@ export default function MissionDetails() {
                           ID: MIS-{String(mission.id).padStart(4,'0')}
                         </span>
                       </div>
-                      <h2 className="text-xl font-black text-slate-900">{mission.title}</h2>
+                      <h2 className="text-lg sm:text-xl font-black text-slate-900">{mission.title}</h2>
                     </div>
                   </div>
                 </div>
@@ -231,21 +381,39 @@ export default function MissionDetails() {
             </div>
 
             {/* Workflow / Status Section */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-6">
+            <div
+              className={`bg-white rounded-2xl border-2 shadow-sm overflow-hidden transition-all ${
+                showStatusAttention
+                  ? 'border-amber-300 ring-2 ring-amber-300/60 shadow-lg shadow-amber-100 animate-pulse'
+                  : (ACTIONS_SECTION_ACCENT[status] || 'border-slate-200')
+              }`}
+            >
+              <div className="p-4 sm:p-6">
                 <SectionHeader icon={Zap} title="Actions & État" />
+
+                {showStatusAttention ? (
+                  <div className="mt-3 mb-2 px-4 py-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 flex items-center justify-between gap-3 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle size={16} className="text-amber-500" />
+                      <span className="text-xs sm:text-sm font-black">{statusAttentionText}</span>
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-600">Info</span>
+                  </div>
+                ) : null}
+
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
                   {['À faire', 'En cours', 'Terminée', 'Bloquée'].map((s) => {
                     const cfg = STATUS_CONFIG[s]
                     const Icon = cfg.icon
                     const isActive = status === s
+                    const shouldAnimate = isActive && statusJustChangedTo === s
                     return (
                       <button
                         key={s}
                         onClick={() => handleStatusChange(s)}
                         className={`flex flex-col items-center justify-center gap-3 p-4 rounded-xl border-2 transition-all ${
                           isActive 
-                            ? `${cfg.border} ${cfg.bg} ${cfg.color} scale-[1.02] shadow-sm` 
+                            ? `${cfg.border} ${cfg.bg} ${cfg.color} scale-[1.02] shadow-sm ${shouldAnimate ? 'ring-2 ring-offset-2 ring-[#0052CC] animate-in zoom-in-95 duration-200' : ''}` 
                             : 'border-slate-50 bg-slate-50 text-slate-400 hover:border-slate-200 hover:bg-white hover:text-slate-600'
                         }`}
                       >
@@ -262,7 +430,7 @@ export default function MissionDetails() {
 
             {/* Notes Section */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 <SectionHeader icon={FileText} title="Notes & Observations" />
                 <div className="relative mt-4">
                   <textarea
@@ -285,9 +453,13 @@ export default function MissionDetails() {
             
             {/* Linked Intervention (Moved to first position) */}
             {intervention && (
-              <div className="bg-white rounded-2xl border-2 border-blue-600/10 shadow-sm overflow-hidden relative">
-                <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -mr-12 -mt-12 opacity-50" />
-                <div className="p-6 relative">
+              <div className={`bg-white rounded-2xl border-2 shadow-sm overflow-hidden relative ${
+                intervention.status === 'CLOSED' ? 'border-red-200' : 'border-blue-600/10'
+              }`}>
+                <div className={`absolute top-0 right-0 w-24 h-24 rounded-bl-full -mr-12 -mt-12 opacity-50 ${
+                  intervention.status === 'CLOSED' ? 'bg-red-50' : 'bg-blue-50'
+                }`} />
+                <div className="p-4 sm:p-6 relative">
                   <SectionHeader icon={Wrench} title="Intervention liée">
                     <span className="px-2 py-0.5 rounded bg-blue-100 text-[#0052CC] text-[10px] font-black uppercase tracking-wider">
                       SAV
@@ -295,6 +467,15 @@ export default function MissionDetails() {
                   </SectionHeader>
                   
                   <div className="space-y-4 mt-2">
+                    {intervention.status === 'CLOSED' && (
+                      <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-700">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle size={14} />
+                          <span className="text-xs font-black uppercase tracking-wider">Intervention clôturée</span>
+                        </div>
+                        <span className="text-[10px] font-bold text-red-600">Validée</span>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
                       <div>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Référence</p>
@@ -316,10 +497,17 @@ export default function MissionDetails() {
                     </div>
 
                     <button 
-                      onClick={() => navigate(`/interventions/${intervention.id}`)}
-                      className="w-full mt-2 py-3 bg-[#0052CC] text-white rounded-xl text-xs font-black hover:bg-[#0042a3] transition-all shadow-md shadow-blue-100 flex items-center justify-center gap-2 group"
+                      onClick={() => {
+                        if (intervention.status === 'CLOSED') setShowInterventionPreview(true)
+                        else navigate(`/interventions/${intervention.id}`, { state: { assignedTechnicianName: mission.employee, missionId: mission.id } })
+                      }}
+                      className={`w-full mt-2 py-3 rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center gap-2 group ${
+                        intervention.status === 'CLOSED'
+                          ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-100'
+                          : 'bg-[#0052CC] hover:bg-[#0042a3] text-white shadow-blue-100'
+                      }`}
                     >
-                      Ouvrir le dossier
+                      {intervention.status === 'CLOSED' ? 'Intervention clôturée' : 'Ouvrir le dossier'}
                       <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
                     </button>
                   </div>
@@ -327,9 +515,55 @@ export default function MissionDetails() {
               </div>
             )}
 
+            {showInterventionPreview && intervention && (
+              <div className="fixed inset-0 z-[120] flex items-center justify-center p-4" onClick={() => setShowInterventionPreview(false)}>
+                <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
+                <div className="relative z-10 w-full max-w-xl bg-white rounded-2xl border border-red-200 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                  <div className="px-5 py-4 border-b border-red-200 bg-red-50 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black text-red-600 uppercase tracking-widest">Intervention clôturée</p>
+                      <p className="text-sm font-black text-slate-900 truncate">{intervention.id}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowInterventionPreview(false)}
+                      className="inline-flex items-center justify-center w-10 h-10 bg-white hover:bg-red-100 border border-red-200 text-red-600 rounded-xl transition-colors"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <div className="p-5 bg-white">
+                    <div className="rounded-2xl border border-red-200 bg-red-50 p-4 flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-white border border-red-200 flex items-center justify-center shrink-0 text-red-600">
+                        <AlertTriangle size={18} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-red-700">Si vous souhaitez effectuer une modification ou consulter les détails de l’intervention, veuillez vous rendre dans l’interface Historique des interventions.</p>
+                        <p className="text-xs font-semibold text-red-700/80 mt-1">
+                          Intervention : <span className="font-black">{intervention.id}</span>
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowInterventionPreview(false)
+                            navigate(`/employees/${mission?.employeeId || 'me'}/history?highlight=${encodeURIComponent(intervention.id)}`)
+                          }}
+                          className="mt-3 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-red-100 text-red-700 border border-red-200 text-xs font-black transition-colors"
+                        >
+                          <History size={14} />
+                          Aller à l’historique
+                          <ChevronRight size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Summary Details */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 <SectionHeader icon={Info} title="Détails" />
                 <div className="mt-2">
                   <InfoItem label="Date d'échéance" value={mission.dueDate} icon={Calendar} />
@@ -342,7 +576,7 @@ export default function MissionDetails() {
 
             {/* Location & Primary Document Card */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 <SectionHeader icon={MapPin} title="Lieu & Document">
                   <button className="text-[10px] font-black text-[#0052CC] flex items-center gap-1 hover:underline">
                     OUVRIR MAPS <ExternalLink size={10} />
@@ -378,12 +612,12 @@ export default function MissionDetails() {
                       {attachments[0].type === 'image' ? (
                         <div className="w-full h-full relative">
                           <img 
-                            src={`https://images.unsplash.com/photo-1581092160562-40aa08e78837?q=80&w=1470&auto=format&fit=crop`} // Technical photo placeholder
+                            src={attachments[0].url}
                             alt={attachments[0].name}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                           />
                           <div className="absolute top-2 left-2 px-2 py-1 bg-white/90 backdrop-blur-sm rounded-md text-[9px] font-black text-blue-600 shadow-sm">
-                            PHOTO TECHNIQUE
+                            DOCUMENT
                           </div>
                         </div>
                       ) : (
@@ -397,12 +631,22 @@ export default function MissionDetails() {
                         </div>
                       )}
                       <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                        <button className="p-2 bg-white rounded-lg text-slate-900 shadow-xl hover:scale-110 transition-transform">
+                        <a
+                          href={attachments[0].url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-2 bg-white rounded-lg text-slate-900 shadow-xl hover:scale-110 transition-transform"
+                        >
                           <Eye size={18} />
-                        </button>
-                        <button className="p-2 bg-white rounded-lg text-slate-900 shadow-xl hover:scale-110 transition-transform">
+                        </a>
+                        <a
+                          href={attachments[0].url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-2 bg-white rounded-lg text-slate-900 shadow-xl hover:scale-110 transition-transform"
+                        >
                           <Download size={18} />
-                        </button>
+                        </a>
                       </div>
                     </div>
                   ) : (
@@ -419,7 +663,7 @@ export default function MissionDetails() {
       </main>
 
       {/* ── Sticky Action Bar (SaaS Style) ── */}
-      <footer className="sticky bottom-0 z-40 bg-white border-t border-slate-200 py-4 px-6 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+      <footer className="sticky bottom-0 z-40 bg-white border-t border-slate-200 py-3 sm:py-4 px-3 sm:px-6 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
         <div className="max-w-[1600px] mx-auto flex items-center justify-between">
           <div className="hidden md:flex items-center gap-3 text-slate-400">
             <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center">
@@ -427,25 +671,27 @@ export default function MissionDetails() {
             </div>
             <span className="text-[10px] font-bold uppercase tracking-widest">Dernière modification : Aujourd'hui</span>
           </div>
-          
-          <div className="flex items-center gap-3 w-full md:w-auto">
+
+          <div className="flex items-center gap-2 sm:gap-3 w-full md:w-auto">
             <button
               onClick={() => navigate('/missions/my')}
-              className="flex-1 md:flex-none px-6 py-3 rounded-xl text-[11px] font-black text-slate-500 uppercase tracking-wider hover:bg-slate-50 transition-all border-2 border-transparent"
+              className="flex-1 md:flex-none px-3 sm:px-6 py-2.5 sm:py-3 rounded-xl text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-wider hover:bg-slate-50 transition-all border-2 border-transparent"
             >
-              Annuler les modifs
+              <span className="hidden sm:inline">Annuler les modifs</span>
+              <span className="sm:hidden">Annuler</span>
             </button>
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="flex-1 md:flex-none flex items-center justify-center gap-3 px-10 py-3.5 bg-[#0052CC] text-white rounded-xl text-[11px] font-black uppercase tracking-widest shadow-lg shadow-blue-200 hover:bg-[#0042a3] hover:shadow-blue-300 transition-all active:scale-[0.98] disabled:opacity-50"
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 sm:gap-3 px-5 sm:px-10 py-2.5 sm:py-3.5 bg-[#0052CC] text-white rounded-xl text-[10px] sm:text-[11px] font-black uppercase tracking-widest shadow-lg shadow-blue-200 hover:bg-[#0042a3] hover:shadow-blue-300 transition-all active:scale-[0.98] disabled:opacity-50"
             >
               {isSaving ? (
-                <Loader2 size={16} className="animate-spin" />
+                <Loader2 size={14} className="animate-spin" />
               ) : (
-                <Save size={16} />
+                <Save size={14} />
               )}
-              Enregistrer les changements
+              <span className="hidden sm:inline">Enregistrer les changements</span>
+              <span className="sm:hidden">Enregistrer</span>
             </button>
           </div>
         </div>

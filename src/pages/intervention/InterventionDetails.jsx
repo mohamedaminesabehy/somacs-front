@@ -1,5 +1,6 @@
-﻿import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { apiFetch } from '../../api/apiClient'
 import { 
   ChevronLeft, 
   Clock, 
@@ -27,7 +28,8 @@ import {
   ChevronRight,
   Check,
   Wrench,
-  Eye
+  Eye,
+  XCircle
 } from 'lucide-react'
 import logo from '../../assets/logo.jpg'
 
@@ -607,47 +609,160 @@ function MobilePreviewModal({ onClose, interventionData, parts, laborPrice, logo
 export default function InterventionDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
 
-  // Load the matching intervention from the DB (or fall back to INT-2026-001)
-  const dbEntry = interventionsDB[id] || interventionsDB['INT-2026-001']
-  const completedUpTo = dbEntry.completedUpToSection
+  const assignedTechnicianName = location.state?.assignedTechnicianName?.trim?.() || ''
+  const missionId = location.state?.missionId
+  const returnTo = location.state?.returnTo
+  const isEmployeeHistoryEditFlow = Boolean(returnTo)
+  const [clients, setClients] = useState([])
+  const [machines, setMachines] = useState([])
+  const [dbEntry, setDbEntry] = useState(() => interventionsDB[id] || interventionsDB['INT-2026-001'])
+  const [completedUpTo, setCompletedUpTo] = useState(() => (dbEntry?.completedUpToSection || 1))
 
-  const [activeSection, setActiveSection] = useState(() => statusToSection[dbEntry.status] || 1)
-  const [status, setStatus] = useState(dbEntry.status || 'PENDING')
-  const [laborPrice, setLaborPrice] = useState(dbEntry.laborPrice || 0)
+  const [activeSection, setActiveSection] = useState(() => statusToSection[dbEntry?.status] || 1)
+  const [status, setStatus] = useState(dbEntry?.status || 'PENDING')
+  const [isEditing, setIsEditing] = useState(() => (isEmployeeHistoryEditFlow ? true : (dbEntry?.status || 'PENDING') !== 'CLOSED'))
+  const [laborPrice, setLaborPrice] = useState(dbEntry?.laborPrice || 0)
   const [showMobilePreview, setShowMobilePreview] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [interventionData, setInterventionData] = useState({
-    interventionDate: dbEntry.interventionDate,
-    ficheNumber: dbEntry.ficheNumber,
-    startTime: dbEntry.startTime,
-    endTime: dbEntry.endTime,
-    totalTime: dbEntry.totalTime,
-    siteName: dbEntry.siteName,
-    clientName: dbEntry.clientName,
-    clientCode: dbEntry.clientCode,
-    clientPhone: dbEntry.clientPhone,
-    clientEmail: dbEntry.clientEmail,
-    clientAddress: dbEntry.clientAddress,
-    requestorName: dbEntry.requestorName,
-    machineType: dbEntry.machineType,
-    machineBrand: dbEntry.machineBrand,
-    machineModel: dbEntry.machineModel,
-    serialNumber: dbEntry.serialNumber,
-    problemDescription: dbEntry.problemDescription,
-    telephoneDiagnostic: dbEntry.telephoneDiagnostic,
-    interventionType: dbEntry.interventionType,
-    interventionDetail: dbEntry.interventionDetail,
-    numEssai: dbEntry.numEssai,
-    essaiConcluant: dbEntry.essaiConcluant,
-    technicianName: dbEntry.technicianName,
+    clientId: dbEntry?.clientId || dbEntry?.clientEntity?.id || '',
+    machineId: dbEntry?.machineId || dbEntry?.machineEntity?.id || '',
+    interventionDate: dbEntry?.interventionDate,
+    ficheNumber: dbEntry?.ficheNumber,
+    startTime: dbEntry?.startTime,
+    endTime: dbEntry?.endTime,
+    totalTime: dbEntry?.totalTime,
+    siteName: dbEntry?.siteName,
+    clientName: dbEntry?.clientName,
+    clientCode: dbEntry?.clientCode,
+    clientPhone: dbEntry?.clientPhone,
+    clientEmail: dbEntry?.clientEmail,
+    clientAddress: dbEntry?.clientAddress,
+    requestorName: dbEntry?.requestorName,
+    machineType: dbEntry?.machineType,
+    machineBrand: dbEntry?.machineBrand,
+    machineModel: dbEntry?.machineModel,
+    serialNumber: dbEntry?.serialNumber,
+    problemDescription: dbEntry?.problemDescription,
+    telephoneDiagnostic: dbEntry?.telephoneDiagnostic,
+    interventionType: dbEntry?.interventionType,
+    interventionDetail: dbEntry?.interventionDetail,
+    numEssai: dbEntry?.numEssai,
+    essaiConcluant: dbEntry?.essaiConcluant,
+    technicianName: assignedTechnicianName || dbEntry?.technicianName,
   })
+
+  const selectedClient = useMemo(
+    () => clients.find((c) => String(c.id) === String(interventionData.clientId)),
+    [clients, interventionData.clientId],
+  )
+  const selectedMachine = useMemo(
+    () => machines.find((m) => String(m.id) === String(interventionData.machineId)),
+    [machines, interventionData.machineId],
+  )
+
+  const computeTotalTime = useCallback((start, end) => {
+    if (!start || !end) return ''
+    const [sh, sm] = String(start).split(':').map((v) => Number(v))
+    const [eh, em] = String(end).split(':').map((v) => Number(v))
+    if (![sh, sm, eh, em].every((n) => Number.isFinite(n))) return ''
+    const startMinutes = sh * 60 + sm
+    const endMinutes = eh * 60 + em
+    let diff = endMinutes - startMinutes
+    if (diff < 0) diff += 24 * 60
+    const hours = Math.floor(diff / 60)
+    const minutes = diff % 60
+    return `${hours}h${String(minutes).padStart(2, '0')}m`
+  }, [])
 
   const handleChange = (e) => {
     const { name, value } = e.target
     setInterventionData(prev => ({ ...prev, [name]: value }))
   }
 
-  const [parts, setParts] = useState(dbEntry.parts || [])
+  const [parts, setParts] = useState(dbEntry?.parts || [])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const response = await apiFetch(`/interventions/${id}`)
+        if (!response.ok) return
+        const data = await response.json()
+        if (!cancelled && data) {
+          setDbEntry(data)
+        }
+      } catch {}
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [id])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const [clientsRes, machinesRes] = await Promise.all([
+          apiFetch('/clients'),
+          apiFetch('/machines'),
+        ])
+        const clientsJson = clientsRes.ok ? await clientsRes.json() : []
+        const machinesJson = machinesRes.ok ? await machinesRes.json() : []
+        if (!cancelled) {
+          setClients(Array.isArray(clientsJson) ? clientsJson : [])
+          setMachines(Array.isArray(machinesJson) ? machinesJson : [])
+        }
+      } catch {}
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    setCompletedUpTo(dbEntry?.completedUpToSection || 1)
+    setActiveSection(statusToSection[dbEntry?.status] || 1)
+    setStatus(dbEntry?.status || 'PENDING')
+    setLaborPrice(dbEntry?.laborPrice || 0)
+    setParts(Array.isArray(dbEntry?.parts) ? dbEntry.parts : [])
+    setInterventionData({
+      clientId: dbEntry?.clientId || dbEntry?.clientEntity?.id || '',
+      machineId: dbEntry?.machineId || dbEntry?.machineEntity?.id || '',
+      interventionDate: dbEntry?.interventionDate || '',
+      ficheNumber: dbEntry?.ficheNumber || '',
+      startTime: dbEntry?.startTime || '',
+      endTime: dbEntry?.endTime || '',
+      totalTime: dbEntry?.totalTime || '',
+      siteName: dbEntry?.siteName || '',
+      clientName: dbEntry?.clientName || '',
+      clientCode: dbEntry?.clientCode || '',
+      clientPhone: dbEntry?.clientPhone || '',
+      clientEmail: dbEntry?.clientEmail || '',
+      clientAddress: dbEntry?.clientAddress || '',
+      requestorName: dbEntry?.requestorName || '',
+      machineType: dbEntry?.machineType || '',
+      machineBrand: dbEntry?.machineBrand || '',
+      machineModel: dbEntry?.machineModel || '',
+      serialNumber: dbEntry?.serialNumber || '',
+      problemDescription: dbEntry?.problemDescription || '',
+      telephoneDiagnostic: dbEntry?.telephoneDiagnostic || '',
+      interventionType: dbEntry?.interventionType || '',
+      interventionDetail: dbEntry?.interventionDetail || '',
+      numEssai: dbEntry?.numEssai || '',
+      essaiConcluant: dbEntry?.essaiConcluant ?? null,
+      technicianName: assignedTechnicianName || dbEntry?.technicianName || '',
+    })
+  }, [dbEntry, assignedTechnicianName])
+
+  useEffect(() => {
+    const computed = computeTotalTime(interventionData.startTime, interventionData.endTime)
+    if (computed !== interventionData.totalTime) {
+      setInterventionData((prev) => ({ ...prev, totalTime: computed }))
+    }
+  }, [computeTotalTime, interventionData.startTime, interventionData.endTime, interventionData.totalTime])
 
   const addPart = () => {
     setParts([...parts, { id: Date.now(), reference: '', designation: '', quantity: 1 }])
@@ -659,6 +774,79 @@ export default function InterventionDetails() {
 
   const updatePart = (partId, field, value) => {
     setParts(parts.map(p => p.id === partId ? { ...p, [field]: value } : p))
+  }
+
+  const handleSave = async (options = {}) => {
+    setIsSaving(true)
+    try {
+      const isFinalSave = Boolean(options.finalize)
+      const effectiveStatus = isFinalSave ? 'CLOSED' : status
+      const effectiveCompletedUpTo = isFinalSave ? sections.length : completedUpTo
+      const payload = {
+        id,
+        status: effectiveStatus,
+        completedUpToSection: effectiveCompletedUpTo,
+        technicianName: interventionData.technicianName,
+        interventionDate: interventionData.interventionDate,
+        ficheNumber: interventionData.ficheNumber,
+        startTime: interventionData.startTime,
+        endTime: interventionData.endTime,
+        totalTime: interventionData.totalTime,
+        siteName: interventionData.siteName,
+        clientAddress: interventionData.clientAddress,
+        requestorName: interventionData.requestorName,
+        machineModel: interventionData.machineModel,
+        clientId: interventionData.clientId || null,
+        machineId: interventionData.machineId || null,
+        problemDescription: interventionData.problemDescription,
+        telephoneDiagnostic: interventionData.telephoneDiagnostic,
+        interventionType: interventionData.interventionType,
+        interventionDetail: interventionData.interventionDetail,
+        numEssai: interventionData.numEssai,
+        essaiConcluant: interventionData.essaiConcluant,
+        parts,
+        laborPrice: Number(laborPrice) || 0,
+      }
+
+      const response = await apiFetch(`/interventions/${id}`, {
+        method: 'PATCH',
+        body: payload,
+      })
+      if (!response.ok) {
+        alert('Erreur lors de l’enregistrement.')
+        return
+      }
+      const saved = await response.json().catch(() => null)
+      if (saved) {
+        setDbEntry(saved)
+      }
+      if (isFinalSave) {
+        setStatus('CLOSED')
+        setIsEditing(false)
+      } else if (options.exitEdit) {
+        setIsEditing(false)
+      }
+      if (options.returnTo) {
+        try {
+          const raw = window.localStorage.getItem('intervention_modified_ids')
+          const list = raw ? JSON.parse(raw) : []
+          const next = Array.isArray(list) ? list : []
+          if (!next.includes(id)) {
+            next.push(id)
+            window.localStorage.setItem('intervention_modified_ids', JSON.stringify(next))
+          }
+        } catch {}
+        navigate(options.returnTo)
+        return
+      }
+      if (isFinalSave && missionId) {
+        navigate(`/missions/${missionId}`)
+      }
+    } catch (error) {
+      alert('Impossible de joindre le serveur.')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const renderSectionContent = () => {
@@ -687,8 +875,19 @@ export default function InterventionDetails() {
                   </label>
                   <div className="relative">
                     <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={18} />
-                    <input type="text" name="clientName" value={interventionData.clientName} onChange={handleChange}
-                      className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm hover:border-slate-300" />
+                    <select
+                      name="clientId"
+                      value={interventionData.clientId}
+                      onChange={handleChange}
+                      className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm hover:border-slate-300"
+                    >
+                      <option value="">Sélectionner un client</option>
+                      {clients.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
                 <div className="space-y-2 sm:space-y-3 group">
@@ -698,7 +897,7 @@ export default function InterventionDetails() {
                   </label>
                   <div className="relative">
                     <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={18} />
-                    <input type="text" name="clientCode" value={interventionData.clientCode} onChange={handleChange}
+                    <input type="text" name="clientCode" value={selectedClient?.code || ''} readOnly
                       className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm hover:border-slate-300" />
                   </div>
                 </div>
@@ -720,7 +919,7 @@ export default function InterventionDetails() {
                   </label>
                   <div className="relative">
                     <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={18} />
-                    <input type="tel" name="clientPhone" value={interventionData.clientPhone} onChange={handleChange}
+                    <input type="tel" name="clientPhone" value={selectedClient?.phone || ''} readOnly
                       className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm hover:border-slate-300" />
                   </div>
                 </div>
@@ -731,7 +930,7 @@ export default function InterventionDetails() {
                   </label>
                   <div className="relative">
                     <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={18} />
-                    <input type="email" name="clientEmail" value={interventionData.clientEmail} onChange={handleChange}
+                    <input type="email" name="clientEmail" value={selectedClient?.email || ''} readOnly
                       className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm hover:border-slate-300" />
                   </div>
                 </div>
@@ -742,7 +941,11 @@ export default function InterventionDetails() {
                   </label>
                   <div className="relative">
                     <MapPin className="absolute left-4 top-4 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={18} />
-                    <textarea name="clientAddress" value={interventionData.clientAddress} onChange={handleChange}
+                    <textarea
+                      name="clientAddress"
+                      value={interventionData.clientAddress}
+                      onChange={handleChange}
+                      readOnly={Boolean(interventionData.clientId)}
                       className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold h-20 sm:h-24 resize-none shadow-sm hover:border-slate-300 leading-relaxed" />
                   </div>
                 </div>
@@ -762,8 +965,19 @@ export default function InterventionDetails() {
                   </label>
                   <div className="relative">
                     <Cpu className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 transition-colors" size={18} />
-                    <input type="text" name="machineType" value={interventionData.machineType} onChange={handleChange}
-                      className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm hover:border-slate-300" />
+                    <select
+                      name="machineId"
+                      value={interventionData.machineId}
+                      onChange={handleChange}
+                      className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm hover:border-slate-300"
+                    >
+                      <option value="">Sélectionner une machine</option>
+                      {machines.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.designation}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
                 <div className="space-y-2 sm:space-y-3 group">
@@ -771,7 +985,7 @@ export default function InterventionDetails() {
                     <span className="w-1.5 h-1.5 bg-slate-300 rounded-full"></span>
                     Marque
                   </label>
-                  <input type="text" name="machineBrand" value={interventionData.machineBrand} onChange={handleChange}
+                  <input type="text" name="machineBrand" value={selectedMachine?.brand || ''} readOnly
                     className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm hover:border-slate-300" />
                 </div>
                 <div className="space-y-2 sm:space-y-3 group">
@@ -779,7 +993,12 @@ export default function InterventionDetails() {
                     <span className="w-1.5 h-1.5 bg-slate-300 rounded-full"></span>
                     Modèle
                   </label>
-                  <input type="text" name="machineModel" value={interventionData.machineModel} onChange={handleChange}
+                  <input
+                    type="text"
+                    name="machineModel"
+                    value={selectedMachine?.year || interventionData.machineModel}
+                    onChange={handleChange}
+                    readOnly={Boolean(interventionData.machineId)}
                     className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm hover:border-slate-300" />
                 </div>
                 <div className="space-y-2 sm:space-y-3 group">
@@ -789,7 +1008,7 @@ export default function InterventionDetails() {
                   </label>
                   <div className="relative">
                     <Zap className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 transition-colors" size={18} />
-                    <input type="text" name="serialNumber" value={interventionData.serialNumber} onChange={handleChange}
+                    <input type="text" name="serialNumber" value={selectedMachine?.serialNumber || ''} readOnly
                       className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-bold font-mono tracking-wider shadow-sm hover:border-slate-300" />
                   </div>
                 </div>
@@ -922,7 +1141,7 @@ export default function InterventionDetails() {
                     <Clock size={12} className="text-green-600" />
                     Total
                   </label>
-                  <input type="text" name="totalTime" value={interventionData.totalTime} onChange={handleChange}
+                  <input type="text" name="totalTime" value={interventionData.totalTime} readOnly
                     className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-green-600 focus:ring-4 focus:ring-green-600/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-bold shadow-sm hover:border-slate-300" />
                 </div>
               </div>
@@ -1192,10 +1411,43 @@ export default function InterventionDetails() {
             <span className="hidden md:inline">Imprimer</span>
           </button>
           
-          <button className="flex items-center justify-center gap-2 bg-gradient-to-r from-[#0052CC] to-blue-600 hover:from-blue-700 hover:to-blue-800 text-white px-3 sm:px-6 py-2.5 sm:py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-200 hover:shadow-blue-300 active:scale-95">
-            <Save size={18} /> 
-            <span className="hidden md:inline">Enregistrer</span>
-          </button>
+          {isEmployeeHistoryEditFlow ? (
+            <>
+              <button
+                type="button"
+                onClick={() => navigate(returnTo)}
+                className="flex items-center justify-center gap-2 px-3 sm:px-6 py-2.5 sm:py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm active:scale-95 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200"
+              >
+                <XCircle size={18} />
+                <span className="hidden md:inline">Annuler</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSave({ exitEdit: true, returnTo })}
+                disabled={isSaving}
+                className="flex items-center justify-center gap-2 px-3 sm:px-6 py-2.5 sm:py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg active:scale-95 bg-gradient-to-r from-[#0052CC] to-blue-600 hover:from-blue-700 hover:to-blue-800 text-white shadow-blue-200 hover:shadow-blue-300"
+              >
+                <PenTool size={18} />
+                <span className="hidden md:inline">Modifier</span>
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => {
+                if (status === 'CLOSED') return
+                handleSave()
+              }}
+              disabled={isSaving || status === 'CLOSED'}
+              className={`flex items-center justify-center gap-2 px-3 sm:px-6 py-2.5 sm:py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg active:scale-95 ${
+                status === 'CLOSED'
+                  ? 'bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-slate-300'
+                  : 'bg-gradient-to-r from-[#0052CC] to-blue-600 hover:from-blue-700 hover:to-blue-800 text-white shadow-blue-200 hover:shadow-blue-300'
+              }`}
+            >
+              <Save size={18} />
+              <span className="hidden md:inline">{status === 'CLOSED' ? 'Clôturée' : 'Enregistrer'}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1280,19 +1532,6 @@ export default function InterventionDetails() {
             })}
           </div>
 
-          <div className="mt-8 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Modifier le Statut</p>
-            <select 
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-xs uppercase tracking-widest text-[#0052CC] outline-none focus:border-[#0052CC] transition-all cursor-pointer"
-            >
-              {Object.entries(statusConfig).map(([key, config]) => (
-                <option key={key} value={key}>{config.label}</option>
-              ))}
-            </select>
-          </div>
-
           <div className="mt-auto bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
             <div className="flex items-center gap-3 mb-3">
               <Zap size={16} className="text-orange-400 fill-orange-400" />
@@ -1304,27 +1543,12 @@ export default function InterventionDetails() {
 
         {/* --- MAIN CONTENT --- */}
         <div className="flex-1 overflow-y-auto no-scrollbar bg-white flex flex-col relative">
-          {/* Mobile Status Selector (floating or bottom) */}
-          <div className="lg:hidden flex items-center justify-between px-6 py-3 bg-slate-50 border-b border-slate-200">
-            <div className="flex items-center gap-2">
-              <Zap size={14} className="text-orange-500" />
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Statut</span>
-            </div>
-            <select 
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="bg-transparent border-none font-black text-[10px] uppercase tracking-widest text-[#0052CC] outline-none focus:ring-0 cursor-pointer"
-            >
-              {Object.entries(statusConfig).map(([key, config]) => (
-                <option key={key} value={key}>{config.label}</option>
-              ))}
-            </select>
-          </div>
-
           <div className="flex-1 px-4 sm:px-8 md:px-12 py-8 sm:py-12 md:py-16 max-w-4xl mx-auto w-full">
             <div className="h-full flex flex-col">
               <div className="flex-1">
-                {renderSectionContent()}
+                <fieldset disabled={status === 'CLOSED' && !isEditing} className="contents">
+                  {renderSectionContent()}
+                </fieldset>
               </div>
 
               <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t-2 border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
@@ -1362,14 +1586,44 @@ export default function InterventionDetails() {
                     <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" strokeWidth={3} />
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => navigate('/interventions')}
-                    className="w-full sm:w-auto order-1 sm:order-2 flex items-center justify-center gap-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-10 sm:px-12 py-4 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-xl shadow-green-300 active:scale-95"
-                  >
-                    <Check size={18} strokeWidth={3} />
-                    Valider & Clôturer
-                  </button>
+                  isEmployeeHistoryEditFlow ? (
+                    <div className="w-full sm:w-auto order-1 sm:order-2 flex flex-col sm:flex-row gap-3">
+                      <button
+                        type="button"
+                        onClick={() => navigate(returnTo)}
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-sm active:scale-95 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200"
+                      >
+                        <XCircle size={18} />
+                        Annuler
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSave({ exitEdit: true, returnTo })}
+                        disabled={isSaving}
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-lg active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed bg-gradient-to-r from-[#0052CC] to-blue-600 hover:from-blue-700 hover:to-blue-800 text-white shadow-blue-200 hover:shadow-blue-300"
+                      >
+                        <PenTool size={18} />
+                        Modifier
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (status === 'CLOSED') return
+                        handleSave({ finalize: true })
+                      }}
+                      disabled={isSaving || status === 'CLOSED'}
+                      className={`w-full sm:w-auto order-1 sm:order-2 flex items-center justify-center gap-2 px-8 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-lg active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed ${
+                        status === 'CLOSED'
+                          ? 'bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-slate-300'
+                          : 'bg-gradient-to-r from-[#0052CC] to-blue-600 hover:from-blue-700 hover:to-blue-800 text-white shadow-blue-200 hover:shadow-blue-300'
+                      }`}
+                    >
+                      <Save size={18} />
+                      {status === 'CLOSED' ? 'Clôturée' : 'Enregistrer'}
+                    </button>
+                  )
                 )}
               </div>
             </div>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { 
   History, 
   Search, 
@@ -10,6 +10,7 @@ import {
   Clock,
   ArrowRight
 } from 'lucide-react'
+import { apiFetch } from '../../api/apiClient'
 
 const mockHistory = [
   {
@@ -49,14 +50,100 @@ const mockHistory = [
 
 export default function InterventionHistory() {
   const [searchTerm, setSearchTerm] = useState('')
+  const [interventions, setInterventions] = useState([])
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const response = await apiFetch('/interventions', { auth: false })
+        if (!response.ok) return
+        const data = await response.json()
+        setInterventions(Array.isArray(data) ? data : [])
+      } catch {}
+    })()
+  }, [])
+
+  const historyRows = useMemo(() => {
+    const byKey = new Map()
+    for (const i of interventions) {
+      const machine = i.machineType || i.machine || ''
+      const serial = i.serialNumber || ''
+      const key = `${machine}__${serial}`.trim()
+      const existing = byKey.get(key)
+      const dateStr = i.interventionDate || i.date || ''
+      const dateValue = dateStr ? new Date(dateStr) : null
+      const record = {
+        id: i.id,
+        machine,
+        serial,
+        client: i.clientName || i.client || '',
+        lastFailure: i.problemDescription || i.request || '',
+        date: dateStr ? String(dateStr) : '',
+        dateValue,
+        status: i.status || 'PENDING',
+        priority: i.priority || '',
+      }
+
+      if (!existing) {
+        byKey.set(key, { latest: record, count: 1 })
+        continue
+      }
+
+      existing.count += 1
+      if (!existing.latest.dateValue || (dateValue && dateValue > existing.latest.dateValue)) {
+        existing.latest = record
+      }
+    }
+
+    const rows = Array.from(byKey.values()).map(({ latest, count }) => {
+      const frequency = count
+      const statusLabel =
+        frequency > 3 ? 'RÉCURRENT' : latest.status === 'CLOSED' ? 'RÉSOLU' : 'SOUS SURVEILLANCE'
+      const severity =
+        latest.priority === 'Critique'
+          ? 'Critical'
+          : latest.priority === 'Haute'
+            ? 'High'
+            : latest.priority === 'Moyenne'
+              ? 'Medium'
+              : 'Low'
+
+      return {
+        id: latest.id,
+        machine: latest.machine,
+        serial: latest.serial,
+        client: latest.client,
+        lastFailure: latest.lastFailure,
+        date: latest.date,
+        frequency,
+        status: statusLabel,
+        severity,
+      }
+    })
+
+    return rows
+  }, [interventions])
 
   const filteredHistory = useMemo(() => {
-    return mockHistory.filter(item => 
+    return historyRows.filter(item => 
       item.machine.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.serial.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.client.toLowerCase().includes(searchTerm.toLowerCase())
     )
-  }, [searchTerm])
+  }, [historyRows, searchTerm])
+
+  const recurringCount = historyRows.filter((h) => h.frequency > 3).length
+  const now = new Date()
+  const monthCount = interventions.filter((i) => {
+    const d = i.interventionDate || i.date
+    if (!d) return false
+    const dt = new Date(d)
+    return dt.getFullYear() === now.getFullYear() && dt.getMonth() === now.getMonth()
+  }).length
+  const closedCount = interventions.filter((i) => i.status === 'CLOSED').length
+  const resolutionRate = interventions.length
+    ? Math.round((closedCount / interventions.length) * 100)
+    : 0
 
   return (
     <div className="p-4 sm:p-6 space-y-6 bg-gray-50 min-h-full">
@@ -74,7 +161,7 @@ export default function InterventionHistory() {
           </div>
           <div>
             <p className="text-sm text-slate-500 font-medium">Pannes Récurrentes</p>
-            <p className="text-2xl font-bold text-slate-900">12</p>
+            <p className="text-2xl font-bold text-slate-900">{recurringCount}</p>
           </div>
         </div>
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
@@ -83,7 +170,7 @@ export default function InterventionHistory() {
           </div>
           <div>
             <p className="text-sm text-slate-500 font-medium">Interventions ce mois</p>
-            <p className="text-2xl font-bold text-slate-900">45</p>
+            <p className="text-2xl font-bold text-slate-900">{monthCount}</p>
           </div>
         </div>
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
@@ -92,7 +179,7 @@ export default function InterventionHistory() {
           </div>
           <div>
             <p className="text-sm text-slate-500 font-medium">Taux de résolution</p>
-            <p className="text-2xl font-bold text-slate-900">94%</p>
+            <p className="text-2xl font-bold text-slate-900">{resolutionRate}%</p>
           </div>
         </div>
       </div>

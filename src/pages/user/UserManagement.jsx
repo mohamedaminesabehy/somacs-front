@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Users, Shield, UserPlus, Settings } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Users, Shield, UserPlus, CheckCircle2 } from 'lucide-react'
 import UserTable from '../../components/user/UserTable'
 import CreateUserForm from '../../components/user/CreateUserForm'
 import RoleManagement from '../../components/user/RoleManagement'
@@ -13,6 +13,8 @@ export default function UserManagement({ currentUser }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('Tous les rôles')
   const [statusFilter, setStatusFilter] = useState('Statut: Tous')
+  const [actionToast, setActionToast] = useState({ open: false, message: '' })
+  const toastTimerRef = useRef(null)
 
   const fetchUsers = async () => {
     setIsLoading(true)
@@ -49,7 +51,7 @@ export default function UserManagement({ currentUser }) {
         ? user.name.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]?.toUpperCase()).join('')
         : 'US'
       const roleColor = user.role === 'Administrateur' ? 'purple'
-        : user.role === 'Commerciale' || user.role === 'Coordinateur' ? 'blue' : 'gray'
+        : user.role === 'Commerciale' || user.role === 'Coordinateur' || user.role === 'Responsable technicien' ? 'blue' : 'gray'
       const isActive = Boolean(user.isActive)
       return {
         id: user.id, name: user.name, email: user.email, role: user.role, roleColor,
@@ -81,8 +83,36 @@ export default function UserManagement({ currentUser }) {
   const handlePreviousPage = () => { if (safeCurrentPage > 1) setCurrentPage(p => Math.max(1, p - 1)) }
   const handleNextPage     = () => { if (safeCurrentPage < totalPages) setCurrentPage(p => Math.min(totalPages, p + 1)) }
 
+  const showActionToast = (message) => {
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current)
+      toastTimerRef.current = null
+    }
+    setActionToast({ open: true, message })
+    toastTimerRef.current = window.setTimeout(() => {
+      setActionToast({ open: false, message: '' })
+      toastTimerRef.current = null
+    }, 2500)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
+      toastTimerRef.current = null
+    }
+  }, [])
+
   return (
     <div className="p-6 lg:p-8 space-y-8 bg-slate-50 min-h-full">
+
+      {actionToast.open && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center pointer-events-none animate-in fade-in duration-200">
+          <div className="bg-slate-900 text-white border border-slate-700 px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3">
+            <CheckCircle2 size={20} className="text-green-400" />
+            <span className="text-sm font-black tracking-wide">{actionToast.message}</span>
+          </div>
+        </div>
+      )}
 
       {/* ── PAGE HEADER ── */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
@@ -145,6 +175,7 @@ export default function UserManagement({ currentUser }) {
         isLoading={isLoading}
         currentUser={currentUser}
         onUsersChanged={fetchUsers}
+        onAction={showActionToast}
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         roleFilter={roleFilter}
@@ -174,7 +205,7 @@ export default function UserManagement({ currentUser }) {
 
       {/* ── BOTTOM PANELS ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
-        <CreateUserForm currentUser={currentUser} onUserCreated={fetchUsers} />
+        <CreateUserForm currentUser={currentUser} onUserCreated={fetchUsers} onAction={showActionToast} />
         <RoleManagement />
       </div>
     </div>

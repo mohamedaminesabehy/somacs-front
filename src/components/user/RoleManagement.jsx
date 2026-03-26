@@ -6,7 +6,7 @@ const colorByRole = {
   Technicien: 'bg-gray-600',
   Commerciale: 'bg-[#0052CC]',
   Coordinateur: 'bg-blue-500',
-  Employé: 'bg-[#0052CC]',
+  'Responsable technicien': 'bg-[#0052CC]',
 }
 
 export default function RoleManagement() {

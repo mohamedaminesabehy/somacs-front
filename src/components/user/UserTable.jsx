@@ -21,6 +21,7 @@ export default function UserTable({
   isLoading,
   currentUser,
   onUsersChanged,
+  onAction,
   searchTerm,
   onSearchChange,
   roleFilter,
@@ -143,7 +144,7 @@ export default function UserTable({
       const nextRoleColor =
         updated.role === 'Administrateur'
           ? 'purple'
-          : updated.role === 'Commerciale' || updated.role === 'Coordinateur'
+          : updated.role === 'Commerciale' || updated.role === 'Coordinateur' || updated.role === 'Responsable technicien'
             ? 'blue'
             : 'gray'
       const nextStatusText = updated.isActive ? 'Actif' : 'Inactif'
@@ -170,6 +171,15 @@ export default function UserTable({
 
       setIsEditOpen(false)
       setSelectedUser(null)
+      if (onAction) {
+        const prevStatus = selectedUser.status
+        const nextStatus = editStatus
+        if (prevStatus !== nextStatus) {
+          onAction(nextStatus === 'Inactif' ? 'Utilisateur désactivé' : 'Utilisateur réactivé')
+        } else {
+          onAction('Utilisateur modifié')
+        }
+      }
     } catch {
       setActionError("Erreur lors de la modification de l'utilisateur.")
     } finally {
@@ -229,6 +239,9 @@ export default function UserTable({
 
       if (onUsersChanged) {
         onUsersChanged()
+      }
+      if (onAction) {
+        onAction('Utilisateur supprimé')
       }
     } catch {
       setActionError("Erreur lors de la suppression de l'utilisateur.")
@@ -490,7 +503,7 @@ export default function UserTable({
                       className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] focus:bg-white transition-all font-bold text-gray-700"
                     >
                       {availableRoles.length === 0 ? (
-                        <option>{isLoadingRoles ? 'Chargement...' : 'Aucun rôle'}</option>
+                        <option value="">{isLoadingRoles ? 'Chargement...' : 'Aucun rôle'}</option>
                       ) : (
                         availableRoles.map((role) => (
                           <option key={role.name} value={role.name}>
