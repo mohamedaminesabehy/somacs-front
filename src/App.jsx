@@ -16,6 +16,7 @@ import LoginForm from './components/user/LoginForm'
 import DevisList from './pages/devis/DevisList'
 import DevisDetails from './pages/devis/DevisDetails'
 import CreateDevis from './pages/devis/CreateDevis'
+import { NotificationsProvider } from './notifications/NotificationsProvider'
 
 function AppLayout({
   children,
@@ -34,8 +35,10 @@ function AppLayout({
         onLogout={onLogout}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header onToggleSidebar={onToggleSidebar} currentUser={currentUser} onLogout={onLogout} />
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <NotificationsProvider>
+          <Header onToggleSidebar={onToggleSidebar} currentUser={currentUser} onLogout={onLogout} />
+          <main className="flex-1 overflow-y-auto">{children}</main>
+        </NotificationsProvider>
       </div>
     </div>
   )

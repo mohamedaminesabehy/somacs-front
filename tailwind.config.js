@@ -3,6 +3,9 @@ export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
+      fontWeight: {
+        bold: '800',
+      },
       colors: {
         dark: {
           50: '#f9fafb',

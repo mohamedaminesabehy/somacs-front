@@ -36,7 +36,7 @@ const ClientSelectionModal = ({ isOpen, onClose, onSelect }) => {
   const fetchClients = async () => {
     setLoading(true)
     try {
-      const response = await apiFetch('/clients', { auth: false })
+      const response = await apiFetch('/clients', { auth: true })
       if (response.ok) {
         const data = await response.json()
         setClients(data)
@@ -111,7 +111,7 @@ const ClientSelectionModal = ({ isOpen, onClose, onSelect }) => {
       try {
         const response = await apiFetch(`/clients/${id}`, {
           method: 'DELETE',
-          auth: false,
+            auth: true,
         })
         if (response.ok) {
           fetchClients()
@@ -135,7 +135,7 @@ const ClientSelectionModal = ({ isOpen, onClose, onSelect }) => {
         {
           method: editingClient ? 'PATCH' : 'POST',
           body: formData,
-          auth: false,
+          auth: true,
         },
       )
       if (response.ok) {

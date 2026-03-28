@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Plus, Search, Download,
   Calendar, Clock, CheckCircle2, AlertCircle, Layers,
@@ -46,10 +46,13 @@ function KpiCard({ kpi }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function ListMission() {
   const navigate = useNavigate()
+  const location = useLocation()
   const tableRef = useRef(null)
+  const toastTimerRef = useRef(null)
 
   const [missions, setMissions] = useState([])
   const [isLoading, setIsLoading] = useState(false)
+  const [toast, setToast] = useState({ open: false, message: '' })
 
   const [search, setSearch]                 = useState('')
   const [filterEmployee, setFilterEmployee] = useState('all')
@@ -64,7 +67,7 @@ export default function ListMission() {
   const refreshMissions = async () => {
     setIsLoading(true)
     try {
-      const response = await apiFetch('/missions', { auth: false })
+        const response = await apiFetch('/missions', { auth: true })
       if (!response.ok) return
       const data = await response.json()
       setMissions(Array.isArray(data) ? data : [])
@@ -77,6 +80,34 @@ export default function ListMission() {
   useEffect(() => {
     refreshMissions()
   }, [])
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search || '')
+    const toastKey = params.get('toast') || location.state?.toast || ''
+    if (!toastKey) return
+
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current)
+      toastTimerRef.current = null
+    }
+
+    if (toastKey === 'assigned') {
+      setToast({ open: true, message: 'Mission affectée avec succès.' })
+      toastTimerRef.current = window.setTimeout(() => {
+        setToast({ open: false, message: '' })
+        toastTimerRef.current = null
+      }, 3000)
+    }
+
+    if (location.search || location.state?.toast) {
+      navigate({ pathname: location.pathname, search: '' }, { replace: true, state: {} })
+    }
+
+    return () => {
+      if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
+      toastTimerRef.current = null
+    }
+  }, [location.pathname, location.search, location.state, navigate])
 
   const todayKey = useMemo(() => new Date().toISOString().slice(0, 10), [])
 
@@ -272,6 +303,39 @@ export default function ListMission() {
 
   return (
     <div className="min-h-full bg-slate-50">
+      {toast.open && (
+        <div className="fixed top-5 right-5 sm:top-6 sm:right-6 z-[120] animate-in fade-in duration-200">
+          <div
+            role="status"
+            className="w-[320px] sm:w-[360px] bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden"
+          >
+            <div className="flex items-start gap-3.5 px-4 py-3.5">
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
+                <CheckCircle2 size={18} className="text-emerald-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Missions</p>
+                <p className="text-sm font-semibold text-slate-800 leading-snug mt-0.5 break-words">{toast.message}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (toastTimerRef.current) {
+                    window.clearTimeout(toastTimerRef.current)
+                    toastTimerRef.current = null
+                  }
+                  setToast({ open: false, message: '' })
+                }}
+                className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-colors"
+                aria-label="Fermer"
+              >
+                <span className="text-lg leading-none">×</span>
+              </button>
+            </div>
+            <div className="h-1 bg-gradient-to-r from-emerald-500 via-green-500 to-lime-400" />
+          </div>
+        </div>
+      )}
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 space-y-6">
 
         {/* ── Page header ── */}

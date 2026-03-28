@@ -538,15 +538,18 @@ export default function EmployeeMissions() {
   const navigate = useNavigate()
   const today    = new Date()
 
-  const currentUserName = useMemo(() => {
-    if (typeof window === 'undefined') return ''
+  const currentUser = useMemo(() => {
+    if (typeof window === 'undefined') return null
     const raw = window.localStorage.getItem('auth_user')
-    if (!raw) return ''
+    if (!raw) return null
     try {
       const parsed = JSON.parse(raw)
-      return String(parsed?.name || '').trim()
+      return {
+        id: typeof parsed?.id === 'number' ? parsed.id : Number(parsed?.id) || null,
+        name: String(parsed?.name || '').trim(),
+      }
     } catch {
-      return ''
+      return null
     }
   }, [])
 
@@ -559,13 +562,16 @@ export default function EmployeeMissions() {
   useEffect(() => {
     ;(async () => {
       try {
-        const response = await apiFetch('/missions', { auth: false })
+        const response = await apiFetch('/missions', { auth: true })
         if (!response.ok) return
         const data = await response.json()
         const rows = Array.isArray(data) ? data : []
-        const filteredByUser = currentUserName
-          ? rows.filter((m) => String(m.employee || '').trim() === currentUserName)
-          : rows
+        const filteredByUser =
+          currentUser && currentUser.id
+            ? rows.filter((m) => Number(m.employeeUserId) === Number(currentUser.id))
+            : currentUser && currentUser.name
+              ? rows.filter((m) => String(m.employee || '').trim() === currentUser.name)
+              : rows
 
         const normalized = filteredByUser.map((m) => ({
           ...m,
@@ -576,12 +582,12 @@ export default function EmployeeMissions() {
         setMissions(normalized)
       } catch {}
     })()
-  }, [currentUserName])
+  }, [currentUser])
 
   useEffect(() => {
     ;(async () => {
       try {
-        const response = await apiFetch('/interventions', { auth: false })
+        const response = await apiFetch('/interventions', { auth: true })
         if (!response.ok) return
         const data = await response.json()
         const rows = Array.isArray(data) ? data : []
@@ -617,7 +623,7 @@ export default function EmployeeMissions() {
         await apiFetch(`/missions/${missionId}`, {
           method: 'PATCH',
           body: { status: newStatus },
-          auth: false,
+          auth: true,
         })
       } catch {}
     })()
@@ -666,7 +672,7 @@ export default function EmployeeMissions() {
               </span>
             </div>
             <p className="text-slate-400 text-xs font-semibold flex items-center gap-1 mt-0.5">
-              <User size={10} /> {currentUserName || '—'} <span className="hidden sm:inline">— {today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+              <User size={10} /> {currentUser?.name || '—'} <span className="hidden sm:inline">— {today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
             </p>
           </div>
         </div>

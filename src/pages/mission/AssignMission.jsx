@@ -46,6 +46,15 @@ function getStatusLabel(status) {
   return status || ''
 }
 
+function formatClientAddress(client) {
+  if (!client) return ''
+  if (client.address) return String(client.address)
+  const city = client.city ? String(client.city).trim() : ''
+  const zone = client.zone ? String(client.zone).trim() : ''
+  if (!city && !zone) return ''
+  return zone ? `${city}, ${zone}` : city
+}
+
 // ── Steps definition ──────────────────────────────────────────────────────────
 const steps = [
   { id: 1, title: 'Type',        description: 'Nature de la mission', icon: Target },
@@ -96,20 +105,22 @@ export default function AssignMission() {
   useEffect(() => {
     ;(async () => {
       try {
-        const response = await apiFetch('/interventions', { auth: false })
+        const response = await apiFetch('/interventions', { auth: true })
         if (!response.ok) return
         const data = await response.json()
         const normalized = Array.isArray(data)
           ? data.map((i) => ({
               id: i.id,
               client: i.client || i.clientName || '',
-              machine: i.machine || i.machineType || '',
+              machine: i.machine || i.machineType || i.machineEntity?.designation || '',
               type: i.type || i.interventionType || '',
               status: i.status || 'PENDING',
               statusLabel: getStatusLabel(i.status),
               date: i.date || i.interventionDate || '',
-              phone: i.phone || i.clientPhone || '',
-              clientCode: i.clientCode || '',
+              phone: i.phone || i.clientPhone || i.clientEntity?.phone || '',
+              clientCode: i.clientCode || i.clientEntity?.code || '',
+              site: i.siteName || i.site || i.machineEntity?.site || '',
+              address: i.clientAddress || i.address || formatClientAddress(i.clientEntity) || '',
               request: i.request || i.problemDescription || '',
               assignedTo: i.assignedTo || i.assignee || i.technicianName || null,
             }))
@@ -163,17 +174,19 @@ export default function AssignMission() {
       ...prev,
       interventionId: prefillInterventionId,
       title: prev.title || `Intervention SAV — ${prefillInterventionId}`,
+      description: '',
     }))
   }, [prefillInterventionId])
 
   useEffect(() => {
-    if (!prefillInterventionId) return
+    if (missionType !== 'Intervention') return
     if (!selectedIntervention) return
     setFormData((prev) => ({
       ...prev,
-      description: prev.description || selectedIntervention.request || '',
+      site: selectedIntervention.site || selectedIntervention.client || '',
+      address: selectedIntervention.address || '',
     }))
-  }, [prefillInterventionId, selectedIntervention])
+  }, [missionType, selectedIntervention])
 
   const canGoNext = () => {
     if (currentStep === 1) return missionType !== ''
@@ -223,27 +236,33 @@ export default function AssignMission() {
     const empName = selectedEmployee
     const missionTitle = formData.title
     try {
+      const employeeUserId = selectedEmployeeObj?.id || null
+      if (!employeeUserId) {
+        alert('Veuillez sélectionner un technicien valide.')
+        return
+      }
       const missionPayload = {
         title: formData.title,
         description:
           missionType === 'Intervention'
-            ? (formData.description || selectedIntervention?.request || '')
+            ? formData.description
             : formData.description,
         employee: empName,
+        employeeUserId,
         priority,
         status: 'À faire',
         dueDate: dueDate || "Aujourd'hui",
         dueTime: dueTime || null,
         type: missionType,
         interventionId: missionType === 'Intervention' ? formData.interventionId : null,
-        site: missionType === 'Intervention' ? selectedIntervention?.client : formData.site,
-        address: missionType === 'Intervention' ? 'N/A' : formData.address,
+        site: formData.site,
+        address: formData.address,
       }
 
       const response = await apiFetch('/missions', {
         method: 'POST',
         body: missionPayload,
-        auth: false,
+        auth: true,
       })
       if (!response.ok) {
         alert('Erreur lors de la création de la mission.')
@@ -255,7 +274,7 @@ export default function AssignMission() {
         await apiFetch(`/interventions/${formData.interventionId}`, {
           method: 'PATCH',
           body: { status: 'ASSIGNED', assignedTo: empName },
-          auth: false,
+          auth: true,
         })
       }
 
@@ -267,7 +286,7 @@ export default function AssignMission() {
         const uploadRes = await apiFetch(`/missions/${createdMission.id}/attachments`, {
           method: 'POST',
           body: form,
-          auth: false,
+          auth: true,
         })
         if (!uploadRes.ok) {
           alert('Mission créée, mais erreur lors de l’upload des fichiers.')
@@ -276,10 +295,7 @@ export default function AssignMission() {
         }
       }
 
-      alert(
-        `Mission affectee avec succes !\n\nMission : ${missionTitle}\nTechnicien : ${empName}\nPriorite : ${priority}\nDate : ${dueDate}`
-      )
-      navigate('/missions')
+      navigate('/missions?toast=assigned', { state: { toast: 'assigned' } })
     } catch (error) {
       alert('Impossible de joindre le serveur.')
     }
@@ -486,6 +502,11 @@ export default function AssignMission() {
                         </div>
                       </div>
                       <div>
+                        <p className="text-[10px] font-black text-blue-400 uppercase tracking-wider mb-1">Site</p>
+                        <p className="text-sm font-medium text-slate-700">{selectedIntervention.site || '—'}</p>
+                        <p className="text-xs text-slate-600 mt-1 break-words">{selectedIntervention.address || '—'}</p>
+                      </div>
+                      <div>
                         <p className="text-[10px] font-black text-blue-400 uppercase tracking-wider mb-1">Date creation</p>
                         <div className="flex items-center gap-1.5 text-sm font-medium text-slate-700">
                           <Calendar size={13} className="text-blue-300" />
@@ -552,8 +573,8 @@ export default function AssignMission() {
                 />
               </div>
 
-              {/* Site fields — only for Normal missions */}
-              {missionType === 'Normal' && (
+              {/* Site fields */}
+              {(missionType === 'Normal' || missionType === 'Intervention') && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3 group">
                     <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-[#0052CC] transition-colors">

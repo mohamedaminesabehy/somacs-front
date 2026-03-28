@@ -37,6 +37,7 @@ function MissionTableInner(props, ref) {
   const { missions: missionsProp, onMissionsChanged } = props || {}
   const [missions, setMissions] = useState([])
   const [interventionsList, setInterventionsList] = useState([])
+  const [employeeUsers, setEmployeeUsers] = useState([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState('create')
   const [formMissionId, setFormMissionId] = useState(null)
@@ -66,7 +67,7 @@ function MissionTableInner(props, ref) {
 
   const fetchMissions = useCallback(async () => {
     try {
-      const response = await apiFetch('/missions', { auth: false })
+      const response = await apiFetch('/missions', { auth: true })
       if (response.ok) {
         const data = await response.json()
         setMissions(data)
@@ -78,7 +79,7 @@ function MissionTableInner(props, ref) {
 
   const fetchInterventions = useCallback(async () => {
     try {
-      const response = await apiFetch('/interventions', { auth: false })
+      const response = await apiFetch('/interventions', { auth: true })
       if (response.ok) {
         const data = await response.json()
         setInterventionsList(data)
@@ -88,17 +89,36 @@ function MissionTableInner(props, ref) {
     }
   }, [])
 
+  const fetchEmployees = useCallback(async () => {
+    try {
+      const response = await apiFetch('/users', { auth: true })
+      if (!response.ok) return
+      const data = await response.json().catch(() => [])
+      const users = Array.isArray(data) ? data : []
+      const normalized = users
+        .filter((u) => u && u.isActive !== false)
+        .map((u) => ({
+          id: u.id,
+          name: u.name,
+        }))
+      setEmployeeUsers(normalized)
+    } catch (error) {
+      console.error('Error fetching employees:', error)
+    }
+  }, [])
+
   useEffect(() => {
     if (!Array.isArray(missionsProp)) {
       fetchMissions()
     }
     fetchInterventions()
-  }, [fetchMissions, fetchInterventions, missionsProp])
+    fetchEmployees()
+  }, [fetchMissions, fetchInterventions, fetchEmployees, missionsProp])
 
   // Only show PENDING and ASSIGNED interventions in the "Lier à une intervention" dropdown
   const linkableInterventions = interventionsList.filter(i => i.status === 'PENDING' || i.status === 'ASSIGNED')
 
-  const employeeOptions = Array.from(new Set(displayMissions.map((mission) => mission.employee)))
+  const employeeOptions = employeeUsers
   const selectedIntervention = linkableInterventions.find(i => i.id === selectedInterventionId)
 
   const totalMissions = displayMissions.length
@@ -113,7 +133,7 @@ function MissionTableInner(props, ref) {
     setFormMissionId(null)
     setFormTitle('')
     setFormDescription('')
-    setFormEmployee(employeeOptions[0] || '')
+    setFormEmployee(employeeOptions[0]?.id ? String(employeeOptions[0].id) : '')
     setFormPriority('Moyenne')
     setFormDueDate('')
     setFormDueTime('')
@@ -133,7 +153,13 @@ function MissionTableInner(props, ref) {
     setFormMissionId(mission.id)
     setFormTitle(mission.title)
     setFormDescription(mission.description)
-    setFormEmployee(mission.employee)
+    setFormEmployee(
+      mission.employeeUserId
+        ? String(mission.employeeUserId)
+        : employeeUsers.find((u) => u.name === mission.employee)?.id
+          ? String(employeeUsers.find((u) => u.name === mission.employee).id)
+          : '',
+    )
     setFormPriority(mission.priority)
     setFormDueDate(mission.dueDate)
     setFormDueTime(mission.dueTime || '')
@@ -199,10 +225,14 @@ function MissionTableInner(props, ref) {
       return
     }
 
+    const selectedEmployee = employeeUsers.find((u) => String(u.id) === String(formEmployee)) || null
+    const selectedEmployeeName = selectedEmployee?.name || ''
+
     const baseMission = {
       title: formTitle,
       description: formDescription,
-      employee: formEmployee,
+      employee: selectedEmployeeName,
+      employeeUserId: selectedEmployee ? Number(selectedEmployee.id) : null,
       priority: formPriority,
       status: modalMode === 'create' ? 'À faire' : formStatus,
       dueDate: formDueDate || "Aujourd'hui",
@@ -220,7 +250,7 @@ function MissionTableInner(props, ref) {
         {
           method: modalMode === 'create' ? 'POST' : 'PATCH',
           body: modalMode === 'edit' ? { ...baseMission, attachments: existingAttachments } : baseMission,
-          auth: false,
+          auth: true,
         },
       )
 
@@ -236,7 +266,7 @@ function MissionTableInner(props, ref) {
           const uploadRes = await apiFetch(`/missions/${missionId}/attachments`, {
             method: 'POST',
             body: form,
-            auth: false,
+            auth: true,
           })
           if (!uploadRes.ok) {
             alert('Mission enregistrée, mais erreur lors de l’upload des fichiers.')
@@ -247,8 +277,8 @@ function MissionTableInner(props, ref) {
         if (missionType === 'Intervention' && selectedInterventionId) {
           await apiFetch(`/interventions/${selectedInterventionId}`, {
             method: 'PATCH',
-            body: { status: 'ASSIGNED', assignedTo: formEmployee },
-            auth: false,
+            body: { status: 'ASSIGNED', assignedTo: selectedEmployeeName },
+            auth: true,
           })
           fetchInterventions()
         }
@@ -413,7 +443,7 @@ function MissionTableInner(props, ref) {
                           try {
                             const response = await apiFetch(`/missions/${mission.id}`, {
                               method: 'DELETE',
-                              auth: false,
+                              auth: true,
                             })
                             if (response.ok) {
                               if (typeof onMissionsChanged === 'function') onMissionsChanged()
@@ -712,8 +742,8 @@ function MissionTableInner(props, ref) {
                         >
                           <option value="">Sélectionner</option>
                           {employeeOptions.map((employee) => (
-                            <option key={employee} value={employee}>
-                              {employee}
+                            <option key={employee.id} value={employee.id}>
+                              {employee.name}
                             </option>
                           ))}
                         </select>

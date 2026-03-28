@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Shield, MoreVertical } from 'lucide-react'
+import { apiFetch } from '../../api/apiClient'
 
 const colorByRole = {
   Administrateur: 'bg-purple-600',
@@ -21,8 +22,7 @@ export default function RoleManagement() {
       setIsLoading(true)
       setError('')
       try {
-        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
-        const response = await fetch(`${baseUrl}/roles`)
+        const response = await apiFetch('/roles', { auth: true })
         if (!response.ok) {
           setError('Impossible de charger les rôles.')
           return

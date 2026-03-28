@@ -54,6 +54,46 @@ function normalizeIntervention(row) {
   }
 }
 
+function formatClientAddress(client) {
+  if (!client) return ''
+  if (client.address) return String(client.address)
+  const city = client.city ? String(client.city).trim() : ''
+  const zone = client.zone ? String(client.zone).trim() : ''
+  if (!city && !zone) return ''
+  return zone ? `${city}, ${zone}` : city
+}
+
+function mapRawToInterventionData(raw) {
+  const clientEntity = raw?.clientEntity || null
+  const machineEntity = raw?.machineEntity || null
+
+  return {
+    interventionDate: raw?.interventionDate || raw?.date || '',
+    startTime: raw?.startTime || '',
+    endTime: raw?.endTime || '',
+    totalTime: raw?.totalTime || '',
+    technicianName: raw?.technicianName || raw?.assignedTo || raw?.assignee || raw?.technician || '',
+    ficheNumber: raw?.ficheNumber || '',
+    siteName: raw?.siteName || raw?.site || machineEntity?.site || '',
+    clientName: raw?.clientName || raw?.client || clientEntity?.name || '',
+    clientCode: raw?.clientCode || clientEntity?.code || '',
+    clientPhone: raw?.clientPhone || raw?.phone || clientEntity?.phone || '',
+    clientEmail: raw?.clientEmail || clientEntity?.email || '',
+    clientAddress: raw?.clientAddress || formatClientAddress(clientEntity) || '',
+    requestorName: raw?.requestorName || '',
+    machineType: raw?.machineType || raw?.machine || machineEntity?.designation || '',
+    machineBrand: raw?.machineBrand || machineEntity?.brand || '',
+    machineModel: raw?.machineModel || machineEntity?.year || '',
+    serialNumber: raw?.serialNumber || machineEntity?.serialNumber || '',
+    problemDescription: raw?.problemDescription || raw?.request || '',
+    telephoneDiagnostic: raw?.telephoneDiagnostic || '',
+    interventionType: raw?.interventionType || raw?.type || '',
+    interventionDetail: raw?.interventionDetail || '',
+    numEssai: raw?.numEssai || '',
+    essaiConcluant: raw?.essaiConcluant ?? null,
+  }
+}
+
 function FicheContent({ interventionData, parts, laborPrice, logo }) {
   return (
     <>
@@ -312,31 +352,7 @@ function InterventionPreview({ intervention }) {
   const data = intervention?.raw || {}
   const parts = Array.isArray(data.parts) ? data.parts : []
   const laborPrice = typeof data.laborPrice === 'number' ? data.laborPrice : Number(data.laborPrice) || 0
-  const interventionData = {
-    interventionDate: data.interventionDate,
-    startTime: data.startTime,
-    endTime: data.endTime,
-    totalTime: data.totalTime,
-    technicianName: data.technicianName,
-    ficheNumber: data.ficheNumber,
-    siteName: data.siteName,
-    clientName: data.clientName,
-    clientCode: data.clientCode,
-    clientPhone: data.clientPhone,
-    clientEmail: data.clientEmail,
-    clientAddress: data.clientAddress,
-    requestorName: data.requestorName,
-    machineType: data.machineType,
-    machineBrand: data.machineBrand,
-    machineModel: data.machineModel,
-    serialNumber: data.serialNumber,
-    problemDescription: data.problemDescription,
-    telephoneDiagnostic: data.telephoneDiagnostic,
-    interventionType: data.interventionType,
-    interventionDetail: data.interventionDetail,
-    numEssai: data.numEssai,
-    essaiConcluant: data.essaiConcluant,
-  }
+  const interventionData = mapRawToInterventionData(data)
 
   const FICHE_WIDTH = 560
   const wrapperRef = useRef(null)
@@ -452,7 +468,7 @@ export default function EmployeeHistory() {
           setResolvedRole(found?.role || '')
         }
 
-        const interventionsRes = await apiFetch('/interventions', { auth: false })
+        const interventionsRes = await apiFetch('/interventions', { auth: true })
         if (!interventionsRes.ok) {
           setInterventions([])
           return
@@ -669,7 +685,14 @@ export default function EmployeeHistory() {
                           {!modifiedIdsSet.has(row.id) && (
                             <button
                               type="button"
-                              onClick={() => navigate(`/interventions/${row.id}`, { state: { assignedTechnicianName: row.technicianName, returnTo: window.location.pathname } })}
+                              onClick={() =>
+                                navigate(`/interventions/${row.id}`, {
+                                  state: {
+                                    assignedTechnicianName: row.technicianName,
+                                    returnTo: `${window.location.pathname}${window.location.search}`,
+                                  },
+                                })
+                              }
                               className="inline-flex items-center gap-2 px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-black transition-colors"
                             >
                               <Edit3 size={14} /> Modifier

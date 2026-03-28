@@ -1,4 +1,5 @@
-import { Search, Bell, Clock, Menu, LogOut } from 'lucide-react'
+import { Search, Clock, Menu, LogOut } from 'lucide-react'
+import NotificationBell from '../notifications/NotificationBell'
 
 export default function Header({ onToggleSidebar, currentUser, onLogout }) {
   return (
@@ -29,10 +30,7 @@ export default function Header({ onToggleSidebar, currentUser, onLogout }) {
 
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="flex items-center gap-1 sm:gap-2 mr-2">
-            <button className="relative text-gray-500 hover:text-[#0052CC] p-2 hover:bg-[#0052CC]/5 rounded-xl transition-all">
-              <Bell size={20} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 border-2 border-white rounded-full"></span>
-            </button>
+            <NotificationBell />
 
             <button className="text-gray-500 hover:text-[#0052CC] p-2 hover:bg-[#0052CC]/5 rounded-xl transition-all">
               <Clock size={20} />

@@ -100,7 +100,7 @@ export default function MissionDetails() {
     ;(async () => {
       setIsLoadingMission(true)
       try {
-        const response = await apiFetch(`/missions/${id}`, { auth: false })
+        const response = await apiFetch(`/missions/${id}`, { auth: true })
         if (!response.ok) {
           setMission(null)
           return
@@ -124,7 +124,7 @@ export default function MissionDetails() {
     }
     ;(async () => {
       try {
-        const response = await apiFetch(`/interventions/${mission.interventionId}`, { auth: false })
+        const response = await apiFetch(`/interventions/${mission.interventionId}`, { auth: true })
         if (!response.ok) return
         const data = await response.json()
         setIntervention(data)
@@ -137,7 +137,7 @@ export default function MissionDetails() {
 
     const refresh = async () => {
       try {
-        const missionRes = await apiFetch(`/missions/${mission.id}`, { auth: false })
+        const missionRes = await apiFetch(`/missions/${mission.id}`, { auth: true })
         if (missionRes.ok) {
           const data = await missionRes.json()
           const nextStatus = data?.status || 'À faire'
@@ -145,7 +145,7 @@ export default function MissionDetails() {
           setStatus((prev) => (prev !== nextStatus ? nextStatus : prev))
         }
         if (mission.interventionId) {
-          const interventionRes = await apiFetch(`/interventions/${mission.interventionId}`, { auth: false })
+          const interventionRes = await apiFetch(`/interventions/${mission.interventionId}`, { auth: true })
           if (interventionRes.ok) {
             const iv = await interventionRes.json()
             setIntervention(iv)
@@ -222,7 +222,7 @@ export default function MissionDetails() {
         const response = await apiFetch(`/missions/${mission.id}`, {
           method: 'PATCH',
           body: { status: newStatus },
-          auth: false,
+          auth: true,
         })
         if (response.ok) {
           setStatusJustChangedTo(newStatus)
@@ -246,7 +246,7 @@ export default function MissionDetails() {
         const response = await apiFetch(`/missions/${mission.id}`, {
           method: 'PATCH',
           body: { status, notes },
-          auth: false,
+          auth: true,
         })
         if (response.ok) {
           const saved = await response.json().catch(() => null)
@@ -566,10 +566,15 @@ export default function MissionDetails() {
               <div className="p-4 sm:p-6">
                 <SectionHeader icon={Info} title="Détails" />
                 <div className="mt-2">
-                  <InfoItem label="Date d'échéance" value={mission.dueDate} icon={Calendar} />
-                  <InfoItem label="Heure prévue" value={mission.dueTime} icon={Clock} />
-                  <InfoItem label="Durée estimée" value={mission.duration} icon={Zap} colorClass="text-amber-500" />
-                  <InfoItem label="Assigné à" value={mission.employee} icon={User} colorClass="text-blue-500" />
+                  <InfoItem label="Type" value={mission.type === 'Intervention' ? 'Intervention S.A.V' : mission.type} icon={Wrench} colorClass="text-blue-500" />
+                  <InfoItem label="Statut" value={status} icon={CheckSquare} colorClass={statusCfg.color} />
+                  <InfoItem label="Priorité" value={priority.label} icon={Flag} colorClass={priority.color} />
+                  {mission.type === 'Intervention' && (
+                    <InfoItem label="Dossier SAV lié" value={mission.interventionId} icon={Link2} colorClass="text-indigo-500" />
+                  )}
+                  <InfoItem label="Date mission" value={mission.dueDate} icon={Calendar} />
+                  <InfoItem label="Heure mission" value={mission.dueTime} icon={Clock} />
+                  <InfoItem label="Employé assigné" value={mission.employee} icon={User} colorClass="text-blue-500" />
                 </div>
               </div>
             </div>

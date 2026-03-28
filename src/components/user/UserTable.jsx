@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Eye, Edit2, Trash2, Shield, Clock, AlertCircle } from 'lucide-react'
+import { apiFetch } from '../../api/apiClient'
 
 const roleColors = {
   purple: 'bg-purple-100 text-purple-700',
@@ -54,8 +55,7 @@ export default function UserTable({
     const fetchRoles = async () => {
       setIsLoadingRoles(true)
       try {
-        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
-        const response = await fetch(`${baseUrl}/roles`)
+        const response = await apiFetch('/roles', { auth: true })
         if (!response.ok) {
           return
         }
@@ -115,19 +115,15 @@ export default function UserTable({
 
     setIsSubmittingEdit(true)
     try {
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
-      const response = await fetch(`${baseUrl}/users/${selectedUser.id}`, {
+      const response = await apiFetch(`/users/${selectedUser.id}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+        body: {
           name: editName,
           email: editEmail,
           role: editRole,
           isActive: editStatus === 'Actif',
-        }),
+        },
+        auth: true,
       })
 
       if (!response.ok) {
@@ -216,12 +212,9 @@ export default function UserTable({
 
     setIsSubmittingDelete(true)
     try {
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
-      const response = await fetch(`${baseUrl}/users/${selectedUser.id}`, {
+      const response = await apiFetch(`/users/${selectedUser.id}`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        auth: true,
       })
 
       if (!response.ok) {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Users } from 'lucide-react'
+import { apiFetch } from '../../api/apiClient'
 
 export default function CreateUserForm({ currentUser, onUserCreated, onAction }) {
   const [name, setName] = useState('')
@@ -20,8 +21,7 @@ export default function CreateUserForm({ currentUser, onUserCreated, onAction })
     const fetchRoles = async () => {
       setIsLoadingRoles(true)
       try {
-        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
-        const response = await fetch(`${baseUrl}/roles`)
+        const response = await apiFetch('/roles', { auth: true })
         if (!response.ok) {
           return
         }
@@ -65,20 +65,16 @@ export default function CreateUserForm({ currentUser, onUserCreated, onAction })
 
     setIsSubmitting(true)
     try {
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
-      const response = await fetch(`${baseUrl}/users`, {
+      const response = await apiFetch('/users', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+        body: {
           name,
           email,
           username,
           password,
           role,
-        }),
+        },
+        auth: true,
       })
 
       if (!response.ok) {

@@ -92,7 +92,7 @@ export default function UserManagement({ currentUser }) {
     toastTimerRef.current = window.setTimeout(() => {
       setActionToast({ open: false, message: '' })
       toastTimerRef.current = null
-    }, 2500)
+    }, 3000)
   }
 
   useEffect(() => {
@@ -106,10 +106,35 @@ export default function UserManagement({ currentUser }) {
     <div className="p-6 lg:p-8 space-y-8 bg-slate-50 min-h-full">
 
       {actionToast.open && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center pointer-events-none animate-in fade-in duration-200">
-          <div className="bg-slate-900 text-white border border-slate-700 px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3">
-            <CheckCircle2 size={20} className="text-green-400" />
-            <span className="text-sm font-black tracking-wide">{actionToast.message}</span>
+        <div className="fixed top-5 right-5 sm:top-6 sm:right-6 z-[120] animate-in fade-in duration-200">
+          <div
+            role="status"
+            className="w-[320px] sm:w-[360px] bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden"
+          >
+            <div className="flex items-start gap-3.5 px-4 py-3.5">
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
+                <CheckCircle2 size={18} className="text-emerald-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Succès</p>
+                <p className="text-sm font-semibold text-slate-800 leading-snug mt-0.5 break-words">{actionToast.message}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (toastTimerRef.current) {
+                    window.clearTimeout(toastTimerRef.current)
+                    toastTimerRef.current = null
+                  }
+                  setActionToast({ open: false, message: '' })
+                }}
+                className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-colors"
+                aria-label="Fermer"
+              >
+                <span className="text-lg leading-none">×</span>
+              </button>
+            </div>
+            <div className="h-1 bg-gradient-to-r from-emerald-500 via-green-500 to-lime-400" />
           </div>
         </div>
       )}

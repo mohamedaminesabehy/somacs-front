@@ -55,7 +55,7 @@ export default function InterventionHistory() {
   useEffect(() => {
     ;(async () => {
       try {
-        const response = await apiFetch('/interventions', { auth: false })
+        const response = await apiFetch('/interventions', { auth: true })
         if (!response.ok) return
         const data = await response.json()
         setInterventions(Array.isArray(data) ? data : [])

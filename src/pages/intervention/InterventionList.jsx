@@ -93,6 +93,7 @@ function StatCard({ label, count, total, icon: Icon, active, onClick, colorClass
 function ActionMenu({ item, onNavigate }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
+  const isAlreadyAssigned = Boolean(item?.assignee) || item?.status === 'ASSIGNED'
 
   useEffect(() => {
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
@@ -121,8 +122,19 @@ function ActionMenu({ item, onNavigate }) {
             className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-[#0052CC] transition-colors">
             <Edit2 size={14} /> Modifier les infos
           </button>
-          <button onClick={() => { onNavigate('assign', item); setOpen(false) }}
-            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-[#0052CC] transition-colors">
+          <button
+            disabled={isAlreadyAssigned}
+            onClick={() => {
+              if (isAlreadyAssigned) return
+              onNavigate('assign', item)
+              setOpen(false)
+            }}
+            className={`flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold transition-colors ${
+              isAlreadyAssigned
+                ? 'text-slate-300 cursor-not-allowed'
+                : 'text-slate-700 hover:bg-blue-50 hover:text-[#0052CC]'
+            }`}
+          >
             <UserCheck2 size={14} /> Affecter technicien
           </button>
           <div className="border-t border-slate-50" />
@@ -162,7 +174,7 @@ export default function InterventionList() {
   const fetchInterventions = async () => {
     setLoading(true)
     try {
-      const response = await apiFetch('/interventions', { auth: false })
+      const response = await apiFetch('/interventions', { auth: true })
       if (response.ok) {
         const data = await response.json()
         const normalized = Array.isArray(data)
@@ -252,12 +264,19 @@ export default function InterventionList() {
 
     if (action === 'details') {
       navigate(`/interventions/${id}`, {
-        state: { assignedTechnicianName: item?.assignee || null }
+        state: { assignedTechnicianName: item?.assignee || null, readOnly: true }
       })
       return
     }
 
-    if (action === 'edit') navigate(`/interventions/${id}/edit`)
+    if (action === 'edit') {
+      navigate(`/interventions/${id}`, {
+        state: {
+          assignedTechnicianName: item?.assignee || null,
+          returnTo: `${location.pathname}${location.search}`,
+        },
+      })
+    }
     else if (action === 'assign') navigate('/missions/assign', { state: { prefillInterventionId: id } })
     else if (action === 'delete') {
       const confirmed = window.confirm(`Supprimer le dossier ${id} ?`)
@@ -266,7 +285,7 @@ export default function InterventionList() {
         try {
           const response = await apiFetch(`/interventions/${id}`, {
             method: 'DELETE',
-            auth: false,
+            auth: true,
           })
           if (response.ok) {
             fetchInterventions()
@@ -329,20 +348,37 @@ export default function InterventionList() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
       {toast.open && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center pointer-events-none animate-in fade-in duration-200">
-          <div className="w-full max-w-xl px-4">
-            <div className="bg-slate-900 text-white border border-slate-700 rounded-2xl shadow-2xl overflow-hidden">
-              <div className="px-6 py-4 flex items-start gap-4">
-                <div className="w-10 h-10 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center shrink-0">
-                  <CheckCircle2 size={20} className="text-green-400" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-300">Interventions</p>
-                  <p className="text-sm font-black whitespace-pre-line leading-relaxed mt-1">{toast.message}</p>
-                </div>
+        <div className="fixed top-5 right-5 sm:top-6 sm:right-6 z-[120] animate-in fade-in duration-200">
+          <div
+            role="status"
+            className="w-[320px] sm:w-[380px] bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden"
+          >
+            <div className="flex items-start gap-3.5 px-4 py-3.5">
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
+                <CheckCircle2 size={18} className="text-emerald-600" />
               </div>
-              <div className="h-1 bg-gradient-to-r from-emerald-400 via-green-400 to-lime-300" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Interventions</p>
+                <p className="text-sm font-semibold text-slate-800 whitespace-pre-line leading-snug mt-0.5 break-words">
+                  {toast.message}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (toastTimerRef.current) {
+                    window.clearTimeout(toastTimerRef.current)
+                    toastTimerRef.current = null
+                  }
+                  setToast({ open: false, message: '' })
+                }}
+                className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-colors"
+                aria-label="Fermer"
+              >
+                <span className="text-lg leading-none">×</span>
+              </button>
             </div>
+            <div className="h-1 bg-gradient-to-r from-emerald-500 via-green-500 to-lime-400" />
           </div>
         </div>
       )}
@@ -526,12 +562,11 @@ export default function InterventionList() {
                       <tr
                         key={item.id}
                         ref={isHighlighted ? highlightRowRef : null}
-                        className={`transition-colors group cursor-pointer ${
+                        className={`transition-colors group ${
                           isHighlighted
                             ? 'bg-emerald-50 ring-2 ring-emerald-200 animate-pulse'
                             : `hover:bg-blue-50/50 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`
                         }`}
-                        onClick={() => handleNavigate('details', item)}
                       >
                         <td className="px-6 py-4 border-r border-slate-50 last:border-0">
                           <div className="flex items-center gap-3">
@@ -598,8 +633,13 @@ export default function InterventionList() {
                               Modifier
                             </button>
                             <button 
+                              disabled={Boolean(item.assignee) || item.status === 'ASSIGNED'}
                               onClick={(e) => { e.stopPropagation(); handleNavigate('assign', item) }}
-                              className="flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white rounded-xl transition-all shadow-sm border border-[#004a77]/10 active:scale-95"
+                              className={`flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-sm border active:scale-95 ${
+                                Boolean(item.assignee) || item.status === 'ASSIGNED'
+                                  ? 'text-slate-300 bg-slate-100 border-slate-200 cursor-not-allowed pointer-events-none'
+                                  : 'text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white border-[#004a77]/10'
+                              }`}
                             >
                               <UserCheck2 size={12} strokeWidth={3} />
                               Affecter
@@ -679,8 +719,7 @@ export default function InterventionList() {
                       return (
                         <div 
                           key={item.id} 
-                          onClick={() => handleNavigate('details', item)}
-                          className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-blue-300 hover:shadow-md transition-all cursor-pointer group relative overflow-hidden"
+                          className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-blue-300 hover:shadow-md transition-all group relative overflow-hidden"
                         >
                           <div className={`absolute top-0 left-0 w-1 h-full ${st.bar}`} />
                           <div className="flex items-start justify-between mb-3">

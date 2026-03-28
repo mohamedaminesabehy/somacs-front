@@ -40,7 +40,7 @@ const MachineSelectionModal = ({ isOpen, onClose, onSelect }) => {
 
   const fetchMachines = async () => {
     try {
-      const response = await apiFetch('/machines', { auth: false })
+      const response = await apiFetch('/machines', { auth: true })
       if (response.ok) {
         const data = await response.json()
         setMachines(data)
@@ -52,7 +52,7 @@ const MachineSelectionModal = ({ isOpen, onClose, onSelect }) => {
 
   const fetchClients = async () => {
     try {
-      const response = await apiFetch('/clients', { auth: false })
+      const response = await apiFetch('/clients', { auth: true })
       if (response.ok) {
         const data = await response.json()
         setClients(data)
@@ -119,7 +119,7 @@ const MachineSelectionModal = ({ isOpen, onClose, onSelect }) => {
       try {
         const response = await apiFetch(`/machines/${id}`, {
           method: 'DELETE',
-          auth: false,
+          auth: true,
         })
         if (response.ok) {
           fetchMachines()
@@ -143,7 +143,7 @@ const MachineSelectionModal = ({ isOpen, onClose, onSelect }) => {
         {
           method: editingMachine ? 'PATCH' : 'POST',
           body: formData,
-          auth: false,
+          auth: true,
         },
       )
       if (response.ok) {

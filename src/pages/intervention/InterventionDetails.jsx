@@ -268,6 +268,48 @@ const statusConfig = {
   CLOSED:      { label: 'Clôturé',        color: 'bg-green-50 text-green-700 border border-green-200',    dot: 'bg-green-500'   },
 }
 
+function formatClientAddress(client) {
+  if (!client) return ''
+  if (client.address) return String(client.address)
+  const city = client.city ? String(client.city).trim() : ''
+  const zone = client.zone ? String(client.zone).trim() : ''
+  if (!city && !zone) return ''
+  return zone ? `${city}, ${zone}` : city
+}
+
+function mapEntryToInterventionData(entry, assignedTechnicianName) {
+  const clientEntity = entry?.clientEntity || null
+  const machineEntity = entry?.machineEntity || null
+
+  return {
+    clientId: entry?.clientId || clientEntity?.id || '',
+    machineId: entry?.machineId || machineEntity?.id || '',
+    interventionDate: entry?.interventionDate || entry?.date || '',
+    ficheNumber: entry?.ficheNumber || '',
+    startTime: entry?.startTime || '',
+    endTime: entry?.endTime || '',
+    totalTime: entry?.totalTime || '',
+    siteName: entry?.siteName || machineEntity?.site || '',
+    clientName: entry?.clientName || entry?.client || clientEntity?.name || '',
+    clientCode: entry?.clientCode || clientEntity?.code || '',
+    clientPhone: entry?.clientPhone || entry?.phone || clientEntity?.phone || '',
+    clientEmail: entry?.clientEmail || clientEntity?.email || '',
+    clientAddress: entry?.clientAddress || formatClientAddress(clientEntity) || '',
+    requestorName: entry?.requestorName || '',
+    machineType: entry?.machineType || entry?.machine || machineEntity?.designation || '',
+    machineBrand: entry?.machineBrand || machineEntity?.brand || '',
+    machineModel: entry?.machineModel || machineEntity?.year || '',
+    serialNumber: entry?.serialNumber || machineEntity?.serialNumber || '',
+    problemDescription: entry?.problemDescription || entry?.request || '',
+    telephoneDiagnostic: entry?.telephoneDiagnostic || '',
+    interventionType: entry?.interventionType || entry?.type || '',
+    interventionDetail: entry?.interventionDetail || '',
+    numEssai: entry?.numEssai || '',
+    essaiConcluant: entry?.essaiConcluant ?? null,
+    technicianName: assignedTechnicianName || entry?.technicianName || entry?.assignedTo || entry?.assignee || '',
+  }
+}
+
 const sections = [
   { id: 1, title: 'Informations', description: 'Client & Équipement', icon: Building2 },
   { id: 2, title: 'Diagnostic', description: 'Analyse & Expertise', icon: AlertCircle },
@@ -615,6 +657,7 @@ export default function InterventionDetails() {
   const missionId = location.state?.missionId
   const returnTo = location.state?.returnTo
   const isEmployeeHistoryEditFlow = Boolean(returnTo)
+  const isReadOnlyView = Boolean(location.state?.readOnly)
   const [clients, setClients] = useState([])
   const [machines, setMachines] = useState([])
   const [dbEntry, setDbEntry] = useState(() => interventionsDB[id] || interventionsDB['INT-2026-001'])
@@ -622,37 +665,11 @@ export default function InterventionDetails() {
 
   const [activeSection, setActiveSection] = useState(() => statusToSection[dbEntry?.status] || 1)
   const [status, setStatus] = useState(dbEntry?.status || 'PENDING')
-  const [isEditing, setIsEditing] = useState(() => (isEmployeeHistoryEditFlow ? true : (dbEntry?.status || 'PENDING') !== 'CLOSED'))
+  const [isEditing, setIsEditing] = useState(() => (isReadOnlyView ? false : (isEmployeeHistoryEditFlow ? true : (dbEntry?.status || 'PENDING') !== 'CLOSED')))
   const [laborPrice, setLaborPrice] = useState(dbEntry?.laborPrice || 0)
   const [showMobilePreview, setShowMobilePreview] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [interventionData, setInterventionData] = useState({
-    clientId: dbEntry?.clientId || dbEntry?.clientEntity?.id || '',
-    machineId: dbEntry?.machineId || dbEntry?.machineEntity?.id || '',
-    interventionDate: dbEntry?.interventionDate,
-    ficheNumber: dbEntry?.ficheNumber,
-    startTime: dbEntry?.startTime,
-    endTime: dbEntry?.endTime,
-    totalTime: dbEntry?.totalTime,
-    siteName: dbEntry?.siteName,
-    clientName: dbEntry?.clientName,
-    clientCode: dbEntry?.clientCode,
-    clientPhone: dbEntry?.clientPhone,
-    clientEmail: dbEntry?.clientEmail,
-    clientAddress: dbEntry?.clientAddress,
-    requestorName: dbEntry?.requestorName,
-    machineType: dbEntry?.machineType,
-    machineBrand: dbEntry?.machineBrand,
-    machineModel: dbEntry?.machineModel,
-    serialNumber: dbEntry?.serialNumber,
-    problemDescription: dbEntry?.problemDescription,
-    telephoneDiagnostic: dbEntry?.telephoneDiagnostic,
-    interventionType: dbEntry?.interventionType,
-    interventionDetail: dbEntry?.interventionDetail,
-    numEssai: dbEntry?.numEssai,
-    essaiConcluant: dbEntry?.essaiConcluant,
-    technicianName: assignedTechnicianName || dbEntry?.technicianName,
-  })
+  const [interventionData, setInterventionData] = useState(() => mapEntryToInterventionData(dbEntry, assignedTechnicianName))
 
   const selectedClient = useMemo(
     () => clients.find((c) => String(c.id) === String(interventionData.clientId)),
@@ -728,34 +745,32 @@ export default function InterventionDetails() {
     setStatus(dbEntry?.status || 'PENDING')
     setLaborPrice(dbEntry?.laborPrice || 0)
     setParts(Array.isArray(dbEntry?.parts) ? dbEntry.parts : [])
-    setInterventionData({
-      clientId: dbEntry?.clientId || dbEntry?.clientEntity?.id || '',
-      machineId: dbEntry?.machineId || dbEntry?.machineEntity?.id || '',
-      interventionDate: dbEntry?.interventionDate || '',
-      ficheNumber: dbEntry?.ficheNumber || '',
-      startTime: dbEntry?.startTime || '',
-      endTime: dbEntry?.endTime || '',
-      totalTime: dbEntry?.totalTime || '',
-      siteName: dbEntry?.siteName || '',
-      clientName: dbEntry?.clientName || '',
-      clientCode: dbEntry?.clientCode || '',
-      clientPhone: dbEntry?.clientPhone || '',
-      clientEmail: dbEntry?.clientEmail || '',
-      clientAddress: dbEntry?.clientAddress || '',
-      requestorName: dbEntry?.requestorName || '',
-      machineType: dbEntry?.machineType || '',
-      machineBrand: dbEntry?.machineBrand || '',
-      machineModel: dbEntry?.machineModel || '',
-      serialNumber: dbEntry?.serialNumber || '',
-      problemDescription: dbEntry?.problemDescription || '',
-      telephoneDiagnostic: dbEntry?.telephoneDiagnostic || '',
-      interventionType: dbEntry?.interventionType || '',
-      interventionDetail: dbEntry?.interventionDetail || '',
-      numEssai: dbEntry?.numEssai || '',
-      essaiConcluant: dbEntry?.essaiConcluant ?? null,
-      technicianName: assignedTechnicianName || dbEntry?.technicianName || '',
-    })
+    setInterventionData(mapEntryToInterventionData(dbEntry, assignedTechnicianName))
   }, [dbEntry, assignedTechnicianName])
+
+  useEffect(() => {
+    if (!selectedClient) return
+    setInterventionData((prev) => ({
+      ...prev,
+      clientName: selectedClient.name || prev.clientName,
+      clientCode: selectedClient.code || prev.clientCode,
+      clientPhone: selectedClient.phone || prev.clientPhone,
+      clientEmail: selectedClient.email || prev.clientEmail,
+      clientAddress: formatClientAddress(selectedClient) || prev.clientAddress,
+    }))
+  }, [selectedClient])
+
+  useEffect(() => {
+    if (!selectedMachine) return
+    setInterventionData((prev) => ({
+      ...prev,
+      machineType: selectedMachine.designation || prev.machineType,
+      machineBrand: selectedMachine.brand || prev.machineBrand,
+      machineModel: selectedMachine.year || prev.machineModel,
+      serialNumber: selectedMachine.serialNumber || prev.serialNumber,
+      siteName: selectedMachine.site || prev.siteName,
+    }))
+  }, [selectedMachine])
 
   useEffect(() => {
     const computed = computeTotalTime(interventionData.startTime, interventionData.endTime)
@@ -875,19 +890,28 @@ export default function InterventionDetails() {
                   </label>
                   <div className="relative">
                     <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={18} />
-                    <select
-                      name="clientId"
-                      value={interventionData.clientId}
-                      onChange={handleChange}
-                      className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm hover:border-slate-300"
-                    >
-                      <option value="">Sélectionner un client</option>
-                      {clients.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
+                    {isEmployeeHistoryEditFlow || isReadOnlyView ? (
+                      <input
+                        type="text"
+                        value={interventionData.clientName || ''}
+                        readOnly
+                        className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm"
+                      />
+                    ) : (
+                      <select
+                        name="clientId"
+                        value={interventionData.clientId}
+                        onChange={handleChange}
+                        className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm hover:border-slate-300"
+                      >
+                        <option value="">Sélectionner un client</option>
+                        {clients.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-2 sm:space-y-3 group">
@@ -897,7 +921,7 @@ export default function InterventionDetails() {
                   </label>
                   <div className="relative">
                     <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={18} />
-                    <input type="text" name="clientCode" value={selectedClient?.code || ''} readOnly
+                    <input type="text" name="clientCode" value={selectedClient?.code || interventionData.clientCode || ''} readOnly
                       className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm hover:border-slate-300" />
                   </div>
                 </div>
@@ -919,7 +943,7 @@ export default function InterventionDetails() {
                   </label>
                   <div className="relative">
                     <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={18} />
-                    <input type="tel" name="clientPhone" value={selectedClient?.phone || ''} readOnly
+                    <input type="tel" name="clientPhone" value={selectedClient?.phone || interventionData.clientPhone || ''} readOnly
                       className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm hover:border-slate-300" />
                   </div>
                 </div>
@@ -930,7 +954,7 @@ export default function InterventionDetails() {
                   </label>
                   <div className="relative">
                     <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={18} />
-                    <input type="email" name="clientEmail" value={selectedClient?.email || ''} readOnly
+                    <input type="email" name="clientEmail" value={selectedClient?.email || interventionData.clientEmail || ''} readOnly
                       className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm hover:border-slate-300" />
                   </div>
                 </div>
@@ -965,19 +989,28 @@ export default function InterventionDetails() {
                   </label>
                   <div className="relative">
                     <Cpu className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 transition-colors" size={18} />
-                    <select
-                      name="machineId"
-                      value={interventionData.machineId}
-                      onChange={handleChange}
-                      className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm hover:border-slate-300"
-                    >
-                      <option value="">Sélectionner une machine</option>
-                      {machines.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.designation}
-                        </option>
-                      ))}
-                    </select>
+                    {isEmployeeHistoryEditFlow || isReadOnlyView ? (
+                      <input
+                        type="text"
+                        value={interventionData.machineType || ''}
+                        readOnly
+                        className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm"
+                      />
+                    ) : (
+                      <select
+                        name="machineId"
+                        value={interventionData.machineId}
+                        onChange={handleChange}
+                        className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm hover:border-slate-300"
+                      >
+                        <option value="">Sélectionner une machine</option>
+                        {machines.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.designation}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-2 sm:space-y-3 group">
@@ -985,7 +1018,7 @@ export default function InterventionDetails() {
                     <span className="w-1.5 h-1.5 bg-slate-300 rounded-full"></span>
                     Marque
                   </label>
-                  <input type="text" name="machineBrand" value={selectedMachine?.brand || ''} readOnly
+                  <input type="text" name="machineBrand" value={selectedMachine?.brand || interventionData.machineBrand || ''} readOnly
                     className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm hover:border-slate-300" />
                 </div>
                 <div className="space-y-2 sm:space-y-3 group">
@@ -1008,7 +1041,7 @@ export default function InterventionDetails() {
                   </label>
                   <div className="relative">
                     <Zap className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 transition-colors" size={18} />
-                    <input type="text" name="serialNumber" value={selectedMachine?.serialNumber || ''} readOnly
+                    <input type="text" name="serialNumber" value={selectedMachine?.serialNumber || interventionData.serialNumber || ''} readOnly
                       className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-bold font-mono tracking-wider shadow-sm hover:border-slate-300" />
                   </div>
                 </div>
@@ -1088,7 +1121,7 @@ export default function InterventionDetails() {
                     <span className="w-1.5 h-1.5 bg-slate-300 rounded-full"></span>
                     Nombre d’Essai
                   </label>
-                  <input type="text" name="numEssai" value={interventionData.numEssai} onChange={handleChange}
+                  <input type="number" name="numEssai" value={interventionData.numEssai} onChange={handleChange} min="0" step="1"
                     className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-bold shadow-sm hover:border-slate-300" />
                 </div>
                 <div className="space-y-2 sm:space-y-3">
@@ -1377,7 +1410,13 @@ export default function InterventionDetails() {
       <div className="bg-white border-b-2 border-slate-200 px-4 sm:px-8 py-4 sm:py-6 flex items-center justify-between shrink-0 shadow-sm z-30">
         <div className="flex items-center gap-3 sm:gap-6">
           <button 
-            onClick={() => navigate('/interventions')}
+            onClick={() => {
+              if (isEmployeeHistoryEditFlow && returnTo) {
+                navigate(returnTo)
+                return
+              }
+              navigate('/interventions')
+            }}
             className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 rounded-xl transition-all active:scale-95 shadow-sm"
           >
             <ChevronLeft size={20} className="sm:hidden" strokeWidth={2.5} />
@@ -1415,14 +1454,6 @@ export default function InterventionDetails() {
             <>
               <button
                 type="button"
-                onClick={() => navigate(returnTo)}
-                className="flex items-center justify-center gap-2 px-3 sm:px-6 py-2.5 sm:py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm active:scale-95 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200"
-              >
-                <XCircle size={18} />
-                <span className="hidden md:inline">Annuler</span>
-              </button>
-              <button
-                type="button"
                 onClick={() => handleSave({ exitEdit: true, returnTo })}
                 disabled={isSaving}
                 className="flex items-center justify-center gap-2 px-3 sm:px-6 py-2.5 sm:py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg active:scale-95 bg-gradient-to-r from-[#0052CC] to-blue-600 hover:from-blue-700 hover:to-blue-800 text-white shadow-blue-200 hover:shadow-blue-300"
@@ -1431,7 +1462,7 @@ export default function InterventionDetails() {
                 <span className="hidden md:inline">Modifier</span>
               </button>
             </>
-          ) : (
+          ) : isReadOnlyView ? null : (
             <button
               onClick={() => {
                 if (status === 'CLOSED') return
@@ -1453,34 +1484,31 @@ export default function InterventionDetails() {
 
       <div className="flex flex-1 overflow-hidden flex-col lg:flex-row">
         {/* --- HORIZONTAL STEPPER (MOBILE/TABLET) --- */}
-        <div className="lg:hidden bg-white border-b border-slate-200 px-4 py-4 flex items-center justify-between overflow-x-auto no-scrollbar shrink-0">
-          <div className="flex items-center gap-2 min-w-max mx-auto">
+        <div className="lg:hidden bg-white border-b border-slate-100 px-4 py-3 shrink-0">
+          <div className="flex items-center justify-between max-w-lg mx-auto">
             {sections.map((section, idx) => {
               const isActive = activeSection === section.id
-              const isDone = completedUpTo >= section.id && !isActive
+              const isCompleted = activeSection > section.id
               const Icon = section.icon
               
               return (
                 <React.Fragment key={section.id}>
-                  <div 
-                    onClick={() => setActiveSection(section.id)}
-                    className="flex flex-col items-center gap-1.5 cursor-pointer group"
-                  >
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 ${
-                      isActive 
-                        ? 'bg-[#0052CC] text-white shadow-md scale-105' 
-                        : isDone
-                          ? 'bg-green-500 text-white'
-                          : 'bg-slate-100 text-slate-400'
-                    }`}>
-                      {isDone ? <Check size={18} strokeWidth={3} /> : <Icon size={18} />}
+                  <div className="flex flex-col items-center gap-1">
+                    <div
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 ${
+                        isActive ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-200 scale-110'
+                        : isCompleted ? 'bg-green-500 text-white'
+                        : 'bg-slate-100 text-slate-400'
+                      }`}
+                    >
+                      {isCompleted ? <Check size={16} strokeWidth={3} /> : <Icon size={16} />}
                     </div>
-                    <span className={`text-[9px] font-black uppercase tracking-tighter ${isActive ? 'text-[#0052CC]' : isDone ? 'text-green-500' : 'text-slate-400'}`}>
+                    <span className={`text-[9px] font-black uppercase tracking-wide ${isActive ? 'text-[#0052CC]' : isCompleted ? 'text-green-500' : 'text-slate-400'}`}>
                       {section.title}
                     </span>
                   </div>
                   {idx < sections.length - 1 && (
-                    <div className={`w-4 h-0.5 rounded-full mb-4 ${completedUpTo > section.id ? 'bg-green-500' : 'bg-slate-200'}`}></div>
+                    <div className={`flex-1 h-0.5 mx-1 rounded-full transition-colors duration-300 ${activeSection > section.id ? 'bg-green-400' : 'bg-slate-100'}`} />
                   )}
                 </React.Fragment>
               )
@@ -1490,41 +1518,37 @@ export default function InterventionDetails() {
 
         {/* --- SIDEBAR (DESKTOP) --- */}
         <div className="hidden lg:flex w-[320px] border-r border-slate-50 bg-slate-50/30 flex-col p-8 shrink-0">
-          <div className="space-y-2 mb-8">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Sections</h4>
+          <div className="space-y-2 mb-12">
+            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Progression</h4>
             <div className="h-1 w-12 bg-[#0052CC] rounded-full"></div>
           </div>
           
           <div className="space-y-1">
             {sections.map((section) => {
               const isActive = activeSection === section.id
-              const isDone = completedUpTo >= section.id && !isActive
+              const isCompleted = activeSection > section.id
               const Icon = section.icon
               
               return (
                 <div key={section.id} className="relative pb-10 last:pb-0">
                   {section.id !== sections.length && (
-                    <div className={`absolute left-6 top-14 bottom-0 w-0.5 rounded-full ${completedUpTo >= section.id ? 'bg-[#0052CC]' : 'bg-slate-100'}`}></div>
+                    <div className={`absolute left-6 top-14 bottom-0 w-0.5 rounded-full ${isCompleted ? 'bg-[#0052CC]' : 'bg-slate-100'}`}></div>
                   )}
                   
-                  <div 
-                    className="flex items-start gap-5 group cursor-pointer"
-                    onClick={() => setActiveSection(section.id)}
-                  >
+                  <div className="flex items-start gap-5 group cursor-default">
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-500 z-10 ${
                       isActive 
-                        ? 'bg-[#0052CC] text-white shadow-xl shadow-blue-200 scale-110' 
-                        : isDone
+                        ? 'bg-[#0052CC] text-white shadow-xl shadow-blue-200 scale-110'
+                        : isCompleted
                           ? 'bg-green-500 text-white shadow-lg shadow-green-100'
                           : 'bg-white text-slate-300 border-2 border-slate-50 group-hover:border-slate-200'
                     }`}>
-                      {isDone ? <Check size={20} className="stroke-[4px]" /> : <Icon size={20} className={isActive ? 'stroke-[3px]' : 'stroke-[2px]'} />}
+                      {isCompleted ? <Check size={20} className="stroke-[4px]" /> : <Icon size={20} className={isActive ? 'stroke-[3px]' : 'stroke-[2px]'} />}
                     </div>
                     <div className="pt-1">
-                      <p className={`text-[10px] font-black uppercase tracking-widest leading-none mb-1 transition-colors ${isActive ? 'text-[#0052CC]' : isDone ? 'text-green-500' : 'text-slate-300'}`}>Section 0{section.id}</p>
-                      <p className={`text-base font-black tracking-tight transition-colors ${isActive ? 'text-slate-900' : isDone ? 'text-slate-600' : 'text-slate-400'}`}>{section.title}</p>
-                      <p className={`text-[11px] font-bold mt-0.5 transition-colors ${isActive ? 'text-slate-500' : isDone ? 'text-slate-400' : 'text-slate-300'}`}>{section.description}</p>
-                      {isDone && <span className="text-[9px] font-black text-green-500 uppercase tracking-wider">✓ Complété</span>}
+                      <p className={`text-[10px] font-black uppercase tracking-widest leading-none mb-1 transition-colors ${isActive ? 'text-[#0052CC]' : 'text-slate-300'}`}>Étape 0{section.id}</p>
+                      <p className={`text-base font-black tracking-tight transition-colors ${isActive ? 'text-slate-900' : 'text-slate-400'}`}>{section.title}</p>
+                      <p className={`text-[11px] font-bold mt-0.5 transition-colors ${isActive ? 'text-slate-500' : 'text-slate-300'}`}>{section.description}</p>
                     </div>
                   </div>
                 </div>
@@ -1546,86 +1570,126 @@ export default function InterventionDetails() {
           <div className="flex-1 px-4 sm:px-8 md:px-12 py-8 sm:py-12 md:py-16 max-w-4xl mx-auto w-full">
             <div className="h-full flex flex-col">
               <div className="flex-1">
-                <fieldset disabled={status === 'CLOSED' && !isEditing} className="contents">
+                <fieldset disabled={isReadOnlyView || (status === 'CLOSED' && !isEditing)} className="contents">
                   {renderSectionContent()}
                 </fieldset>
               </div>
 
-              <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t-2 border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
-                <div className="flex items-center gap-3 w-full sm:w-auto order-2 sm:order-1">
-                  <button
-                    type="button"
-                    onClick={() => setActiveSection(prev => Math.max(prev - 1, 1))}
-                    disabled={activeSection === 1}
-                    className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider transition-all ${
-                      activeSection === 1 
-                        ? 'text-slate-300 cursor-not-allowed' 
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:scale-95 shadow-sm hover:shadow-md border border-slate-200 sm:border-none'
-                    }`}
-                  >
-                    <ChevronLeft size={18} />
-                    <span className="sm:inline">Précédent</span>
-                  </button>
-
-                  <button
-                    onClick={() => setShowMobilePreview(true)}
-                    className="xl:hidden flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl font-bold text-xs uppercase tracking-wider transition-all active:scale-95"
-                  >
-                    <Eye size={18} />
-                    Aperçu
-                  </button>
-                </div>
-                
-                {activeSection < sections.length ? (
-                  <button
-                    type="button"
-                    onClick={() => setActiveSection(prev => Math.min(prev + 1, sections.length))}
-                    className="w-full sm:w-auto order-1 sm:order-2 group flex items-center justify-center gap-3 bg-gradient-to-r from-slate-900 to-slate-800 hover:from-[#0052CC] hover:to-blue-700 text-white px-8 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-xl shadow-slate-300 hover:shadow-blue-300 active:scale-95"
-                  >
-                    Continuer
-                    <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" strokeWidth={3} />
-                  </button>
-                ) : (
-                  isEmployeeHistoryEditFlow ? (
-                    <div className="w-full sm:w-auto order-1 sm:order-2 flex flex-col sm:flex-row gap-3">
+              {isEmployeeHistoryEditFlow && activeSection === sections.length ? (
+                <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t-2 border-slate-200 flex flex-col gap-3 shrink-0">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
                       <button
                         type="button"
-                        onClick={() => navigate(returnTo)}
-                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-sm active:scale-95 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200"
+                        onClick={() => setActiveSection(prev => Math.max(prev - 1, 1))}
+                        disabled={activeSection === 1}
+                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider transition-all ${
+                          activeSection === 1 
+                            ? 'text-slate-300 cursor-not-allowed' 
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:scale-95 shadow-sm hover:shadow-md border border-slate-200 sm:border-none'
+                        }`}
                       >
-                        <XCircle size={18} />
-                        Annuler
+                        <ChevronLeft size={18} />
+                        <span className="sm:inline">Précédent</span>
                       </button>
+
                       <button
-                        type="button"
-                        onClick={() => handleSave({ exitEdit: true, returnTo })}
-                        disabled={isSaving}
-                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-lg active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed bg-gradient-to-r from-[#0052CC] to-blue-600 hover:from-blue-700 hover:to-blue-800 text-white shadow-blue-200 hover:shadow-blue-300"
+                        onClick={() => setShowMobilePreview(true)}
+                        className="xl:hidden flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl font-bold text-xs uppercase tracking-wider transition-all active:scale-95"
                       >
-                        <PenTool size={18} />
-                        Modifier
+                        <Eye size={18} />
+                        Aperçu
                       </button>
                     </div>
-                  ) : (
+                  </div>
+
+                  <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-3 pt-1">
                     <button
                       type="button"
-                      onClick={() => {
-                        if (status === 'CLOSED') return
-                        handleSave({ finalize: true })
-                      }}
-                      disabled={isSaving || status === 'CLOSED'}
-                      className={`w-full sm:w-auto order-1 sm:order-2 flex items-center justify-center gap-2 px-8 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-lg active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed ${
-                        status === 'CLOSED'
-                          ? 'bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-slate-300'
-                          : 'bg-gradient-to-r from-[#0052CC] to-blue-600 hover:from-blue-700 hover:to-blue-800 text-white shadow-blue-200 hover:shadow-blue-300'
+                      onClick={() => handleSave({ exitEdit: true, returnTo })}
+                      disabled={isSaving}
+                      className="w-full sm:w-72 flex items-center justify-center gap-2 px-8 sm:px-10 py-4 sm:py-4.5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-lg active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed bg-gradient-to-r from-[#0052CC] to-blue-600 hover:from-blue-700 hover:to-blue-800 text-white shadow-blue-200 hover:shadow-blue-300"
+                    >
+                      <PenTool size={18} />
+                      Modifier
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => navigate(returnTo)}
+                      className="w-full sm:w-72 flex items-center justify-center gap-2 px-8 sm:px-10 py-4 sm:py-4.5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-sm active:scale-95 bg-[#F7F3E8] hover:bg-[#F1E8D4] text-slate-700 border border-[#E9DEC4]"
+                    >
+                      <XCircle size={18} />
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t-2 border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
+                  <div className="flex items-center gap-3 w-full sm:w-auto order-2 sm:order-1">
+                    <button
+                      type="button"
+                      onClick={() => setActiveSection(prev => Math.max(prev - 1, 1))}
+                      disabled={activeSection === 1}
+                      className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider transition-all ${
+                        activeSection === 1 
+                          ? 'text-slate-300 cursor-not-allowed' 
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:scale-95 shadow-sm hover:shadow-md border border-slate-200 sm:border-none'
                       }`}
                     >
-                      <Save size={18} />
-                      {status === 'CLOSED' ? 'Clôturée' : 'Enregistrer'}
+                      <ChevronLeft size={18} />
+                      <span className="sm:inline">Précédent</span>
                     </button>
-                  )
-                )}
-              </div>
+
+                    <button
+                      onClick={() => setShowMobilePreview(true)}
+                      className="xl:hidden flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl font-bold text-xs uppercase tracking-wider transition-all active:scale-95"
+                    >
+                      <Eye size={18} />
+                      Aperçu
+                    </button>
+                  </div>
+                  
+                  {activeSection < sections.length ? (
+                    <button
+                      type="button"
+                      onClick={() => setActiveSection(prev => Math.min(prev + 1, sections.length))}
+                      className="w-full sm:w-auto order-1 sm:order-2 group flex items-center justify-center gap-3 bg-gradient-to-r from-slate-900 to-slate-800 hover:from-[#0052CC] hover:to-blue-700 text-white px-8 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-xl shadow-slate-300 hover:shadow-blue-300 active:scale-95"
+                    >
+                      Continuer
+                      <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" strokeWidth={3} />
+                    </button>
+                  ) : (
+                    isReadOnlyView ? (
+                      <button
+                        type="button"
+                        onClick={() => navigate('/interventions')}
+                        className="w-full sm:w-auto order-1 sm:order-2 flex items-center justify-center gap-2 px-8 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-sm active:scale-95 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200"
+                      >
+                        <ChevronLeft size={18} />
+                        Retour
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (status === 'CLOSED') return
+                          handleSave({ finalize: true })
+                        }}
+                        disabled={isSaving || status === 'CLOSED'}
+                        className={`w-full sm:w-auto order-1 sm:order-2 flex items-center justify-center gap-2 px-8 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-lg active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed ${
+                          status === 'CLOSED'
+                            ? 'bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-slate-300'
+                            : 'bg-gradient-to-r from-[#0052CC] to-blue-600 hover:from-blue-700 hover:to-blue-800 text-white shadow-blue-200 hover:shadow-blue-300'
+                        }`}
+                      >
+                        <Save size={18} />
+                        {status === 'CLOSED' ? 'Clôturée' : 'Enregistrer'}
+                      </button>
+                    )
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
