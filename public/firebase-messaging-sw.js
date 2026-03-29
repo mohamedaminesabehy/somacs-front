@@ -24,6 +24,8 @@ loadConfig().then((cfg) => {
       const data = payload?.data || {}
       self.registration.showNotification(title, {
         body,
+        icon: '/icon.svg',
+        badge: '/icon.svg',
         data,
       })
     })

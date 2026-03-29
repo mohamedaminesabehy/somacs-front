@@ -15,6 +15,7 @@ function formatDate(value) {
 export default function NotificationBell() {
   const { notifications, unreadCount, markRead, markAllRead, enablePushNotifications } = useNotifications()
   const [open, setOpen] = useState(false)
+  const [pushState, setPushState] = useState({ status: 'idle', message: '' })
   const rootRef = useRef(null)
 
   const items = useMemo(() => (Array.isArray(notifications) ? notifications.slice(0, 12) : []), [notifications])
@@ -75,13 +76,53 @@ export default function NotificationBell() {
               <div className="flex items-center justify-between gap-3">
                 <div className="text-xs font-semibold text-amber-900">
                   Activez les notifications push pour recevoir les missions en arrière-plan.
+                  {pushState.status === 'error' && (
+                    <div className="mt-1 text-[11px] font-bold text-red-700">{pushState.message}</div>
+                  )}
+                  {pushState.status === 'enabled' && (
+                    <div className="mt-1 text-[11px] font-bold text-emerald-700">{pushState.message}</div>
+                  )}
+                  {pushState.status === 'loading' && (
+                    <div className="mt-1 text-[11px] font-bold text-amber-900">Activation en cours…</div>
+                  )}
                 </div>
                 <button
                   type="button"
                   onClick={async () => {
-                    await enablePushNotifications()
+                    setPushState({ status: 'loading', message: '' })
+                    const res = await enablePushNotifications()
+                    if (res && res.ok) {
+                      setPushState({
+                        status: 'enabled',
+                        message: 'Notifications activées.',
+                      })
+                      return
+                    }
+                    const reason = res?.reason || 'unknown'
+                    const msg =
+                      reason === 'unsupported'
+                        ? "Votre navigateur ne supporte pas les notifications push."
+                        : reason === 'permission-denied'
+                          ? "Autorisation refusée. Activez-la dans les réglages du navigateur."
+                          : reason === 'missing-vapid'
+                            ? "Configuration VAPID manquante côté frontend."
+                            : reason === 'missing-config'
+                              ? "Configuration Firebase manquante côté frontend."
+                              : reason === 'sw-failed'
+                                ? "Service Worker non installé (HTTPS requis, ou blocage navigateur)."
+                                : reason === 'token-failed'
+                                  ? "Impossible d'obtenir le token push (Firebase)."
+                                  : reason === 'unauthorized'
+                                    ? "Session expirée. Reconnectez-vous puis réessayez."
+                                    : "Échec d’activation. Ouvrez la console pour plus de détails."
+                    setPushState({ status: 'error', message: msg })
                   }}
-                  className="shrink-0 text-xs font-black px-3 py-1.5 rounded-xl bg-amber-500 text-white hover:bg-amber-600 transition-all"
+                  disabled={pushState.status === 'loading'}
+                  className={`shrink-0 text-xs font-black px-3 py-1.5 rounded-xl transition-all ${
+                    pushState.status === 'loading'
+                      ? 'bg-amber-300 text-white cursor-not-allowed'
+                      : 'bg-amber-500 text-white hover:bg-amber-600'
+                  }`}
                 >
                   Activer
                 </button>

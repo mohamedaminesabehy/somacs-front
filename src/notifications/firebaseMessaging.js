@@ -57,15 +57,32 @@ export async function registerFcmToken() {
   if (!registration) return { ok: false, reason: 'sw-failed' }
 
   const messaging = getMessaging(app)
-  const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: registration }).catch(() => null)
+  const token = await getToken(messaging, {
+    vapidKey,
+    serviceWorkerRegistration: registration,
+  }).catch((err) => {
+    try {
+      console.error('FCM getToken failed', err)
+    } catch {}
+    return null
+  })
   if (!token) return { ok: false, reason: 'token-failed' }
 
   const res = await apiFetch('/notifications/fcm-token', {
     method: 'POST',
     auth: true,
     body: { token },
+  }).catch((err) => {
+    try {
+      console.error('FCM register token backend call failed', err)
+    } catch {}
+    return null
   })
-  if (!res.ok) return { ok: false, reason: 'backend-failed' }
+  if (!res) return { ok: false, reason: 'backend-failed' }
+  if (!res.ok) {
+    if (res.status === 401) return { ok: false, reason: 'unauthorized' }
+    return { ok: false, reason: 'backend-failed' }
+  }
 
   return { ok: true, token }
 }
