@@ -23,6 +23,18 @@ export function Root() {
     if (typeof window === 'undefined') return
     if (!('serviceWorker' in navigator)) return
     navigator.serviceWorker.register('/firebase-messaging-sw.js').catch(() => {})
+
+    const onMessage = (event) => {
+      const data = event?.data
+      if (!data || data.type !== 'NAVIGATE') return
+      const url = data.url
+      if (typeof url !== 'string' || url.trim() === '') return
+      window.location.assign(url)
+    }
+    navigator.serviceWorker.addEventListener('message', onMessage)
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', onMessage)
+    }
   }, [])
 
   useEffect(() => {

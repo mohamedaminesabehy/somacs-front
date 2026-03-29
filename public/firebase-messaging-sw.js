@@ -27,5 +27,24 @@ loadConfig().then((cfg) => {
         data,
       })
     })
+
+    self.addEventListener('notificationclick', (event) => {
+      event.notification.close()
+      const url = event.notification?.data?.url
+      if (!url || typeof url !== 'string') return
+      event.waitUntil(
+        self.clients
+          .matchAll({ type: 'window', includeUncontrolled: true })
+          .then((clientsArr) => {
+            for (const c of clientsArr) {
+              if ('focus' in c) {
+                c.postMessage({ type: 'NAVIGATE', url })
+                return c.focus()
+              }
+            }
+            return self.clients.openWindow(url)
+          }),
+      )
+    })
   } catch {}
 })
