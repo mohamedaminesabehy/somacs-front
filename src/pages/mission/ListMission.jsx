@@ -109,6 +109,22 @@ export default function ListMission() {
     }
   }, [location.pathname, location.search, location.state, navigate])
 
+  useEffect(() => {
+    const msg = typeof window !== 'undefined' ? window.sessionStorage.getItem('missions_bg_toast') : ''
+    if (!msg) return
+    if (typeof window !== 'undefined') window.sessionStorage.removeItem('missions_bg_toast')
+
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current)
+      toastTimerRef.current = null
+    }
+    setToast({ open: true, message: msg })
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast({ open: false, message: '' })
+      toastTimerRef.current = null
+    }, 4000)
+  }, [])
+
   const todayKey = useMemo(() => new Date().toISOString().slice(0, 10), [])
 
   const parseMissionDate = (mission) => {

@@ -25,7 +25,8 @@ import {
   Hash,
   ArrowRight,
   Target,
-  Send
+  Send,
+  Loader2
 } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 
@@ -78,6 +79,8 @@ export default function AssignMission() {
   const [interventionsList, setInterventionsList] = useState([])
   const [employeeList, setEmployeeList] = useState([])
   const [attachments, setAttachments] = useState([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const isMountedRef = useRef(true)
 
   // Step 1 — Type
   const [missionType, setMissionType] = useState('') // 'Normal' | 'Intervention'
@@ -165,6 +168,12 @@ export default function AssignMission() {
   const fileInputRef = useRef(null)
 
   useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
     if (prefillDoneRef.current) return
     if (!prefillInterventionId) return
 
@@ -241,12 +250,14 @@ export default function AssignMission() {
   }
 
   const handleSubmit = async () => {
+    if (isSubmitting) return
     const empName = selectedEmployee
-    const missionTitle = formData.title
     try {
+      setIsSubmitting(true)
       const employeeUserId = selectedEmployeeObj?.id || null
       if (!employeeUserId) {
         alert('Veuillez sélectionner un technicien valide.')
+        if (isMountedRef.current) setIsSubmitting(false)
         return
       }
       const missionPayload = {
@@ -274,38 +285,55 @@ export default function AssignMission() {
       })
       if (!response.ok) {
         alert('Erreur lors de la création de la mission.')
+        if (isMountedRef.current) setIsSubmitting(false)
         return
       }
       const createdMission = await response.json().catch(() => null)
 
-      if (missionType === 'Intervention' && formData.interventionId) {
-        await apiFetch(`/interventions/${formData.interventionId}`, {
-          method: 'PATCH',
-          body: { status: 'ASSIGNED', assignedTo: empName },
-          auth: true,
-        })
-      }
-
-      if (createdMission?.id && attachments.length > 0) {
-        const form = new FormData()
-        for (const file of attachments) {
-          form.append('files', file)
-        }
-        const uploadRes = await apiFetch(`/missions/${createdMission.id}/attachments`, {
-          method: 'POST',
-          body: form,
-          auth: true,
-        })
-        if (!uploadRes.ok) {
-          alert('Mission créée, mais erreur lors de l’upload des fichiers.')
-          navigate('/missions')
-          return
-        }
-      }
-
       navigate('/missions?toast=assigned', { state: { toast: 'assigned' } })
+      if (createdMission?.id) {
+        ;(async () => {
+          try {
+            if (missionType === 'Intervention' && formData.interventionId) {
+              await apiFetch(`/interventions/${formData.interventionId}`, {
+                method: 'PATCH',
+                body: { status: 'ASSIGNED', assignedTo: empName },
+                auth: true,
+              })
+            }
+
+            if (attachments.length > 0) {
+              const form = new FormData()
+              for (const file of attachments) {
+                form.append('files', file)
+              }
+              const uploadRes = await apiFetch(`/missions/${createdMission.id}/attachments`, {
+                method: 'POST',
+                body: form,
+                auth: true,
+              })
+              if (!uploadRes.ok) {
+                if (typeof window !== 'undefined') {
+                  window.sessionStorage.setItem(
+                    'missions_bg_toast',
+                    'Mission créée, mais erreur lors de l’upload des fichiers.',
+                  )
+                }
+              }
+            }
+          } catch {
+            if (typeof window !== 'undefined') {
+              window.sessionStorage.setItem(
+                'missions_bg_toast',
+                'Mission créée, mais une étape de finalisation a échoué (upload / mise à jour).',
+              )
+            }
+          }
+        })()
+      }
     } catch (error) {
       alert('Impossible de joindre le serveur.')
+      if (isMountedRef.current) setIsSubmitting(false)
     }
   }
 
@@ -1132,10 +1160,11 @@ export default function AssignMission() {
                   <button
                     type="button"
                     onClick={handleSubmit}
+                    disabled={isSubmitting}
                     className="flex items-center gap-2 sm:gap-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 sm:px-12 py-3 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-xl shadow-green-300 active:scale-95"
                   >
-                    <Check size={18} strokeWidth={3} />
-                    <span>Confirmer l'affectation</span>
+                    {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} strokeWidth={3} />}
+                    <span>{isSubmitting ? 'Enregistrement...' : "Confirmer l'affectation"}</span>
                   </button>
                 )}
               </div>

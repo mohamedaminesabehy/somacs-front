@@ -80,8 +80,19 @@ export function NotificationsProvider({ children }) {
     if (!token) return
 
     void refresh()
+    
+    // Demander les permissions de notification dès la connexion
     if (typeof window !== 'undefined' && typeof window.Notification !== 'undefined') {
-      if (window.Notification.permission === 'granted') {
+      if (window.Notification.permission === 'default') {
+        // Demander la permission automatiquement
+        window.Notification.requestPermission().then((permission) => {
+          if (permission === 'granted') {
+            void registerFcmToken()
+          }
+        }).catch(() => {
+          // Permission refusée, on continue sans notifications push
+        })
+      } else if (window.Notification.permission === 'granted') {
         void registerFcmToken()
       }
     }

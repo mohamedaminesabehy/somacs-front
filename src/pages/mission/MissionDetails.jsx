@@ -83,18 +83,45 @@ export default function MissionDetails() {
   const lastInterventionStatusRef = useRef('')
   const [showStatusAttention, setShowStatusAttention] = useState(false)
   const [statusAttentionText, setStatusAttentionText] = useState('')
-  const [docViewer, setDocViewer] = useState({ open: false, url: '', type: '', name: '' })
+  const [docViewer, setDocViewer] = useState({ open: false, url: '', type: '', name: '', isPdf: false, downloadUrl: '', publicId: '' })
 
   const attachments = useMemo(() => {
     const list = Array.isArray(mission?.attachments) ? mission.attachments : []
-    return list.map((a, idx) => ({
-      id: a.publicId || String(idx),
-      name: a.originalFilename || a.publicId || `Fichier ${idx + 1}`,
-      type: a.resourceType === 'image' ? 'image' : 'file',
-      size: typeof a.bytes === 'number' ? `${Math.ceil(a.bytes / 1024)} KB` : '',
-      date: a.createdAt || '',
-      url: a.url,
-    }))
+    return list.map((a, idx) => {
+      // Determine if it's an image or PDF/file
+      const isPdf = a.format === 'pdf' || (a.url && a.url.toLowerCase().includes('.pdf'))
+      const isImage = a.resourceType === 'image' && !isPdf
+      
+      // For PDFs, we need to modify the URL
+      let displayUrl = a.url
+      let viewUrl = a.url // URL for viewing in modal (without download flag)
+      let downloadUrl = a.url
+      
+      if (isPdf && a.url) {
+        // Convert PDF URL to display first page as PNG image for preview
+        displayUrl = a.url.replace('/upload/', '/upload/pg_1,f_png/')
+        
+        // For viewing in modal, use original URL without any flags
+        viewUrl = a.url
+        
+        // For download, add fl_attachment flag to force download
+        downloadUrl = a.url.replace('/upload/', '/upload/fl_attachment/')
+      }
+      
+      return {
+        id: a.publicId || String(idx),
+        name: a.originalFilename || a.publicId || `Fichier ${idx + 1}`,
+        type: isImage ? 'image' : 'file',
+        size: typeof a.bytes === 'number' ? `${Math.ceil(a.bytes / 1024)} KB` : '',
+        date: a.createdAt || '',
+        url: a.url,
+        displayUrl: displayUrl, // URL for preview (first page as image for PDFs)
+        viewUrl: viewUrl, // URL for viewing in modal (no download)
+        downloadUrl: downloadUrl, // URL for download
+        publicId: a.publicId || '', // Public ID for signed URL generation
+        isPdf: isPdf,
+      }
+    })
   }, [mission])
 
   useEffect(() => {
@@ -657,39 +684,58 @@ export default function MissionDetails() {
                             DOCUMENT
                           </div>
                         </div>
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center bg-red-50 text-red-500 group-hover:bg-red-100 transition-colors">
-                          <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center mb-2">
-                            <File size={24} strokeWidth={2} />
+                      ) : attachments[0].isPdf ? (
+                        <div className="w-full h-full relative">
+                          <img 
+                            src={attachments[0].displayUrl}
+                            alt={attachments[0].name}
+                            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+                          />
+                          <div className="absolute top-2 left-2 px-2 py-1 bg-white/90 backdrop-blur-sm rounded-md text-[9px] font-black text-red-600 shadow-sm flex items-center gap-1">
+                            <File size={10} />
+                            PDF
                           </div>
-                          <span className="text-[10px] font-black uppercase tracking-widest px-4 text-center truncate w-full">
+                        </div>
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 text-slate-600 group-hover:bg-slate-100 transition-colors">
+                          <div className="w-16 h-16 bg-white rounded-xl shadow-sm flex items-center justify-center mb-3 border border-slate-200">
+                            <File size={32} strokeWidth={2} className="text-red-500" />
+                          </div>
+                          <span className="text-xs font-black text-slate-700 px-4 text-center mb-1">
                             {attachments[0].name}
+                          </span>
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                            Cliquez pour prévisualiser
                           </span>
                         </div>
                       )}
                       <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
                         <button
                           type="button"
-                          onClick={() => setDocViewer({ open: true, url: attachments[0].url, type: attachments[0].type, name: attachments[0].name })}
+                          onClick={() => setDocViewer({ 
+                            open: true, 
+                            url: attachments[0].viewUrl || attachments[0].url, 
+                            type: attachments[0].type, 
+                            name: attachments[0].name,
+                            isPdf: attachments[0].isPdf,
+                            downloadUrl: attachments[0].downloadUrl,
+                            publicId: attachments[0].publicId 
+                          })}
                           className="p-2 bg-white rounded-lg text-slate-900 shadow-xl hover:scale-110 transition-transform"
                         >
                           <Eye size={18} />
                         </button>
                         <button
                           type="button"
-                          onClick={async () => {
-                            try {
-                              const res = await fetch(attachments[0].url)
-                              const blob = await res.blob()
-                              const url = URL.createObjectURL(blob)
-                              const a = document.createElement('a')
-                              a.href = url
-                              a.download = attachments[0].name || 'document'
-                              document.body.appendChild(a)
-                              a.click()
-                              a.remove()
-                              URL.revokeObjectURL(url)
-                            } catch {}
+                          onClick={() => {
+                            const a = document.createElement('a')
+                            a.href = attachments[0].downloadUrl || attachments[0].url
+                            a.download = attachments[0].name || 'document'
+                            a.target = '_blank'
+                            a.rel = 'noopener noreferrer'
+                            document.body.appendChild(a)
+                            a.click()
+                            document.body.removeChild(a)
                           }}
                           className="p-2 bg-white rounded-lg text-slate-900 shadow-xl hover:scale-110 transition-transform"
                         >
@@ -709,27 +755,99 @@ export default function MissionDetails() {
           </div>
         </div>
         {docViewer.open && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setDocViewer({ open: false, url: '', type: '', name: '' })}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setDocViewer({ open: false, url: '', type: '', name: '', isPdf: false, downloadUrl: '', publicId: '' })}>
             <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
             <div className="relative z-10 w-full max-w-4xl bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
               <div className="px-5 py-4 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aperçu du document</p>
                   <p className="text-sm font-black text-slate-900 truncate">{docViewer.name}</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setDocViewer({ open: false, url: '', type: '', name: '' })}
-                  className="inline-flex items-center justify-center w-10 h-10 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors"
-                >
-                  <X size={18} />
-                </button>
+                <div className="flex items-center gap-2 ml-4">
+                  {docViewer.isPdf && (
+                    <a
+                      href={docViewer.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center w-10 h-10 bg-blue-50 hover:bg-blue-100 text-[#0052CC] rounded-xl transition-colors"
+                      title="Ouvrir dans un nouvel onglet"
+                    >
+                      <ExternalLink size={18} />
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const link = document.createElement('a')
+                      link.href = docViewer.downloadUrl || docViewer.url
+                      link.download = docViewer.name || 'document'
+                      link.target = '_blank'
+                      document.body.appendChild(link)
+                      link.click()
+                      document.body.removeChild(link)
+                    }}
+                    className="inline-flex items-center justify-center w-10 h-10 bg-green-50 hover:bg-green-100 text-green-600 rounded-xl transition-colors"
+                    title="Télécharger"
+                  >
+                    <Download size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDocViewer({ open: false, url: '', type: '', name: '', isPdf: false, downloadUrl: '', publicId: '' })}
+                    className="inline-flex items-center justify-center w-10 h-10 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
               </div>
-              <div className="p-5 bg-white">
+              <div className="p-5 bg-white overflow-auto max-h-[80vh]">
                 {docViewer.type === 'image' ? (
-                  <img src={docViewer.url} alt={docViewer.name} className="w-full h-[75vh] md:h-[70vh] object-contain rounded-xl border border-slate-200" />
+                  <img src={docViewer.url} alt={docViewer.name} className="w-full h-auto object-contain rounded-xl border border-slate-200" />
+                ) : docViewer.isPdf ? (
+                  <div className="w-full min-h-[75vh] rounded-xl border border-slate-200 overflow-hidden bg-slate-50">
+                    <iframe 
+                      src={`https://docs.google.com/viewer?url=${encodeURIComponent(docViewer.url)}&embedded=true`}
+                      title={docViewer.name} 
+                      className="w-full h-[75vh] md:h-[80vh]"
+                      style={{ border: 'none' }}
+                      onError={(e) => {
+                        console.error('Erreur chargement PDF:', e);
+                      }}
+                    />
+                    <div className="p-4 bg-slate-100 border-t border-slate-200 flex items-center justify-center gap-4">
+                      <p className="text-xs text-slate-600">Le PDF ne s'affiche pas ?</p>
+                      <a
+                        href={docViewer.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-[#0052CC] text-white rounded-lg text-xs font-bold hover:bg-[#0042a3] transition-colors"
+                      >
+                        <ExternalLink size={14} />
+                        Ouvrir dans un nouvel onglet
+                      </a>
+                    </div>
+                  </div>
                 ) : (
-                  <iframe src={docViewer.url} title={docViewer.name} className="w-full h-[75vh] md:h-[70vh] rounded-xl border border-slate-200" />
+                  <div className="w-full h-[75vh] md:h-[70vh] rounded-xl border border-slate-200 flex flex-col items-center justify-center bg-slate-50">
+                    <File size={48} className="text-slate-400 mb-4" />
+                    <p className="text-sm font-bold text-slate-700 mb-2">{docViewer.name}</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const link = document.createElement('a')
+                        link.href = docViewer.downloadUrl || docViewer.url
+                        link.download = docViewer.name || 'document'
+                        link.target = '_blank'
+                        document.body.appendChild(link)
+                        link.click()
+                        document.body.removeChild(link)
+                      }}
+                      className="px-4 py-2 bg-[#0052CC] text-white rounded-lg text-sm font-bold hover:bg-[#0042a3] transition-colors flex items-center gap-2"
+                    >
+                      <Download size={16} />
+                      Télécharger le fichier
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

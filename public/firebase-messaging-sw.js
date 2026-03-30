@@ -18,28 +18,38 @@ loadConfig().then((cfg) => {
   try {
     firebase.initializeApp(cfg)
     const messaging = firebase.messaging()
+    
     messaging.onBackgroundMessage((payload) => {
+      console.log('[SW] Background message received:', payload)
+      
       const title = payload?.notification?.title || 'Notification'
       const body = payload?.notification?.body || ''
       const data = payload?.data || {}
-      self.registration.showNotification(title, {
+      
+      return self.registration.showNotification(title, {
         body,
         icon: '/icon.svg',
         badge: '/icon.svg',
+        tag: data.notificationId || 'notification',
+        requireInteraction: false,
+        vibrate: [200, 100, 200],
         data,
       })
     })
 
     self.addEventListener('notificationclick', (event) => {
+      console.log('[SW] Notification clicked:', event.notification)
       event.notification.close()
-      const url = event.notification?.data?.url
-      if (!url || typeof url !== 'string') return
+      
+      const data = event.notification?.data || {}
+      const url = data.url || '/'
+      
       event.waitUntil(
         self.clients
           .matchAll({ type: 'window', includeUncontrolled: true })
           .then((clientsArr) => {
             for (const c of clientsArr) {
-              if ('focus' in c) {
+              if (c.url.includes(self.registration.scope) && 'focus' in c) {
                 c.postMessage({ type: 'NAVIGATE', url })
                 return c.focus()
               }
@@ -48,5 +58,7 @@ loadConfig().then((cfg) => {
           }),
       )
     })
-  } catch {}
+  } catch (err) {
+    console.error('[SW] Firebase init error:', err)
+  }
 })
