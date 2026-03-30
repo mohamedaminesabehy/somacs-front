@@ -162,6 +162,7 @@ export default function AssignMission() {
   const selectedEmployeeObj = employeeList.find((e) => e.name === selectedEmployee)
   const prefillDoneRef = useRef(false)
   const prefillInterventionId = location.state?.prefillInterventionId || ''
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     if (prefillDoneRef.current) return
@@ -230,6 +231,13 @@ export default function AssignMission() {
         (f) => !(f.name === file.name && f.size === file.size && f.lastModified === file.lastModified),
       ),
     )
+  }
+
+  const openFilePicker = () => {
+    const el = fileInputRef.current
+    if (!el) return
+    el.value = ''
+    el.click()
   }
 
   const handleSubmit = async () => {
@@ -614,25 +622,29 @@ export default function AssignMission() {
               )}
 
               {/* Pièces jointes */}
-              <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center hover:border-[#0052CC] hover:bg-blue-50/30 transition-all cursor-pointer group bg-slate-50/30">
+              <div
+                className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center hover:border-[#0052CC] hover:bg-blue-50/30 transition-all cursor-pointer group bg-slate-50/30"
+                onClick={openFilePicker}
+              >
                 <input
                   type="file"
                   multiple
-                  accept=".pdf,.png,.jpg,.jpeg,image/png,image/jpeg,application/pdf"
-                  className="hidden"
+                  accept="application/pdf,image/*"
+                  className="sr-only"
                   id="mission-attachments"
                   onChange={handlePickFiles}
+                  ref={fileInputRef}
                 />
                 <div className="flex flex-col items-center gap-2">
                   <div className="w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center text-slate-300 group-hover:text-[#0052CC] transition-colors">
                     <Paperclip size={24} />
                   </div>
-                  <label
-                    htmlFor="mission-attachments"
+                  <button
+                    type="button"
                     className="text-sm font-bold text-slate-500 group-hover:text-[#0052CC] transition-colors cursor-pointer"
                   >
                     Ajouter des pieces jointes
-                  </label>
+                  </button>
                   <p className="text-xs text-slate-400">PDF, JPG, PNG — Max 10MB</p>
                 </div>
                 {attachments.length > 0 && (
@@ -651,7 +663,10 @@ export default function AssignMission() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => removeAttachment(file)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            removeAttachment(file)
+                          }}
                           className="text-[10px] font-black text-red-600 hover:text-red-700"
                         >
                           Retirer

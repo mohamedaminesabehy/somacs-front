@@ -3,10 +3,10 @@ import { Users } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 
 export default function CreateUserForm({ currentUser, onUserCreated, onAction }) {
-  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [role, setRole] = useState('')
+  const [department, setDepartment] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -47,7 +47,7 @@ export default function CreateUserForm({ currentUser, onUserCreated, onAction })
       return
     }
 
-    if (!name || !email || !username || !role || !password || !confirmPassword) {
+    if (!email || !username || !role || !department || !password || !confirmPassword) {
       setError('Tous les champs obligatoires doivent être remplis.')
       return
     }
@@ -65,10 +65,12 @@ export default function CreateUserForm({ currentUser, onUserCreated, onAction })
 
     setIsSubmitting(true)
     try {
+      const autoName = (username || '').trim() || (email || '').split('@')[0] || 'Utilisateur'
       const response = await apiFetch('/users', {
         method: 'POST',
         body: {
-          name,
+          name: autoName,
+          department,
           email,
           username,
           password,
@@ -87,10 +89,10 @@ export default function CreateUserForm({ currentUser, onUserCreated, onAction })
       }
 
       setSuccess("L'utilisateur a été créé avec succès.")
-      setName('')
       setEmail('')
       setUsername('')
       setRole('')
+      setDepartment('')
       setPassword('')
       setConfirmPassword('')
       if (onUserCreated) {
@@ -141,19 +143,6 @@ export default function CreateUserForm({ currentUser, onUserCreated, onAction })
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Nom complet <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              placeholder="Ex: Marie Curie"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]"
-              disabled={!isAdmin || isSubmitting}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
               Email professionnel <span className="text-red-500">*</span>
             </label>
             <input
@@ -164,6 +153,21 @@ export default function CreateUserForm({ currentUser, onUserCreated, onAction })
               className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]"
               disabled={!isAdmin || isSubmitting}
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Département <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={department}
+              onChange={(event) => setDepartment(event.target.value)}
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC] bg-white"
+              disabled={!isAdmin || isSubmitting}
+            >
+              <option value="">Sélectionner un département</option>
+              <option value="SOMACS Commercial">SOMACS Commercial</option>
+              <option value="SOMACS Service">SOMACS Service</option>
+            </select>
           </div>
         </div>
 

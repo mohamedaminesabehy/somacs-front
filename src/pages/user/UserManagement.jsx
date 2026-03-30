@@ -54,7 +54,8 @@ export default function UserManagement({ currentUser }) {
         : user.role === 'Commerciale' || user.role === 'Coordinateur' || user.role === 'Responsable technicien' ? 'blue' : 'gray'
       const isActive = Boolean(user.isActive)
       return {
-        id: user.id, name: user.name, email: user.email, role: user.role, roleColor,
+        id: user.id, name: user.name, email: user.email, department: user.department || '',
+        role: user.role, roleColor,
         status: isActive ? 'Actif' : 'Inactif',
         statusColor: isActive ? 'green' : 'gray',
         lastLogin: user.lastLogin
@@ -65,7 +66,11 @@ export default function UserManagement({ currentUser }) {
     }), [rawUsers])
 
   const filteredUsers = useMemo(() => users.filter((user) => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) || user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    const q = searchTerm.toLowerCase()
+    const matchesSearch =
+      user.name.toLowerCase().includes(q) ||
+      user.email.toLowerCase().includes(q) ||
+      (user.department || '').toLowerCase().includes(q)
     const matchesRole   = roleFilter === 'Tous les rôles' || user.role === roleFilter
     const matchesStatus = statusFilter === 'Statut: Tous' || user.status === statusFilter
     return matchesSearch && matchesRole && matchesStatus

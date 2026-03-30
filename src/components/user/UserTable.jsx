@@ -35,10 +35,10 @@ export default function UserTable({
   const [isViewOpen, setIsViewOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
-  const [editName, setEditName] = useState('')
   const [editEmail, setEditEmail] = useState('')
   const [editRole, setEditRole] = useState('')
   const [editStatus, setEditStatus] = useState('')
+  const [editDepartment, setEditDepartment] = useState('')
   const [actionError, setActionError] = useState('')
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false)
   const [isSubmittingDelete, setIsSubmittingDelete] = useState(false)
@@ -83,10 +83,10 @@ export default function UserTable({
 
   const handleOpenEdit = (user) => {
     setSelectedUser(user)
-    setEditName(user.name)
     setEditEmail(user.email)
     setEditRole(user.role)
     setEditStatus(user.status)
+    setEditDepartment(user.department || '')
     setActionError('')
     setIsEditOpen(true)
   }
@@ -118,10 +118,10 @@ export default function UserTable({
       const response = await apiFetch(`/users/${selectedUser.id}`, {
         method: 'PATCH',
         body: {
-          name: editName,
           email: editEmail,
           role: editRole,
           isActive: editStatus === 'Actif',
+          department: editDepartment,
         },
         auth: true,
       })
@@ -153,6 +153,7 @@ export default function UserTable({
             ...user,
             name: updated.name,
             email: updated.email,
+            department: updated.department || '',
             role: updated.role,
             status: nextStatusText,
             roleColor: nextRoleColor,
@@ -281,11 +282,12 @@ export default function UserTable({
 
       {/* ── TABLE ── */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px]">
+        <table className="w-full min-w-[840px]">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-100">
               <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Utilisateur</th>
               <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Email</th>
+              <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Département</th>
               <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Rôle</th>
               <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Statut</th>
               <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Dernière connexion</th>
@@ -294,14 +296,14 @@ export default function UserTable({
           </thead>
           <tbody className="divide-y divide-slate-50">
             {isLoading ? (
-              <tr><td colSpan={6} className="px-6 py-16 text-center">
+              <tr><td colSpan={7} className="px-6 py-16 text-center">
                 <div className="flex flex-col items-center gap-3">
                   <svg className="animate-spin h-8 w-8 text-[#0052CC]" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
                   <p className="text-sm font-semibold text-slate-400">Chargement des utilisateurs...</p>
                 </div>
               </td></tr>
             ) : userList.length === 0 ? (
-              <tr><td colSpan={6} className="px-6 py-16 text-center">
+              <tr><td colSpan={7} className="px-6 py-16 text-center">
                 <div className="flex flex-col items-center gap-3">
                   <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center">
                     <Shield size={24} className="text-slate-300" />
@@ -322,6 +324,7 @@ export default function UserTable({
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-500 font-medium">{user.email}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500 font-medium">{user.department || '—'}</td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold ${roleColors[user.roleColor]}`}>
                       {user.role === 'Administrateur' && <Shield size={12} />}
@@ -387,7 +390,7 @@ export default function UserTable({
                 <p className="text-gray-500 font-medium">{selectedUser.email}</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                 <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Rôle</p>
                   <div className="flex items-center gap-1.5">
@@ -400,6 +403,10 @@ export default function UserTable({
                       {selectedUser.role}
                     </span>
                   </div>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Département</p>
+                  <p className="text-sm font-semibold text-slate-700">{selectedUser.department || '—'}</p>
                 </div>
                 <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Statut</p>
@@ -463,17 +470,6 @@ export default function UserTable({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">
-                      Nom complet
-                    </label>
-                    <input
-                      type="text"
-                      value={editName}
-                      onChange={(event) => setEditName(event.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] focus:bg-white transition-all font-medium"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">
                       Email professionnel
                     </label>
                     <input
@@ -482,6 +478,20 @@ export default function UserTable({
                       onChange={(event) => setEditEmail(event.target.value)}
                       className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] focus:bg-white transition-all font-medium"
                     />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">
+                      Département
+                    </label>
+                    <select
+                      value={editDepartment}
+                      onChange={(event) => setEditDepartment(event.target.value)}
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] focus:bg-white transition-all font-bold text-gray-700"
+                    >
+                      <option value="">Sélectionner un département</option>
+                      <option value="SOMACS Commercial">SOMACS Commercial</option>
+                      <option value="SOMACS Service">SOMACS Service</option>
+                    </select>
                   </div>
                 </div>
 

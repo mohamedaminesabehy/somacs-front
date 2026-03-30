@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bell } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useNotifications } from '../../notifications/NotificationsProvider'
 
 function formatDate(value) {
@@ -17,6 +18,7 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false)
   const [pushState, setPushState] = useState({ status: 'idle', message: '' })
   const rootRef = useRef(null)
+  const navigate = useNavigate()
 
   const items = useMemo(() => (Array.isArray(notifications) ? notifications.slice(0, 12) : []), [notifications])
   const permission =
@@ -35,6 +37,19 @@ export default function NotificationBell() {
     }
   }, [open])
 
+  function getMissionIdFromNotification(n) {
+    if (!n) return null
+    if (typeof n.missionId === 'number') return n.missionId
+    const text = [n.message, n.title].filter(Boolean).join(' ')
+    if (typeof text !== 'string' || text.trim() === '') return null
+    const patterns = [/MIS-?(\d+)/i, /mission[^0-9]*?(\d+)/i, /id[^0-9]*?(\d+)/i]
+    for (const re of patterns) {
+      const m = text.match(re)
+      if (m && m[1] && !Number.isNaN(Number(m[1]))) return Number(m[1])
+    }
+    return null
+  }
+
   return (
     <div ref={rootRef} className="relative">
       <button
@@ -52,7 +67,14 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-3 w-[320px] sm:w-[360px] bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden z-50">
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 bg-black/30 z-40 md:hidden"
+            onClick={() => setOpen(false)}
+            aria-label="Fermer les notifications"
+          />
+          <div className="fixed inset-x-0 bottom-0 md:absolute md:inset-x-auto md:right-0 md:bottom-auto md:top-full md:mt-3 w-full md:w-[360px] bg-white border border-gray-200 rounded-t-2xl md:rounded-2xl shadow-xl overflow-hidden z-50 flex flex-col max-h-[80vh] md:max-h-[calc(100vh-8rem)]">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
             <div className="font-black text-sm text-slate-900">Notifications</div>
             <button
@@ -130,7 +152,7 @@ export default function NotificationBell() {
             </div>
           )}
 
-          <div className="max-h-[380px] overflow-y-auto">
+          <div className="flex-1 overflow-y-auto">
             {items.length === 0 ? (
               <div className="px-4 py-10 text-center text-sm text-gray-500 font-semibold">
                 Aucune notification
@@ -144,8 +166,15 @@ export default function NotificationBell() {
                       <button
                         type="button"
                         onClick={async () => {
-                          if (!isRead) await markRead(n.id)
-                          setOpen(false)
+                          try {
+                            if (!isRead) await markRead(n.id)
+                            const missionId = getMissionIdFromNotification(n)
+                            if (missionId) {
+                              navigate(`/missions/${missionId}`)
+                            }
+                          } finally {
+                            setOpen(false)
+                          }
                         }}
                         className={`w-full text-left px-4 py-3 transition-all ${
                           isRead ? 'bg-white hover:bg-gray-50' : 'bg-[#0052CC]/5 hover:bg-[#0052CC]/10'
@@ -168,7 +197,8 @@ export default function NotificationBell() {
               </ul>
             )}
           </div>
-        </div>
+          </div>
+        </>
       )}
     </div>
   )

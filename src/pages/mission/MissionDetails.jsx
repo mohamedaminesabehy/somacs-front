@@ -83,6 +83,7 @@ export default function MissionDetails() {
   const lastInterventionStatusRef = useRef('')
   const [showStatusAttention, setShowStatusAttention] = useState(false)
   const [statusAttentionText, setStatusAttentionText] = useState('')
+  const [docViewer, setDocViewer] = useState({ open: false, url: '', type: '', name: '' })
 
   const attachments = useMemo(() => {
     const list = Array.isArray(mission?.attachments) ? mission.attachments : []
@@ -293,8 +294,14 @@ export default function MissionDetails() {
                 <ChevronRight size={10} />
                 <span className="text-slate-500">Détails</span>
               </div>
-              <h1 className="text-xs sm:text-sm font-black text-slate-900 leading-none mt-0.5 sm:mt-1 truncate">
-                {mission.title}
+              <h1 className="text-xs sm:text-sm font-black text-slate-900 leading-none mt-0.5 sm:mt-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                <span className="truncate">{mission.title}</span>
+                {mission?.dueTime && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 text-[10px] font-black w-fit">
+                    <Clock size={12} />
+                    {mission.dueTime}
+                  </span>
+                )}
               </h1>
             </div>
           </div>
@@ -320,7 +327,7 @@ export default function MissionDetails() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
           {/* Left Column: Mission Content (8 cols) */}
-          <div className="lg:col-span-8 space-y-6">
+          <div className="lg:col-span-8 order-1 lg:order-1 space-y-6">
             
             {/* Mission Card */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -341,7 +348,15 @@ export default function MissionDetails() {
                           ID: MIS-{String(mission.id).padStart(4,'0')}
                         </span>
                       </div>
-                      <h2 className="text-lg sm:text-xl font-black text-slate-900">{mission.title}</h2>
+                      <h2 className="text-lg sm:text-xl font-black text-slate-900 min-w-0 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                        <span className="truncate">{mission.title}</span>
+                        {mission?.dueTime && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 text-[10px] font-black w-fit">
+                            <Clock size={12} />
+                            {mission.dueTime}
+                          </span>
+                        )}
+                      </h2>
                     </div>
                   </div>
                 </div>
@@ -380,7 +395,6 @@ export default function MissionDetails() {
               </div>
             </div>
 
-            {/* Workflow / Status Section */}
             <div
               className={`bg-white rounded-2xl border-2 shadow-sm overflow-hidden transition-all ${
                 showStatusAttention
@@ -412,8 +426,8 @@ export default function MissionDetails() {
                         key={s}
                         onClick={() => handleStatusChange(s)}
                         className={`flex flex-col items-center justify-center gap-3 p-4 rounded-xl border-2 transition-all ${
-                          isActive 
-                            ? `${cfg.border} ${cfg.bg} ${cfg.color} scale-[1.02] shadow-sm ${shouldAnimate ? 'ring-2 ring-offset-2 ring-[#0052CC] animate-in zoom-in-95 duration-200' : ''}` 
+                          isActive
+                            ? `${cfg.border} ${cfg.bg} ${cfg.color} scale-[1.02] shadow-sm ${shouldAnimate ? 'ring-2 ring-offset-2 ring-[#0052CC] animate-in zoom-in-95 duration-200' : ''}`
                             : 'border-slate-50 bg-slate-50 text-slate-400 hover:border-slate-200 hover:bg-white hover:text-slate-600'
                         }`}
                       >
@@ -428,7 +442,6 @@ export default function MissionDetails() {
               </div>
             </div>
 
-            {/* Notes Section */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="p-4 sm:p-6">
                 <SectionHeader icon={FileText} title="Notes & Observations" />
@@ -444,12 +457,23 @@ export default function MissionDetails() {
                     Modification en direct
                   </div>
                 </div>
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0052CC] text-white text-xs font-black uppercase tracking-wider hover:bg-[#0042a3] active:scale-95 disabled:opacity-50"
+                  >
+                    <Save size={14} />
+                    Enregistrer
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Right Column: Sidebar (4 cols) */}
-          <div className="lg:col-span-4 space-y-6">
+          <div className="lg:col-span-4 lg:row-span-3 space-y-6 order-2 lg:order-2">
             
             {/* Linked Intervention (Moved to first position) */}
             {intervention && (
@@ -563,7 +587,7 @@ export default function MissionDetails() {
 
             {/* Summary Details */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-4 sm:p-6">
+              <div className="p-4 sm:p-6 bg-[#F0F8FF]">
                 <SectionHeader icon={Info} title="Détails" />
                 <div className="mt-2">
                   <InfoItem label="Type" value={mission.type === 'Intervention' ? 'Intervention S.A.V' : mission.type} icon={Wrench} colorClass="text-blue-500" />
@@ -573,7 +597,15 @@ export default function MissionDetails() {
                     <InfoItem label="Dossier SAV lié" value={mission.interventionId} icon={Link2} colorClass="text-indigo-500" />
                   )}
                   <InfoItem label="Date mission" value={mission.dueDate} icon={Calendar} />
-                  <InfoItem label="Heure mission" value={mission.dueTime} icon={Clock} />
+                  <div className="flex items-start gap-3 py-3 border-b border-slate-50 last:border-0">
+                    <div className="mt-0.5 text-slate-500">
+                      <Clock size={16} />
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-tight mb-0.5">Heure mission</p>
+                      <p className="text-sm font-black text-slate-900">{mission.dueTime || '—'}</p>
+                    </div>
+                  </div>
                   <InfoItem label="Employé assigné" value={mission.employee} icon={User} colorClass="text-blue-500" />
                 </div>
               </div>
@@ -613,13 +645,13 @@ export default function MissionDetails() {
                   </div>
                   {/* Mission Document Preview (Replacing Map) */}
                   {attachments.length > 0 ? (
-                    <div className="aspect-video bg-slate-100 rounded-xl border border-slate-200 overflow-hidden group relative cursor-pointer shadow-sm">
+                    <div className="aspect-[4/3] md:aspect-video bg-slate-100 rounded-xl border border-slate-200 overflow-hidden group relative cursor-pointer shadow-sm">
                       {attachments[0].type === 'image' ? (
                         <div className="w-full h-full relative">
                           <img 
                             src={attachments[0].url}
                             alt={attachments[0].name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            className="w-full h-full object-contain md:object-cover group-hover:scale-105 transition-transform duration-500"
                           />
                           <div className="absolute top-2 left-2 px-2 py-1 bg-white/90 backdrop-blur-sm rounded-md text-[9px] font-black text-blue-600 shadow-sm">
                             DOCUMENT
@@ -636,26 +668,37 @@ export default function MissionDetails() {
                         </div>
                       )}
                       <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                        <a
-                          href={attachments[0].url}
-                          target="_blank"
-                          rel="noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => setDocViewer({ open: true, url: attachments[0].url, type: attachments[0].type, name: attachments[0].name })}
                           className="p-2 bg-white rounded-lg text-slate-900 shadow-xl hover:scale-110 transition-transform"
                         >
                           <Eye size={18} />
-                        </a>
-                        <a
-                          href={attachments[0].url}
-                          target="_blank"
-                          rel="noreferrer"
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(attachments[0].url)
+                              const blob = await res.blob()
+                              const url = URL.createObjectURL(blob)
+                              const a = document.createElement('a')
+                              a.href = url
+                              a.download = attachments[0].name || 'document'
+                              document.body.appendChild(a)
+                              a.click()
+                              a.remove()
+                              URL.revokeObjectURL(url)
+                            } catch {}
+                          }}
                           className="p-2 bg-white rounded-lg text-slate-900 shadow-xl hover:scale-110 transition-transform"
                         >
                           <Download size={18} />
-                        </a>
+                        </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="aspect-video bg-slate-50 rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center">
+                    <div className="aspect-[4/3] md:aspect-video bg-slate-50 rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center">
                       <Paperclip size={24} className="text-slate-300 mb-2" />
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center px-4">Aucun document affecté</span>
                     </div>
@@ -665,42 +708,36 @@ export default function MissionDetails() {
             </div>
           </div>
         </div>
+        {docViewer.open && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setDocViewer({ open: false, url: '', type: '', name: '' })}>
+            <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
+            <div className="relative z-10 w-full max-w-4xl bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+              <div className="px-5 py-4 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aperçu du document</p>
+                  <p className="text-sm font-black text-slate-900 truncate">{docViewer.name}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDocViewer({ open: false, url: '', type: '', name: '' })}
+                  className="inline-flex items-center justify-center w-10 h-10 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="p-5 bg-white">
+                {docViewer.type === 'image' ? (
+                  <img src={docViewer.url} alt={docViewer.name} className="w-full h-[75vh] md:h-[70vh] object-contain rounded-xl border border-slate-200" />
+                ) : (
+                  <iframe src={docViewer.url} title={docViewer.name} className="w-full h-[75vh] md:h-[70vh] rounded-xl border border-slate-200" />
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
-      {/* ── Sticky Action Bar (SaaS Style) ── */}
-      <footer className="sticky bottom-0 z-40 bg-white border-t border-slate-200 py-3 sm:py-4 px-3 sm:px-6 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-        <div className="max-w-[1600px] mx-auto flex items-center justify-between">
-          <div className="hidden md:flex items-center gap-3 text-slate-400">
-            <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center">
-              <Info size={14} />
-            </div>
-            <span className="text-[10px] font-bold uppercase tracking-widest">Dernière modification : Aujourd'hui</span>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3 w-full md:w-auto">
-            <button
-              onClick={() => navigate('/missions/my')}
-              className="flex-1 md:flex-none px-3 sm:px-6 py-2.5 sm:py-3 rounded-xl text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-wider hover:bg-slate-50 transition-all border-2 border-transparent"
-            >
-              <span className="hidden sm:inline">Annuler les modifs</span>
-              <span className="sm:hidden">Annuler</span>
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="flex-1 md:flex-none flex items-center justify-center gap-2 sm:gap-3 px-5 sm:px-10 py-2.5 sm:py-3.5 bg-[#0052CC] text-white rounded-xl text-[10px] sm:text-[11px] font-black uppercase tracking-widest shadow-lg shadow-blue-200 hover:bg-[#0042a3] hover:shadow-blue-300 transition-all active:scale-[0.98] disabled:opacity-50"
-            >
-              {isSaving ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Save size={14} />
-              )}
-              <span className="hidden sm:inline">Enregistrer les changements</span>
-              <span className="sm:hidden">Enregistrer</span>
-            </button>
-          </div>
-        </div>
-      </footer>
+      {/* Action bar supprimée */}
 
       {/* Save Toast */}
       {showSaveToast && (
