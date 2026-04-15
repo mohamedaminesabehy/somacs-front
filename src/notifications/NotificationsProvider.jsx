@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
-import { API_BASE_URL, getAuthToken } from '../api/apiClient'
+import { API_BASE_URL, getAuthToken, isAuthTokenUsable } from '../api/apiClient'
 import {
   fetchNotifications,
   fetchUnreadCount,
@@ -78,6 +78,14 @@ export function NotificationsProvider({ children }) {
   useEffect(() => {
     const token = getAuthToken()
     if (!token) return
+    if (!isAuthTokenUsable(token)) {
+      if (typeof window !== 'undefined') {
+        try {
+          window.dispatchEvent(new CustomEvent('auth:invalid', { detail: { reason: 'expired-token' } }))
+        } catch {}
+      }
+      return
+    }
 
     void refresh()
     
@@ -113,8 +121,18 @@ export function NotificationsProvider({ children }) {
     socket.on('reconnect', () => {
       void refresh()
     })
-    socket.on('connect_error', () => {
-      return
+    socket.on('connect_error', (error) => {
+      const message = String(error?.message || error?.data?.message || '').toLowerCase()
+      if (message.includes('unauthorized') || message.includes('invalid') || message.includes('forbidden')) {
+        if (typeof window !== 'undefined') {
+          try {
+            window.dispatchEvent(new CustomEvent('auth:invalid', { detail: { reason: 'socket-unauthorized' } }))
+          } catch {}
+        }
+        try {
+          socket.disconnect()
+        } catch {}
+      }
     })
 
     socket.on('newNotification', (payload) => {

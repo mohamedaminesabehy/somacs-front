@@ -64,7 +64,7 @@ function StatCard({ label, count, total, icon: Icon, active, onClick, colorClass
   return (
     <button
       onClick={onClick}
-      className={`flex-1 min-w-[200px] bg-white border-2 rounded-2xl p-5 text-left transition-all relative overflow-hidden group
+      className={`w-full min-w-0 bg-white border-2 rounded-2xl p-5 text-left transition-all relative overflow-hidden group
         ${active ? 'border-[#0052CC] shadow-xl shadow-blue-100/50 translate-y-[-4px]' : 'border-slate-100 hover:border-slate-300 hover:shadow-lg hover:translate-y-[-2px]'}`}
     >
       <div className={`absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 rounded-full opacity-[0.05] transition-transform group-hover:scale-110 ${colorClass}`} />
@@ -110,7 +110,7 @@ function ActionMenu({ item, onNavigate }) {
         <MoreHorizontal size={16} />
       </button>
       {open && (
-        <div className="absolute right-0 top-10 z-50 w-48 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute right-0 top-10 z-50 w-48 max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
           <div className="px-3 py-2 border-b border-slate-50">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Actions dossier</p>
           </div>
@@ -174,23 +174,91 @@ export default function InterventionList() {
   const fetchInterventions = async () => {
     setLoading(true)
     try {
-      const response = await apiFetch('/interventions', { auth: true })
-      if (response.ok) {
-        const data = await response.json()
-        const normalized = Array.isArray(data)
-          ? data.map((i) => ({
+      // Fetch interventions and missions in parallel
+      const [interventionsRes, missionsRes] = await Promise.all([
+        apiFetch('/interventions', { auth: true }),
+        apiFetch('/missions', { auth: true }),
+      ])
+
+      if (!interventionsRes.ok || !missionsRes.ok) {
+        setInterventions([])
+        setLoading(false)
+        return
+      }
+
+      const interventionsData = await interventionsRes.json()
+      const missionsData = await missionsRes.json()
+
+      // Build a map of interventionId -> grouped employee names
+      const agentsByIntervention = new Map()
+      if (Array.isArray(missionsData)) {
+        const namesByGroup = new Map()
+
+        // First pass: group names by assignmentGroupId
+        for (const mission of missionsData) {
+          const groupId = mission?.assignmentGroupId
+          const employeeName = String(mission?.employee || '').trim()
+          const interventionId = mission?.interventionId
+
+          if (!employeeName) continue
+
+          // Track by intervention for direct lookup
+          if (interventionId) {
+            if (!agentsByIntervention.has(interventionId)) {
+              agentsByIntervention.set(interventionId, new Set())
+            }
+            agentsByIntervention.get(interventionId).add(employeeName)
+          }
+
+          // Also track grouped names for multi-assignment display
+          if (groupId) {
+            if (!namesByGroup.has(groupId)) {
+              namesByGroup.set(groupId, new Set())
+            }
+            namesByGroup.get(groupId).add(employeeName)
+          }
+        }
+
+        // Second pass: consolidate grouped names within interventions
+        for (const [groupId, names] of namesByGroup.entries()) {
+          for (const mission of missionsData) {
+            if (mission?.assignmentGroupId === groupId && mission?.interventionId) {
+              const interventionId = mission.interventionId
+              if (agentsByIntervention.has(interventionId)) {
+                // Replace with all grouped names for this group
+                const agents = agentsByIntervention.get(interventionId)
+                agents.clear()
+                for (const name of names) {
+                  agents.add(name)
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Normalize interventions with grouped technician names
+      const normalized = Array.isArray(interventionsData)
+        ? interventionsData.map((i) => {
+            const interventionId = i.id
+            const assignees = agentsByIntervention.get(interventionId)
+            const assigneeDisplay = assignees && assignees.size > 0
+              ? Array.from(assignees).join(', ')
+              : (i.assignee || i.assignedTo || i.technicianName || null)
+
+            return {
               id: i.id,
               client: i.client || i.clientName || '',
               machine: i.machine || i.machineType || '',
               type: i.type || '',
               status: i.status || 'PENDING',
               date: i.date || i.interventionDate || '',
-              assignee: i.assignee || i.assignedTo || i.technicianName || null,
+              assignee: assigneeDisplay,
               priority: i.priority || 'Moyenne',
-            }))
-          : []
-        setInterventions(normalized)
-      }
+            }
+          })
+        : []
+      setInterventions(normalized)
     } catch (error) {
       console.error('Error fetching interventions:', error)
     } finally {
@@ -348,10 +416,10 @@ export default function InterventionList() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
       {toast.open && (
-        <div className="fixed top-5 right-5 sm:top-6 sm:right-6 z-[120] animate-in fade-in duration-200">
+        <div className="fixed top-4 left-4 right-4 sm:top-6 sm:left-auto sm:right-6 z-[120] animate-in fade-in duration-200">
           <div
             role="status"
-            className="w-[320px] sm:w-[380px] bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden"
+            className="w-full sm:w-[380px] max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden"
           >
             <div className="flex items-start gap-3.5 px-4 py-3.5">
               <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
@@ -384,13 +452,13 @@ export default function InterventionList() {
       )}
       {/* ── Top Bar ── */}
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200">
-        <div className="max-w-[1600px] mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 sm:py-0 sm:h-20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4 min-w-0">
             <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-100">
               <Wrench size={24} className="text-white" />
             </div>
-            <div>
-              <h1 className="text-xl font-black text-slate-900 tracking-tight">Liste des Interventions</h1>
+            <div className="min-w-0">
+              <h1 className="text-xl font-black text-slate-900 tracking-tight truncate">Liste des Interventions</h1>
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded uppercase tracking-wider">{total} dossiers</span>
                 <div className="w-1 h-1 bg-slate-300 rounded-full" />
@@ -399,7 +467,7 @@ export default function InterventionList() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-end gap-3 w-full sm:w-auto">
             <button className="hidden sm:flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all">
               <Download size={16} /> Export
             </button>
@@ -412,7 +480,7 @@ export default function InterventionList() {
             </button>
             <button
               onClick={() => navigate('/interventions/create')}
-              className="flex items-center gap-2 px-6 py-3 bg-[#0052CC] text-white rounded-xl text-xs font-black shadow-lg shadow-blue-200 hover:bg-[#0042a3] transition-all active:scale-95"
+              className="flex items-center justify-center gap-2 w-full sm:w-auto px-5 sm:px-6 py-3 bg-[#0052CC] text-white rounded-xl text-xs font-black shadow-lg shadow-blue-200 hover:bg-[#0042a3] transition-all active:scale-95"
             >
               <Plus size={18} strokeWidth={3} /> Nouvelle Intervention
             </button>
@@ -421,7 +489,7 @@ export default function InterventionList() {
       </header>
 
       {/* ── Main Content ── */}
-      <main className="flex-1 max-w-[1600px] mx-auto w-full p-6 sm:p-8 space-y-8">
+      <main className="flex-1 max-w-[1600px] mx-auto w-full px-4 sm:px-6 py-6 sm:py-8 space-y-8">
         
         {/* KPI Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -452,7 +520,7 @@ export default function InterventionList() {
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <div className="flex flex-wrap items-center gap-4">
             {/* Search */}
-            <div className="relative flex-1 min-w-[280px]">
+            <div className="relative w-full lg:flex-1 min-w-0">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input 
                 type="text"
@@ -464,7 +532,7 @@ export default function InterventionList() {
             </div>
             
             {/* Type filter with icons */}
-            <div className="relative group min-w-[180px]">
+            <div className="relative group w-full sm:w-auto sm:min-w-[180px]">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
                 {typeFilter !== 'ALL' ? (
                   React.createElement(typeConfig[typeFilter].icon, { size: 14 })
@@ -486,30 +554,30 @@ export default function InterventionList() {
             </div>
 
             {/* Date Filters Row (Now on the same line) */}
-            <div className="flex items-center gap-2">
-              <div className="relative">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+              <div className="relative w-full sm:w-auto">
                 <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500" size={12} />
                 <input 
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-600 focus:bg-white outline-none transition-all w-36"
+                  className="pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-600 focus:bg-white outline-none transition-all w-full sm:w-36"
                 />
               </div>
-              <span className="text-slate-300 text-xs">à</span>
-              <div className="relative">
+              <span className="text-slate-300 text-xs hidden sm:inline">à</span>
+              <div className="relative w-full sm:w-auto">
                 <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500" size={12} />
                 <input 
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-600 focus:bg-white outline-none transition-all w-36"
+                  className="pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-600 focus:bg-white outline-none transition-all w-full sm:w-36"
                 />
               </div>
             </div>
 
             {/* Actions / View Mode */}
-            <div className="flex items-center gap-2 ml-auto">
+            <div className="flex items-center justify-end gap-2 w-full lg:w-auto lg:ml-auto">
               {(startDate || endDate || search || typeFilter !== 'ALL' || statusFilter !== 'ALL') && (
                 <button 
                   onClick={() => { setStartDate(''); setEndDate(''); setSearch(''); setTypeFilter('ALL'); setStatusFilter('ALL'); }}
@@ -540,7 +608,7 @@ export default function InterventionList() {
         {viewMode === 'list' && (
           <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-lg shadow-slate-100/50 overflow-hidden">
             <div className="overflow-x-auto no-scrollbar">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full min-w-[980px] text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 border-b-2 border-slate-100">
                     <th className="px-6 py-5 text-[11px] font-black text-slate-500 uppercase tracking-widest border-r border-slate-100 last:border-0">ID / Machine</th>
@@ -569,24 +637,24 @@ export default function InterventionList() {
                         }`}
                       >
                         <td className="px-6 py-4 border-r border-slate-50 last:border-0">
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${ty.color}`}>
                               <TyIcon size={18} />
                             </div>
-                            <div>
-                              <p className="text-[13px] font-black text-slate-900 leading-none mb-1.5 group-hover:text-blue-600 transition-colors">{item.machine}</p>
+                            <div className="min-w-0">
+                              <p className="text-[13px] font-black text-slate-900 leading-none mb-1.5 group-hover:text-blue-600 transition-colors truncate">{item.machine}</p>
                               <div className="flex items-center gap-1.5">
-                                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-tight">{item.id}</span>
+                                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-tight truncate">{item.id}</span>
                                 <span className="w-1 h-1 bg-slate-200 rounded-full" />
-                                <span className="text-[9px] font-black uppercase text-[#004a77]">{ty.label}</span>
+                                <span className="text-[9px] font-black uppercase text-[#004a77] truncate">{ty.label}</span>
                               </div>
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 border-r border-slate-50 last:border-0">
-                          <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                            <Building2 size={14} className="text-slate-300" />
-                            {item.client}
+                          <div className="flex items-center gap-2 text-sm font-bold text-slate-700 min-w-0">
+                            <Building2 size={14} className="text-slate-300 shrink-0" />
+                            <span className="truncate">{item.client}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-center border-r border-slate-50 last:border-0">
@@ -596,9 +664,9 @@ export default function InterventionList() {
                           </span>
                         </td>
                         <td className="px-6 py-4 border-r border-slate-50 last:border-0">
-                          <div className="flex items-center gap-2 text-xs font-black text-slate-600">
-                            <Calendar size={16} className="text-blue-500" />
-                            {item.date}
+                          <div className="flex items-center gap-2 text-xs font-black text-slate-600 min-w-0">
+                            <Calendar size={16} className="text-blue-500 shrink-0" />
+                            <span className="truncate">{item.date}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 border-r border-slate-50 last:border-0">
@@ -671,13 +739,13 @@ export default function InterventionList() {
             
             {/* Pagination Controls */}
             {totalPages > 1 && (
-              <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
-                <div className="flex items-center gap-2">
+              <div className="px-4 sm:px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Page {currentPage} sur {totalPages}</span>
                   <div className="h-4 w-px bg-slate-200 mx-2" />
                   <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">{filtered.length} résultats au total</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-2">
                   <button
                     disabled={currentPage === 1}
                     onClick={() => setCurrentPage(prev => prev - 1)}
@@ -700,11 +768,11 @@ export default function InterventionList() {
 
         {/* Kanban View */}
         {viewMode === 'kanban' && (
-          <div className="flex gap-6 overflow-x-auto pb-6 no-scrollbar min-h-[500px]">
+          <div className="flex gap-6 overflow-x-auto pb-6 no-scrollbar min-h-[420px] sm:min-h-[500px]">
             {Object.entries(statusConfig).map(([statusKey, st]) => {
               const items = filtered.filter(i => i.status === statusKey)
               return (
-                <div key={statusKey} className="flex-shrink-0 w-80 flex flex-col gap-4">
+                <div key={statusKey} className="flex-shrink-0 w-[18rem] sm:w-80 flex flex-col gap-4">
                   <div className="flex items-center justify-between px-2">
                     <div className="flex items-center gap-2">
                       <div className={`w-2 h-2 rounded-full ${st.dot}`} />

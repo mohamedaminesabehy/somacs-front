@@ -95,13 +95,22 @@ export default function AssignMission() {
   })
 
   // Step 3 — Affectation
-  const [selectedEmployee, setSelectedEmployee] = useState('')
+  const [selectedEmployees, setSelectedEmployees] = useState([])
+  const [showMaxEmployeesPopup, setShowMaxEmployeesPopup] = useState(false)
   const [priority, setPriority] = useState('Moyenne')
   const [dueDate, setDueDate] = useState('')
   const [dueTime, setDueTime] = useState('')
 
+  const siteManuallyEditedRef = useRef(false)
+
   const handleChange = (e) => {
     const { name, value } = e.target
+    if (name === 'site') {
+      siteManuallyEditedRef.current = true
+    }
+    if (name === 'interventionId') {
+      siteManuallyEditedRef.current = false
+    }
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
@@ -162,7 +171,7 @@ export default function AssignMission() {
   const selectedIntervention = linkableInterventions.find(
     (i) => i.id === formData.interventionId
   )
-  const selectedEmployeeObj = employeeList.find((e) => e.name === selectedEmployee)
+  const selectedEmployeeObjs = employeeList.filter((e) => selectedEmployees.includes(e.name))
   const prefillDoneRef = useRef(false)
   const prefillInterventionId = location.state?.prefillInterventionId || ''
   const fileInputRef = useRef(null)
@@ -172,6 +181,12 @@ export default function AssignMission() {
       isMountedRef.current = false
     }
   }, [])
+
+  useEffect(() => {
+    if (!showMaxEmployeesPopup) return
+    const timer = setTimeout(() => setShowMaxEmployeesPopup(false), 2200)
+    return () => clearTimeout(timer)
+  }, [showMaxEmployeesPopup])
 
   useEffect(() => {
     if (prefillDoneRef.current) return
@@ -190,11 +205,18 @@ export default function AssignMission() {
 
   useEffect(() => {
     if (missionType !== 'Intervention') return
+    siteManuallyEditedRef.current = false
+  }, [missionType])
+
+  useEffect(() => {
+    if (missionType !== 'Intervention') return
     if (!selectedIntervention) return
     setFormData((prev) => ({
       ...prev,
-      site: selectedIntervention.site || selectedIntervention.client || '',
-      address: selectedIntervention.address || '',
+      site: siteManuallyEditedRef.current
+        ? prev.site
+        : (String(selectedIntervention.site || '').trim() ? selectedIntervention.site : prev.site),
+      address: String(prev.address || '').trim() ? prev.address : (selectedIntervention.address || ''),
     }))
   }, [missionType, selectedIntervention])
 
@@ -204,8 +226,21 @@ export default function AssignMission() {
       if (missionType === 'Normal') return formData.title.trim() !== '' && formData.description.trim() !== ''
       if (missionType === 'Intervention') return formData.interventionId !== '' && formData.title.trim() !== ''
     }
-    if (currentStep === 3) return selectedEmployee !== '' && dueDate !== ''
+    if (currentStep === 3) return selectedEmployees.length > 0 && dueDate !== ''
     return true
+  }
+
+  const toggleEmployeeSelection = (employeeName) => {
+    setSelectedEmployees((prev) => {
+      if (prev.includes(employeeName)) {
+        return prev.filter((name) => name !== employeeName)
+      }
+      if (prev.length >= 3) {
+        setShowMaxEmployeesPopup(true)
+        return prev
+      }
+      return [...prev, employeeName]
+    })
   }
 
   const nextStep = () => {
@@ -251,73 +286,94 @@ export default function AssignMission() {
 
   const handleSubmit = async () => {
     if (isSubmitting) return
-    const empName = selectedEmployee
+    const selectedNames = selectedEmployees
     try {
       setIsSubmitting(true)
-      const employeeUserId = selectedEmployeeObj?.id || null
-      if (!employeeUserId) {
-        alert('Veuillez sélectionner un technicien valide.')
+      if (selectedEmployeeObjs.length === 0) {
+        alert('Veuillez sélectionner au moins un technicien valide.')
         if (isMountedRef.current) setIsSubmitting(false)
         return
       }
-      const missionPayload = {
-        title: formData.title,
-        description:
-          missionType === 'Intervention'
-            ? formData.description
-            : formData.description,
-        employee: empName,
-        employeeUserId,
-        priority,
-        status: 'À faire',
-        dueDate: dueDate || "Aujourd'hui",
-        dueTime: dueTime || null,
-        type: missionType,
-        interventionId: missionType === 'Intervention' ? formData.interventionId : null,
-        site: formData.site,
-        address: formData.address,
+      const createdMissions = []
+      const assignmentGroupId =
+        selectedEmployeeObjs.length > 1
+          ? `AG-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+          : null
+      for (const employee of selectedEmployeeObjs) {
+        const missionPayload = {
+          title: formData.title,
+          description:
+            missionType === 'Intervention'
+              ? formData.description
+              : formData.description,
+          employee: employee.name,
+          employeeUserId: employee.id,
+          assignmentGroupId,
+          priority,
+          status: 'À faire',
+          dueDate: dueDate || "Aujourd'hui",
+          dueTime: dueTime || null,
+          type: missionType,
+          interventionId: missionType === 'Intervention' ? formData.interventionId : null,
+          site: formData.site,
+          address: formData.address,
+        }
+
+        const response = await apiFetch('/missions', {
+          method: 'POST',
+          body: missionPayload,
+          auth: true,
+        })
+        if (!response.ok) {
+          alert('Erreur lors de la création de la mission.')
+          if (isMountedRef.current) setIsSubmitting(false)
+          return
+        }
+        const createdMission = await response.json().catch(() => null)
+        if (createdMission?.id) {
+          createdMissions.push(createdMission)
+        }
       }
 
-      const response = await apiFetch('/missions', {
-        method: 'POST',
-        body: missionPayload,
-        auth: true,
+      const highlightMissionId = createdMissions.length > 0 ? String(createdMissions[0]?.id || '') : ''
+      const highlightGroupId = assignmentGroupId ? String(assignmentGroupId) : ''
+      const params = new URLSearchParams()
+      params.set('toast', 'assigned')
+      if (highlightMissionId) params.set('highlight', highlightMissionId)
+      if (highlightGroupId) params.set('highlightGroup', highlightGroupId)
+      navigate(`/missions?${params.toString()}`, {
+        state: { toast: 'assigned', highlight: highlightMissionId, highlightGroup: highlightGroupId },
       })
-      if (!response.ok) {
-        alert('Erreur lors de la création de la mission.')
-        if (isMountedRef.current) setIsSubmitting(false)
-        return
-      }
-      const createdMission = await response.json().catch(() => null)
-
-      navigate('/missions?toast=assigned', { state: { toast: 'assigned' } })
-      if (createdMission?.id) {
+      if (createdMissions.length > 0) {
         ;(async () => {
           try {
             if (missionType === 'Intervention' && formData.interventionId) {
               await apiFetch(`/interventions/${formData.interventionId}`, {
                 method: 'PATCH',
-                body: { status: 'ASSIGNED', assignedTo: empName },
+                body: { status: 'ASSIGNED', assignedTo: selectedNames.join(', ') },
                 auth: true,
               })
             }
 
             if (attachments.length > 0) {
-              const form = new FormData()
-              for (const file of attachments) {
-                form.append('files', file)
-              }
-              const uploadRes = await apiFetch(`/missions/${createdMission.id}/attachments`, {
-                method: 'POST',
-                body: form,
-                auth: true,
-              })
-              if (!uploadRes.ok) {
-                if (typeof window !== 'undefined') {
-                  window.sessionStorage.setItem(
-                    'missions_bg_toast',
-                    'Mission créée, mais erreur lors de l’upload des fichiers.',
-                  )
+              for (const mission of createdMissions) {
+                const form = new FormData()
+                for (const file of attachments) {
+                  form.append('files', file)
+                }
+                const uploadRes = await apiFetch(`/missions/${mission.id}/attachments`, {
+                  method: 'POST',
+                  body: form,
+                  auth: true,
+                })
+                if (!uploadRes.ok) {
+                  if (typeof window !== 'undefined') {
+                    window.sessionStorage.setItem(
+                      'missions_bg_toast',
+                      'Missions créées, mais erreur lors de l’upload des fichiers.',
+                    )
+                  }
+                  break
                 }
               }
             }
@@ -325,7 +381,7 @@ export default function AssignMission() {
             if (typeof window !== 'undefined') {
               window.sessionStorage.setItem(
                 'missions_bg_toast',
-                'Mission créée, mais une étape de finalisation a échoué (upload / mise à jour).',
+                'Missions créées, mais une étape de finalisation a échoué (upload / mise à jour).',
               )
             }
           }
@@ -726,16 +782,16 @@ export default function AssignMission() {
             <div className="space-y-3">
               <label className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
                 <User size={14} className="text-[#0052CC]" />
-                Choisir le technicien
+                Choisir les techniciens (max 3)
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {employeeList.map((emp) => {
-                  const isSelected = selectedEmployee === emp.name
+                  const isSelected = selectedEmployees.includes(emp.name)
                   return (
                     <button
                       key={emp.id}
                       type="button"
-                      onClick={() => setSelectedEmployee(emp.name)}
+                      onClick={() => toggleEmployeeSelection(emp.name)}
                       className={`relative flex items-center gap-4 p-4 rounded-2xl border-2 text-left transition-all duration-200 ${
                         isSelected
                           ? 'border-[#0052CC] bg-[#0052CC]/5 shadow-lg shadow-blue-100'
@@ -892,15 +948,19 @@ export default function AssignMission() {
                   <span className="text-xs font-black uppercase tracking-wider text-orange-900">Technicien & Planning</span>
                 </div>
                 <div className="space-y-3">
-                  {selectedEmployeeObj && (
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0052CC] to-blue-700 text-white flex items-center justify-center font-black text-sm shadow-sm">
-                        {selectedEmployeeObj.avatar}
-                      </div>
-                      <div>
-                        <p className="text-sm font-black text-slate-900">{selectedEmployeeObj.name}</p>
-                        <p className="text-xs text-slate-500 font-semibold">{selectedEmployeeObj.role}</p>
-                      </div>
+                  {selectedEmployeeObjs.length > 0 && (
+                    <div className="space-y-2">
+                      {selectedEmployeeObjs.map((emp) => (
+                        <div key={emp.id} className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0052CC] to-blue-700 text-white flex items-center justify-center font-black text-sm shadow-sm">
+                            {emp.avatar}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-black text-slate-900 truncate">{emp.name}</p>
+                            <p className="text-xs text-slate-500 font-semibold truncate">{emp.role}</p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                   <div className="grid grid-cols-2 gap-3 pt-2">
@@ -943,7 +1003,7 @@ export default function AssignMission() {
                   <p className="text-xs font-medium text-slate-600 leading-relaxed">
                     Apres confirmation, le dossier <span className="font-black text-[#0052CC]">{selectedIntervention.id}</span> passera
                     automatiquement au statut <span className="font-black text-blue-700">"Affectee"</span> et
-                    <span className="font-black text-slate-800"> {selectedEmployee || 'le technicien selectionne'}</span> sera
+                    <span className="font-black text-slate-800"> {selectedEmployees.length > 0 ? selectedEmployees.join(', ') : 'le technicien selectionne'}</span> sera
                     designe comme responsable de cette intervention.
                   </p>
                 </div>
@@ -973,6 +1033,14 @@ export default function AssignMission() {
   // ── Main render ───────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+
+      {showMaxEmployeesPopup && (
+        <div className="fixed top-4 right-4 z-[120]">
+          <div className="bg-red-600 text-white px-5 py-3 rounded-xl shadow-2xl border border-red-700 font-black text-sm">
+            Le maximum autorise est 3
+          </div>
+        </div>
+      )}
 
       {/* ── TOP HEADER ── */}
       <div className="bg-white border-b-2 border-slate-200 px-4 sm:px-8 py-3 sm:py-5 flex items-center justify-between shrink-0 shadow-sm">

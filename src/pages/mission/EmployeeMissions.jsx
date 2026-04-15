@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useCallback, useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ClipboardList, Wrench, AlertTriangle, CheckCircle2, Clock,
@@ -53,6 +53,25 @@ function getStatusColorKey(status) {
   if (status === 'Terminée') return 'green'
   if (status === 'Bloquée') return 'red'
   return 'blue'
+}
+
+function synchronizeGroupedMissionStatuses(rows) {
+  const missions = Array.isArray(rows) ? rows : []
+  const statusByGroup = new Map()
+
+  for (const mission of missions) {
+    const groupId = String(mission?.assignmentGroupId || '').trim()
+    if (!groupId || statusByGroup.has(groupId)) continue
+    statusByGroup.set(groupId, mission?.status || 'À faire')
+  }
+
+  return missions.map((mission) => {
+    const groupId = String(mission?.assignmentGroupId || '').trim()
+    const groupStatus = groupId ? statusByGroup.get(groupId) : null
+    return groupStatus
+      ? { ...mission, status: groupStatus, statusColor: getStatusColorKey(groupStatus) }
+      : mission
+  })
 }
 
 // ── Utilitaire : parse "DD Mois YYYY" / "Aujourd'hui" → Date ──────────────────
@@ -558,36 +577,55 @@ export default function EmployeeMissions() {
   const [search,       setSearch]       = useState('')
   const [filterStatus, setFilterStatus] = useState('Tous')
   const [filterType,   setFilterType]   = useState('Tous')
+  const [listPage, setListPage] = useState(1)
+  const daysPerPage = 3
 
-  useEffect(() => {
-    ;(async () => {
-      try {
-        const response = await apiFetch('/missions', { auth: true })
-        if (!response.ok) return
-        const data = await response.json()
-        const rows = Array.isArray(data) ? data : []
-        const filteredByUser =
-          currentUser && currentUser.id
-            ? rows.filter((m) => Number(m.employeeUserId) === Number(currentUser.id))
-            : currentUser && currentUser.name
-              ? rows.filter((m) => String(m.employee || '').trim() === currentUser.name)
-              : rows
+  const refreshMissions = useCallback(async () => {
+    try {
+      const response = await apiFetch('/missions', { auth: true, cache: 'no-store' })
+      if (!response.ok) return
+      const data = await response.json()
+      const rows = Array.isArray(data) ? data : []
+      const syncedRows = synchronizeGroupedMissionStatuses(rows)
+      const filteredByUser =
+        currentUser && currentUser.id
+          ? syncedRows.filter((m) => Number(m.employeeUserId) === Number(currentUser.id))
+          : currentUser && currentUser.name
+            ? syncedRows.filter((m) => String(m.employee || '').trim() === currentUser.name)
+            : syncedRows
 
-        const normalized = filteredByUser.map((m) => ({
-          ...m,
-          avatar: getAvatarFromName(m.employee),
-          priorityColor: getPriorityColor(m.priority),
-          statusColor: getStatusColorKey(m.status),
-        }))
-        setMissions(normalized)
-      } catch {}
-    })()
+      const normalized = filteredByUser.map((m) => ({
+        ...m,
+        avatar: getAvatarFromName(m.employee),
+        priorityColor: getPriorityColor(m.priority),
+        statusColor: getStatusColorKey(m.status),
+      }))
+      setMissions(normalized)
+    } catch {}
   }, [currentUser])
 
   useEffect(() => {
+    void refreshMissions()
+  }, [refreshMissions])
+
+  useEffect(() => {
+    const onFocus = () => {
+      void refreshMissions()
+    }
+    window.addEventListener('focus', onFocus)
+    const timerId = window.setInterval(() => {
+      void refreshMissions()
+    }, 5000)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      window.clearInterval(timerId)
+    }
+  }, [refreshMissions])
+
+  useEffect(() => {
     ;(async () => {
       try {
-        const response = await apiFetch('/interventions', { auth: true })
+        const response = await apiFetch('/interventions', { auth: true, cache: 'no-store' })
         if (!response.ok) return
         const data = await response.json()
         const rows = Array.isArray(data) ? data : []
@@ -611,20 +649,30 @@ export default function EmployeeMissions() {
   }, [])
 
   const handleStatusChange = (missionId, newStatus) => {
-    setMissions((prev) =>
-      prev.map((m) => {
-        if (m.id !== missionId) return m
-        return { ...m, status: newStatus, statusColor: getStatusColorKey(newStatus) }
-      }),
-    )
+    setMissions((prev) => {
+      const source = prev.find((m) => m.id === missionId) || null
+      const groupId = String(source?.assignmentGroupId || '').trim()
+      return prev.map((m) => {
+        if (m.id === missionId) {
+          return { ...m, status: newStatus, statusColor: getStatusColorKey(newStatus) }
+        }
+        if (groupId && String(m?.assignmentGroupId || '').trim() === groupId) {
+          return { ...m, status: newStatus, statusColor: getStatusColorKey(newStatus) }
+        }
+        return m
+      })
+    })
 
     ;(async () => {
       try {
-        await apiFetch(`/missions/${missionId}`, {
+        const response = await apiFetch(`/missions/${missionId}`, {
           method: 'PATCH',
           body: { status: newStatus },
           auth: true,
         })
+        if (response.ok) {
+          void refreshMissions()
+        }
       } catch {}
     })()
   }
@@ -640,6 +688,66 @@ export default function EmployeeMissions() {
       })
       .sort((a, b) => (PRIORITY_ORDER[a.priority] || 9) - (PRIORITY_ORDER[b.priority] || 9))
   }, [missions, filterStatus, filterType, search])
+
+  const dateGroups = useMemo(() => {
+    const todayRef = new Date()
+    const todayStart = new Date(todayRef.getFullYear(), todayRef.getMonth(), todayRef.getDate())
+    const map = new Map()
+
+    for (const mission of filtered) {
+      const parsed = parseDueDate(mission?.dueDate)
+      const dateObj = parsed ? new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()) : null
+      const key = dateObj ? dateObj.toISOString().slice(0, 10) : 'no_date'
+      if (!map.has(key)) {
+        map.set(key, { key, dateObj, missions: [] })
+      }
+      map.get(key).missions.push(mission)
+    }
+
+    const groups = Array.from(map.values()).map((g) => {
+      if (!g.dateObj) return { ...g, label: 'Sans date', dayDiff: null }
+      const dayDiff = Math.round((g.dateObj.getTime() - todayStart.getTime()) / 86400000)
+      const label =
+        dayDiff === 0
+          ? "Aujourd'hui"
+          : dayDiff === 1
+            ? 'Demain'
+            : dayDiff === -1
+              ? 'Hier'
+              : g.dateObj.toLocaleDateString('fr-FR', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })
+      return { ...g, label, dayDiff }
+    })
+
+    const category = (g) => {
+      if (!g.dateObj) return 3
+      if (g.dayDiff === 0) return 0
+      if (typeof g.dayDiff === 'number' && g.dayDiff > 0) return 1
+      return 2
+    }
+
+    groups.sort((a, b) => {
+      const ca = category(a)
+      const cb = category(b)
+      if (ca !== cb) return ca - cb
+      if (!a.dateObj || !b.dateObj) return 0
+      if (ca === 1) return a.dateObj.getTime() - b.dateObj.getTime()
+      return b.dateObj.getTime() - a.dateObj.getTime()
+    })
+
+    return groups
+  }, [filtered])
+
+  const totalListPages = Math.max(1, Math.ceil(dateGroups.length / daysPerPage))
+  const safeListPage = Math.min(Math.max(1, listPage), totalListPages)
+  const pagedDateGroups = dateGroups.slice(
+    (safeListPage - 1) * daysPerPage,
+    (safeListPage - 1) * daysPerPage + daysPerPage,
+  )
 
   const total     = missions.length
   const enCours   = missions.filter((m) => m.status === 'En cours').length
@@ -743,7 +851,7 @@ export default function EmployeeMissions() {
               {hasActiveFilters && (
                 <button
                   type="button"
-                  onClick={() => { setSearch(''); setFilterStatus('Tous'); setFilterType('Tous') }}
+                  onClick={() => { setSearch(''); setFilterStatus('Tous'); setFilterType('Tous'); setListPage(1) }}
                   className="flex items-center gap-1 text-[11px] font-black text-red-500 hover:text-red-700 transition-colors"
                 >
                   <XCircle size={12} /> Reset
@@ -758,7 +866,7 @@ export default function EmployeeMissions() {
                 type="text"
                 placeholder="Rechercher une mission..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => { setSearch(e.target.value); setListPage(1) }}
                 className="w-full pl-8 pr-3 py-2 bg-slate-50 border-2 border-slate-200 rounded-xl text-xs font-medium text-slate-700 placeholder:text-slate-400 focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all hover:border-slate-300"
               />
             </div>
@@ -767,7 +875,7 @@ export default function EmployeeMissions() {
             <div className="flex gap-2">
               <select
                 value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
+                onChange={(e) => { setFilterStatus(e.target.value); setListPage(1) }}
                 className="flex-1 px-2 py-1.5 border-2 border-slate-200 rounded-xl text-xs bg-white focus:border-[#0052CC] outline-none font-bold text-slate-600 hover:border-slate-300 transition-all"
               >
                 <option value="Tous">Tous statuts</option>
@@ -775,7 +883,7 @@ export default function EmployeeMissions() {
               </select>
               <select
                 value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
+                onChange={(e) => { setFilterType(e.target.value); setListPage(1) }}
                 className="flex-1 px-2 py-1.5 border-2 border-slate-200 rounded-xl text-xs bg-white focus:border-[#0052CC] outline-none font-bold text-slate-600 hover:border-slate-300 transition-all"
               >
                 <option value="Tous">Tous types</option>
@@ -796,17 +904,66 @@ export default function EmployeeMissions() {
                 <p className="text-slate-400 text-xs mt-1">Modifiez vos filtres</p>
               </div>
             ) : (
-              filtered.map((m) => (
-                <MissionRow
-                  key={m.id}
-                  mission={m}
-                  interventions={interventions}
-                  onStatusChange={handleStatusChange}
-                  onOpen={(id) => navigate('/missions/' + id)}
-                />
+              pagedDateGroups.map((group) => (
+                <div key={group.key} className="space-y-2">
+                  <div className="flex items-center justify-between px-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500">
+                        <CalendarDays size={14} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-black text-slate-700 truncate capitalize">{group.label}</p>
+                        {group.dateObj ? (
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            {group.dateObj.toISOString().slice(0, 10)}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-black">
+                      {group.missions.length}
+                    </span>
+                  </div>
+                  {group.missions.map((m) => (
+                    <MissionRow
+                      key={m.id}
+                      mission={m}
+                      interventions={interventions}
+                      onStatusChange={handleStatusChange}
+                      onOpen={(id) => navigate('/missions/' + id)}
+                    />
+                  ))}
+                </div>
               ))
             )}
           </div>
+
+          {/* Pagination */}
+          {dateGroups.length > 0 && totalListPages > 1 && (
+            <div className="px-4 py-3 border-t border-slate-100 bg-white shrink-0">
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setListPage((p) => Math.max(1, p - 1))}
+                  disabled={safeListPage <= 1}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-slate-200 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft size={14} /> Précédent
+                </button>
+                <div className="text-[11px] font-black text-slate-500">
+                  Page <span className="text-slate-900">{safeListPage}</span> / {totalListPages}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setListPage((p) => Math.min(totalListPages, p + 1))}
+                  disabled={safeListPage >= totalListPages}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-slate-200 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Suivant <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Footer colonne droite */}
           <div className="px-4 py-3 border-t border-slate-100 bg-white shrink-0">

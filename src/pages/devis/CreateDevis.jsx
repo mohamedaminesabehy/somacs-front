@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronLeft,
@@ -18,25 +18,37 @@ import {
 } from 'lucide-react'
 import ArticleSelectionModal from '../../components/devis/ArticleSelectionModal'
 
-// --- Helper Functions ---
-const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('fr-FR', {
+// --- Helpers ---
+const formatCurrency = (amount) =>
+  new Intl.NumberFormat('fr-FR', {
     style: 'decimal',
     minimumFractionDigits: 3,
-    maximumFractionDigits: 3
+    maximumFractionDigits: 3,
   }).format(amount || 0)
-}
 
 const toNumber = (value, fallback = 0) => {
-  if (value === null || value === undefined || value === '') {
-    return fallback
-  }
-
+  if (value === null || value === undefined || value === '') return fallback
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
 const normalizeRate = (value) => Math.max(0, toNumber(value, 0))
+
+// Extrait le taux numérique depuis le CodeTVA si TVA n'est pas renseigné
+// Ex: "19  " → 19, "TVA7" → 7, "7" → 7
+const extractTauxFromCode = (codeTva) => {
+  if (!codeTva) return 0
+  const match = String(codeTva).match(/(\d+(?:\.\d+)?)/)
+  if (match) return parseFloat(match[1])
+  return 0
+}
+
+// Résout le taux TVA effectif d'une ligne
+const resolveTVA = (line) => {
+  const taux = normalizeRate(line.TVA)
+  if (taux > 0) return taux
+  return extractTauxFromCode(line.CodeTVA)
+}
 
 const createEmptyLine = () => ({
   id: Date.now() + Math.floor(Math.random() * 1000),
@@ -44,24 +56,61 @@ const createEmptyLine = () => ({
   Designation: '',
   CodeTVA: '',
   AnneeTaxe: null,
-  Qte: 0,
+  Qte: 1,
   PU_HT: 0,
   Remise: 0,
   TVA: 0,
-  Total_HT: 0,
-  Total_TTC: 0
+  TotalNetHT: 0,
 })
+
+// Calcule les totaux depuis les lignes (même logique que DevisDetails)
+const computeTotals = (lines) => {
+  const articleLines = lines.filter((d) => d.Code && toNumber(d.Qte) > 0)
+
+  const totalHTBrut = articleLines.reduce((acc, d) => acc + toNumber(d.Qte) * toNumber(d.PU_HT), 0)
+  const totalRemise = articleLines.reduce(
+    (acc, d) => acc + toNumber(d.Qte) * toNumber(d.PU_HT) * (normalizeRate(d.Remise) / 100),
+    0
+  )
+  const totalNetHT = articleLines.reduce((acc, d) => acc + toNumber(d.TotalNetHT), 0)
+  const totalTVA = articleLines.reduce(
+    (acc, d) => acc + toNumber(d.TotalNetHT) * (resolveTVA(d) / 100),
+    0
+  )
+  const timbre = 1.0
+  const totalTTC = totalNetHT + totalTVA + timbre
+
+  // Groupement TVA par taux numérique résolu
+  const tvaMap = {}
+  for (const d of articleLines) {
+    const taux = resolveTVA(d)
+    const key = String(taux)
+    const base = toNumber(d.TotalNetHT)
+    const montant = base * (taux / 100)
+    if (!tvaMap[key]) tvaMap[key] = { taux, base: 0, montant: 0 }
+    tvaMap[key].base += base
+    tvaMap[key].montant += montant
+  }
+  const tvaSummary = Object.values(tvaMap).sort((a, b) => a.taux - b.taux)
+
+  return { totalHTBrut, totalRemise, totalNetHT, totalTVA, timbre, totalTTC, tvaSummary }
+}
+
+const computeLine = (item) => {
+  const qte = Math.max(0, toNumber(item.Qte))
+  const pu = Math.max(0, toNumber(item.PU_HT))
+  const remise = normalizeRate(item.Remise)
+  return qte * pu * (1 - remise / 100)
+}
 
 const CreateDevis = () => {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(false)
+  const [createdNumero, setCreatedNumero] = useState(null)
 
-  // Header State
   const [header, setHeader] = useState({
-    NUMERO: '', // Sera généré par le backend ou auto
-    TYPDOC: 'DE',
     DATDOC: new Date().toISOString().split('T')[0],
     DATLIV: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     NOMTIE: '',
@@ -71,98 +120,36 @@ const CreateDevis = () => {
     CODPOS: '',
     TELCLI: '',
     CODTVA: '',
-    OBSERVATION: ''
+    OBSERVATION: '',
   })
 
-  // Details State
   const [details, setDetails] = useState([createEmptyLine()])
-
-  // Articles Modal
   const [isArticleModalOpen, setIsArticleModalOpen] = useState(false)
   const [articleRowIndex, setArticleRowIndex] = useState(null)
 
-  // Footer / Totals State
-  const [totals, setTotals] = useState({
-    totalNetHT: 0,
-    totalRemise: 0,
-    totalTVA: 0,
-    totalTTC: 0,
-    tvaSummary: [] // Array of { code: 'TVA19', base: 0, amount: 0 }
-  })
-
-  // Recalculate totals whenever details change
-  useEffect(() => {
-    const newTotals = details.reduce((acc, item) => {
-      const qte = Math.max(0, toNumber(item.Qte, 0))
-      const pu = Math.max(0, toNumber(item.PU_HT, 0))
-      const remise = normalizeRate(item.Remise)
-      const tva = normalizeRate(item.TVA)
-
-      const lineBrut = qte * pu
-      const lineRemise = lineBrut * (remise / 100)
-      const lineHT = lineBrut - lineRemise
-      const lineTVA = lineHT * (tva / 100)
-      
-      acc.totalNetHT += lineHT
-      acc.totalRemise += lineRemise
-      acc.totalTVA += lineTVA
-      
-      // TVA Summary logic grouped by Code TVA
-      const codeTVA = item.CodeTVA || 'SANS_CODE'
-      const existingTVA = acc.tvaSummary.find(t => t.code === codeTVA)
-      if (existingTVA) {
-        existingTVA.base += lineHT
-        existingTVA.amount += lineTVA
-      } else if (qte > 0) {
-        acc.tvaSummary.push({ code: codeTVA, base: lineHT, amount: lineTVA })
-      }
-      
-      return acc
-    }, { totalNetHT: 0, totalRemise: 0, totalTVA: 0, totalTTC: 0, tvaSummary: [] })
-
-    newTotals.totalTTC = newTotals.totalNetHT + newTotals.totalTVA + 1.000 // + 1.000 Timbre
-    setTotals(newTotals)
-  }, [details])
+  const totals = computeTotals(details)
+  const activeLines = details.filter((line) => line.Code && toNumber(line.Qte) > 0)
+  const openLines = details.filter((line) => !line.Code).length
 
   const handleHeaderChange = (e) => {
     const { name, value } = e.target
-    setHeader(prev => ({ ...prev, [name]: value }))
+    setHeader((prev) => ({ ...prev, [name]: value }))
   }
 
   const handleLineChange = (index, field, value) => {
-    const newDetails = [...details]
-    const item = { ...newDetails[index] }
-
-    if (field === 'Qte' || field === 'PU_HT') {
-      item[field] = Math.max(0, toNumber(value, 0))
-    } else if (field === 'Remise' || field === 'TVA') {
-      item[field] = normalizeRate(value)
-    } else {
-      item[field] = value
-    }
-    
-    // Recalculate line total
-    const qte = Math.max(0, toNumber(item.Qte, 0))
-    const pu = Math.max(0, toNumber(item.PU_HT, 0))
-    const rem = normalizeRate(item.Remise)
-    const tva = normalizeRate(item.TVA)
-    
-    item.Total_HT = qte * pu * (1 - rem / 100)
-    item.Total_TTC = item.Total_HT * (1 + tva / 100)
-    
-    newDetails[index] = item
-    setDetails(newDetails)
+    setDetails((prev) => {
+      const next = [...prev]
+      const item = { ...next[index], [field]: value }
+      item.TotalNetHT = computeLine(item)
+      next[index] = item
+      return next
+    })
   }
 
-  const addLine = () => {
-    setDetails((prev) => [...prev, createEmptyLine()])
-  }
+  const addLine = () => setDetails((prev) => [...prev, createEmptyLine()])
 
   const removeLine = (index) => {
-    if (details.length > 1) {
-      const newDetails = details.filter((_, i) => i !== index)
-      setDetails(newDetails)
-    }
+    if (details.length > 1) setDetails((prev) => prev.filter((_, i) => i !== index))
   }
 
   const openArticleModal = (index) => {
@@ -172,36 +159,26 @@ const CreateDevis = () => {
 
   const selectArticle = (article) => {
     const pu = Math.max(0, toNumber(article.PV, 0))
-    const tva = normalizeRate(article.tva ?? article.TVA ?? article.tauxmaj)
-    const remiseArticle = normalizeRate(article.remise ?? article.REM ?? article.Remise)
     const codeTva = article.codeTva ?? article.CodeTVA ?? article.CODTAXE ?? ''
     const anneeTaxe = article.anneeTaxe ?? article.AnneeTaxe ?? null
-
-    console.debug('[CreateDevis] article selected', {
-      CODE: article.CODE,
-      CodeTVA: codeTva,
-      AnneeTaxe: anneeTaxe,
-      tauxmaj: tva,
-      remise: remiseArticle,
-      PV: pu,
-    })
+    // Résoudre le taux TVA : depuis le champ numérique ou depuis le code
+    const tvaFromField = normalizeRate(article.tva ?? article.TVA ?? article.tauxmaj)
+    const tva = tvaFromField > 0 ? tvaFromField : extractTauxFromCode(codeTva)
+    const remise = normalizeRate(article.remise ?? article.REM ?? article.Remise)
 
     setDetails((prev) => {
       const safeIndex =
         articleRowIndex !== null && articleRowIndex >= 0 && articleRowIndex < prev.length
           ? articleRowIndex
           : prev.findIndex((line) => !line.Code)
-
       const targetIndex = safeIndex >= 0 ? safeIndex : prev.length
-      const workingRows = safeIndex >= 0 ? [...prev] : [...prev, createEmptyLine()]
-      const currentLine = workingRows[targetIndex]
+      const rows = safeIndex >= 0 ? [...prev] : [...prev, createEmptyLine()]
 
       const qte = 1
-      const remise = remiseArticle
-      const totalHt = qte * pu * (1 - remise / 100)
+      const totalNetHT = qte * pu * (1 - remise / 100)
 
-      workingRows[targetIndex] = {
-        ...currentLine,
+      rows[targetIndex] = {
+        ...rows[targetIndex],
         Code: article.CODE,
         Designation: article.LIBELL,
         CodeTVA: codeTva,
@@ -210,16 +187,11 @@ const CreateDevis = () => {
         PU_HT: pu,
         Remise: remise,
         TVA: tva,
-        Total_HT: totalHt,
-        Total_TTC: totalHt * (1 + tva / 100)
+        TotalNetHT: totalNetHT,
       }
 
-      const hasEmptyLine = workingRows.some((line) => !line.Code)
-      if (!hasEmptyLine) {
-        workingRows.push(createEmptyLine())
-      }
-
-      return workingRows
+      if (!rows.some((line) => !line.Code)) rows.push(createEmptyLine())
+      return rows
     })
 
     setArticleRowIndex(null)
@@ -227,49 +199,56 @@ const CreateDevis = () => {
   }
 
   const handleSubmit = async () => {
+    const validLines = details.filter((d) => d.Code && toNumber(d.Qte) > 0)
+    if (!header.NOMTIE.trim()) {
+      setError('Le nom du client est obligatoire.')
+      return
+    }
+    if (validLines.length === 0) {
+      setError('Ajoutez au moins un article avec une quantité.')
+      return
+    }
+
     try {
       setLoading(true)
       setError(null)
       const token = localStorage.getItem('auth_token')
-      
+
       const payload = {
         ...header,
-        details: details
-          .filter(d => d.Code && toNumber(d.Qte, 0) > 0)
-          .map((d) => ({
-            ...d,
-            Qte: Math.max(0, toNumber(d.Qte, 0)),
-            PU_HT: Math.max(0, toNumber(d.PU_HT, 0)),
-            Remise: normalizeRate(d.Remise),
-            TVA: normalizeRate(d.TVA),
-          })),
-        totals: {
-          totalNetHT: totals.totalNetHT,
-          totalRemise: totals.totalRemise,
-          totalTVA: totals.totalTVA,
-          totalTTC: totals.totalTTC
-        }
+        details: validLines.map((d) => ({
+          Code: d.Code,
+          Designation: d.Designation,
+          CodeTVA: d.CodeTVA,
+          Qte: Math.max(0, toNumber(d.Qte)),
+          PU_HT: Math.max(0, toNumber(d.PU_HT)),
+          Remise: normalizeRate(d.Remise),
+          TVA: normalizeRate(d.TVA),
+        })),
       }
 
       const response = await fetch('http://localhost:3000/devis', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       })
 
       if (response.ok) {
+        const result = await response.json()
+        setCreatedNumero(result.NUMERO)
         setSuccess(true)
-        setTimeout(() => navigate('/devis'), 2000)
+        // Redirection vers les détails du devis créé
+        setTimeout(() => navigate(`/devis/${result.NUMERO}`), 2000)
       } else {
-        const data = await response.json()
-        setError(data.message || 'Erreur lors de la création du devis')
+        const data = await response.json().catch(() => ({}))
+        setError(data.message || 'Erreur lors de la création du devis.')
       }
     } catch (err) {
       console.error('Error creating devis:', err)
-      setError('Impossible de joindre le serveur')
+      setError('Impossible de joindre le serveur.')
     } finally {
       setLoading(false)
     }
@@ -277,312 +256,371 @@ const CreateDevis = () => {
 
   return (
     <>
-      <div className="p-4 sm:p-6 bg-[#f8fafc] min-h-screen">
-      {/* Header Actions */}
-      <div className="max-w-[1600px] mx-auto mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate('/devis')}
-            className="p-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-all shadow-sm"
-          >
-            <ChevronLeft size={22} />
-          </button>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase">
-              Nouveau Devis
-            </h1>
-            <p className="text-slate-500 text-xs sm:text-sm font-medium">Créez un nouveau devis avec calculs dynamiques</p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={handleSubmit}
-            disabled={loading}
-            className="flex items-center gap-2 px-6 py-2.5 bg-[#0052CC] text-white rounded-xl font-bold hover:bg-[#0747A6] transition-all shadow-lg shadow-blue-200 disabled:opacity-50"
-          >
-            {loading ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
-            Enregistrer le Devis
-          </button>
-        </div>
-      </div>
-
-      {success && (
-        <div className="max-w-[1600px] mx-auto mb-6 bg-green-50 border border-green-200 p-4 rounded-2xl flex items-center gap-3 text-green-700 animate-in fade-in zoom-in">
-          <CheckCircle2 size={24} />
-          <p className="font-bold">Devis créé avec succès ! Redirection...</p>
-        </div>
-      )}
-
-      {error && (
-        <div className="max-w-[1600px] mx-auto mb-6 bg-red-50 border border-red-200 p-4 rounded-2xl flex items-center gap-3 text-red-700 animate-in fade-in zoom-in">
-          <AlertCircle size={24} />
-          <p className="font-bold">{error}</p>
-        </div>
-      )}
-
-      <div className="max-w-[1600px] mx-auto grid grid-cols-1 xl:grid-cols-12 gap-6">
-        {/* Left Section: Header & Items */}
-        <div className="xl:col-span-8 space-y-6">
-          {/* Client & General Info */}
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3 bg-slate-50/50">
-              <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-                <Building2 size={20} />
-              </div>
-              <h2 className="font-black text-slate-900 uppercase tracking-wider text-sm">Informations Client</h2>
-            </div>
-            <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                  <User size={12} className="text-blue-500" /> Client (Nom)
-                </label>
-                <input
-                  type="text"
-                  name="NOMTIE"
-                  value={header.NOMTIE}
-                  onChange={handleHeaderChange}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none font-bold text-sm"
-                  placeholder="Nom du client..."
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                  <Calendar size={12} className="text-blue-500" /> Date Document
-                </label>
-                <input
-                  type="date"
-                  name="DATDOC"
-                  value={header.DATDOC}
-                  onChange={handleHeaderChange}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none font-bold text-sm"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                  <Truck size={12} className="text-blue-500" /> Livraison Prévue
-                </label>
-                <input
-                  type="date"
-                  name="DATLIV"
-                  value={header.DATLIV}
-                  onChange={handleHeaderChange}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none font-bold text-sm"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Items Table */}
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 text-purple-600 rounded-lg">
-                  <Package size={20} />
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(0,82,204,0.08),_transparent_26%),linear-gradient(180deg,#f8fbff_0%,#eef4fb_100%)] px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-6">
+          <section className="overflow-hidden rounded-[32px] border border-white/70 bg-white/88 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur">
+            <div className="flex flex-col gap-6 p-6 lg:p-8 xl:flex-row xl:items-end xl:justify-between">
+              <div className="max-w-3xl space-y-4">
+                <div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.35em] text-[#0052CC]">
+                  <span className="rounded-full bg-blue-50 px-3 py-1">Devis</span>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-500">Création structurée</span>
                 </div>
-                <h2 className="font-black text-slate-900 uppercase tracking-wider text-sm">Articles du Devis</h2>
+                <div className="space-y-3">
+                  <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">
+                    Nouveau devis
+                  </h1>
+                  <p className="max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
+                    Créez un devis clair, homogène et prêt à l’envoi grâce à une interface pensée comme un espace de travail SaaS premium.
+                  </p>
+                </div>
               </div>
-              <button 
-                onClick={addLine}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-xl font-bold text-xs hover:bg-blue-100 transition-all"
-              >
-                <Plus size={16} /> Ajouter une ligne
-              </button>
-            </div>
-            
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/30 border-b border-slate-100">
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-[18%]">Article</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-[28%]">Désignation</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-[8%]">Qté</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right w-[12%]">P.U HT</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-[8%]">Rem (%)</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-[8%]">TVA</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right w-[13%]">Total HT</th>
-                    <th className="px-6 py-4 w-[5%]"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {details.map((item, idx) => (
-                    <tr key={item.id} className="hover:bg-slate-50/50 transition-colors relative">
-                      <td className="px-6 py-4">
-                        <div className="space-y-2">
-                          <div className="text-xs font-black text-blue-700 uppercase tracking-widest min-h-[16px]">
-                            {item.Code || 'Aucun article'}
-                          </div>
-                          <button
-                            onClick={() => openArticleModal(idx)}
-                            className="inline-flex items-center gap-2 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider bg-slate-900 text-white rounded-lg hover:bg-blue-600 transition-all"
-                          >
-                            Sélectionner article
-                          </button>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <input
-                          type="text"
-                          value={item.Designation}
-                          onChange={(e) => handleLineChange(idx, 'Designation', e.target.value)}
-                          className="w-full bg-transparent border-none focus:ring-0 text-sm font-medium text-slate-600"
-                        />
-                        <div className="mt-1 text-[10px] font-semibold text-slate-400">
-                          Année taxe: {item.AnneeTaxe ?? '-'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <input
-                          type="number"
-                          value={item.Qte}
-                          onChange={(e) => handleLineChange(idx, 'Qte', e.target.value)}
-                          className="w-16 px-2 py-1 bg-slate-100 rounded-lg text-center font-black text-xs text-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none"
-                        />
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <input
-                          type="number"
-                          value={item.PU_HT}
-                          readOnly
-                          title="Le prix unitaire HT est récupéré depuis la fiche article"
-                          className="w-24 px-2 py-1 bg-transparent border-none text-right font-bold text-sm text-slate-900 focus:ring-0 cursor-not-allowed"
-                        />
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <input
-                          type="number"
-                          value={item.Remise}
-                          onChange={(e) => handleLineChange(idx, 'Remise', e.target.value)}
-                          className="w-12 px-2 py-1 bg-slate-100 rounded-lg text-center font-bold text-xs text-amber-600 focus:ring-2 focus:ring-blue-500/20 outline-none"
-                        />
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <input
-                          type="text"
-                          value={item.CodeTVA || ''}
-                          readOnly
-                          title="Le code TVA est récupéré depuis la fiche article"
-                          className="w-12 px-2 py-1 bg-slate-100 rounded-lg text-center font-bold text-xs text-slate-700 focus:ring-2 focus:ring-blue-500/20 outline-none cursor-not-allowed"
-                        />
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <span className="font-black text-blue-600 text-sm">
-                          {formatCurrency(item.Total_HT)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <button 
-                          onClick={() => removeLine(idx)}
-                          className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
 
-        {/* Right Section: Totals & Summary */}
-        <div className="xl:col-span-4 space-y-6">
-          {/* TVA Summary Card */}
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3 bg-slate-50/50">
-              <div className="p-2 bg-amber-100 text-amber-600 rounded-lg">
-                <Percent size={20} />
+              <div className="flex flex-col gap-3 sm:flex-row xl:flex-col xl:items-end">
+                <button
+                  onClick={() => navigate('/devis')}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50"
+                >
+                  <ChevronLeft size={18} />
+                  Retour à la liste
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={loading}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0052CC] px-6 py-3 text-sm font-black text-white shadow-[0_18px_40px_rgba(0,82,204,0.25)] transition-all hover:-translate-y-0.5 hover:bg-[#0747A6] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {loading ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
+                  Enregistrer le devis
+                </button>
               </div>
-              <h2 className="font-black text-slate-900 uppercase tracking-wider text-sm">Récapitulatif TVA</h2>
             </div>
-            <div className="p-6">
-              {totals.tvaSummary.length > 0 ? (
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                      <th className="py-2">TVA</th>
-                      <th className="py-2 text-right">Base HT</th>
-                      <th className="py-2 text-right">Montant TVA</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {totals.tvaSummary.map((tva, idx) => (
-                      <tr key={idx}>
-                        <td className="py-3 text-sm font-bold text-slate-900">{tva.code}</td>
-                        <td className="py-3 text-right text-sm font-medium text-slate-600">{formatCurrency(tva.base)}</td>
-                        <td className="py-3 text-right text-sm font-bold text-slate-900">{formatCurrency(tva.amount)}</td>
+
+            <div className="grid gap-4 border-t border-slate-100 p-6 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Lignes actives</div>
+                <div className="mt-2 text-2xl font-black text-slate-950">{activeLines.length}</div>
+                <p className="mt-1 text-xs font-medium text-slate-500">Articles remplis et comptabilisés</p>
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Lignes vides</div>
+                <div className="mt-2 text-2xl font-black text-slate-950">{openLines}</div>
+                <p className="mt-1 text-xs font-medium text-slate-500">Emplacements disponibles pour ajout rapide</p>
+              </div>
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4">
+                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500">Total net HT</div>
+                <div className="mt-2 text-2xl font-black text-emerald-700">{formatCurrency(totals.totalNetHT)}</div>
+                <p className="mt-1 text-xs font-medium text-emerald-700/70">Base hors taxes calculée</p>
+              </div>
+              <div className="rounded-2xl border border-[#0052CC]/15 bg-[#0052CC]/8 p-4">
+                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-[#0052CC]">Total TTC</div>
+                <div className="mt-2 text-2xl font-black text-slate-950">{formatCurrency(totals.totalTTC)}</div>
+                <p className="mt-1 text-xs font-medium text-slate-500">Inclut TVA et droit de timbre</p>
+              </div>
+            </div>
+          </section>
+
+          {success && (
+            <div className="flex items-start gap-3 rounded-[24px] border border-emerald-200 bg-emerald-50/90 p-4 text-emerald-700 shadow-sm">
+              <div className="rounded-2xl bg-white p-2 text-emerald-500 shadow-sm">
+                <CheckCircle2 size={22} />
+              </div>
+              <div>
+                <p className="text-sm font-black">Devis créé avec succès</p>
+                <p className="mt-1 text-sm font-medium text-emerald-700/80">
+                  Devis {createdNumero} créé avec succès ! Redirection vers les détails...
+                </p>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="flex items-start gap-3 rounded-[24px] border border-red-200 bg-red-50/90 p-4 text-red-700 shadow-sm">
+              <div className="rounded-2xl bg-white p-2 text-red-500 shadow-sm">
+                <AlertCircle size={22} />
+              </div>
+              <div>
+                <p className="text-sm font-black">Erreur de validation</p>
+                <p className="mt-1 text-sm font-medium text-red-700/80">{error}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+            <div className="space-y-6 xl:col-span-8">
+              <section className="overflow-hidden rounded-[28px] border border-white/70 bg-white/92 shadow-[0_18px_60px_rgba(15,23,42,0.06)] backdrop-blur">
+                <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-6 py-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-[#0052CC]">
+                      <Building2 size={20} />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-black uppercase tracking-[0.3em] text-slate-900">Informations client</h2>
+                      <p className="mt-1 text-xs font-medium text-slate-500">Les données principales du devis et les dates clés</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid gap-4 p-6 md:grid-cols-3">
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                      <User size={12} className="text-[#0052CC]" /> Client (Nom)
+                    </label>
+                    <input
+                      type="text"
+                      name="NOMTIE"
+                      value={header.NOMTIE}
+                      onChange={handleHeaderChange}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                      placeholder="Nom du client..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                      <Calendar size={12} className="text-[#0052CC]" /> Date document
+                    </label>
+                    <input
+                      type="date"
+                      name="DATDOC"
+                      value={header.DATDOC}
+                      onChange={handleHeaderChange}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                      <Truck size={12} className="text-[#0052CC]" /> Livraison prévue
+                    </label>
+                    <input
+                      type="date"
+                      name="DATLIV"
+                      value={header.DATLIV}
+                      onChange={handleHeaderChange}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <section className="overflow-hidden rounded-[28px] border border-white/70 bg-white/92 shadow-[0_18px_60px_rgba(15,23,42,0.06)] backdrop-blur">
+                <div className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-purple-50 text-purple-600">
+                      <Package size={20} />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-black uppercase tracking-[0.3em] text-slate-900">Articles du devis</h2>
+                      <p className="mt-1 text-xs font-medium text-slate-500">Ajoutez les lignes, ajustez les remises et contrôlez les montants</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={addLine}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-xs font-black uppercase tracking-[0.25em] text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-[#0052CC]"
+                  >
+                    <Plus size={16} /> Ajouter une ligne
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[1050px] border-collapse text-left">
+                    <thead className="bg-slate-50/70">
+                      <tr className="border-b border-slate-100">
+                        <th className="w-[18%] px-4 py-4 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Article</th>
+                        <th className="w-[26%] px-4 py-4 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Désignation</th>
+                        <th className="w-[8%] px-4 py-4 text-center text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Qté</th>
+                        <th className="w-[12%] px-4 py-4 text-right text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">P.U HT</th>
+                        <th className="w-[8%] px-4 py-4 text-center text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Rem (%)</th>
+                        <th className="w-[8%] px-4 py-4 text-center text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">TVA (%)</th>
+                        <th className="w-[15%] px-4 py-4 text-right text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Total net HT</th>
+                        <th className="w-[5%] px-4 py-4"></th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="text-center py-4 text-slate-400 text-xs font-medium italic">
-                  Aucun article ajouté pour le moment
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {details.map((item, idx) => (
+                        <tr key={item.id} className="transition-colors hover:bg-slate-50/70">
+                          <td className="px-4 py-4 align-top">
+                            <div className="space-y-2">
+                              <div className="min-h-[16px] text-xs font-black uppercase tracking-[0.25em] text-[#0052CC]">
+                                {item.Code || <span className="text-slate-300">—</span>}
+                              </div>
+                              <button
+                                onClick={() => openArticleModal(idx)}
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-[0.25em] text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:text-[#0052CC]"
+                              >
+                                Sélectionner
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 align-top">
+                            <input
+                              type="text"
+                              value={item.Designation}
+                              onChange={(e) => handleLineChange(idx, 'Designation', e.target.value)}
+                              className="w-full rounded-2xl border border-transparent bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                              placeholder="Désignation..."
+                            />
+                          </td>
+                          <td className="px-4 py-4 text-center align-top">
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.Qte}
+                              onChange={(e) => handleLineChange(idx, 'Qte', e.target.value)}
+                              className="w-20 rounded-2xl border border-transparent bg-slate-50/80 px-3 py-3 text-center text-sm font-black text-slate-800 outline-none transition-all focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                            />
+                          </td>
+                          <td className="px-4 py-4 text-right align-top">
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.PU_HT}
+                              onChange={(e) => handleLineChange(idx, 'PU_HT', e.target.value)}
+                              className="w-28 rounded-2xl border border-transparent bg-slate-50/80 px-3 py-3 text-right text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                            />
+                          </td>
+                          <td className="px-4 py-4 text-center align-top">
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={item.Remise}
+                              onChange={(e) => handleLineChange(idx, 'Remise', e.target.value)}
+                              className="w-20 rounded-2xl border border-transparent bg-slate-50/80 px-3 py-3 text-center text-sm font-bold text-amber-600 outline-none transition-all focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                            />
+                          </td>
+                          <td className="px-4 py-4 text-center align-top">
+                            <div className="flex flex-col items-center gap-1 rounded-2xl bg-slate-50/80 px-3 py-3">
+                              <span className="text-sm font-black text-slate-800">
+                                {item.CodeTVA ? item.CodeTVA.trim() : '—'}
+                              </span>
+                              {resolveTVA(item) > 0 && (
+                                <span className="text-[10px] font-bold text-slate-400">{resolveTVA(item)}%</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 text-right align-top">
+                            <span className="text-sm font-black text-[#0052CC]">
+                              {formatCurrency(item.TotalNetHT)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-center align-top">
+                            <button
+                              onClick={() => removeLine(idx)}
+                              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-300 shadow-sm transition-all hover:-translate-y-0.5 hover:border-red-200 hover:text-red-500 hover:shadow-md"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              )}
+              </section>
             </div>
-          </div>
 
-          {/* Final Totals Card */}
-          <div className="bg-[#0052CC] rounded-[32px] border border-[#0052CC] shadow-2xl shadow-blue-500/20 overflow-hidden text-white">
-            <div className="px-6 py-5 border-b border-white/10 flex items-center gap-3 bg-white/5">
-              <div className="p-2 bg-white/20 rounded-xl text-white">
-                <Calculator size={22} />
-              </div>
-              <h2 className="font-black uppercase tracking-wider text-sm">Calculateur Devis</h2>
-            </div>
-            <div className="p-8 space-y-5">
-              <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                <span className="text-white/60 font-black uppercase text-[10px] tracking-[0.2em]">Total Net HT</span>
-                <span className="text-xl font-black">{formatCurrency(totals.totalNetHT)}</span>
-              </div>
-              <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                <span className="text-white/60 font-black uppercase text-[10px] tracking-[0.2em]">Total Remise</span>
-                <span className="text-xl font-black">{formatCurrency(totals.totalRemise)}</span>
-              </div>
-              <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                <span className="text-white/60 font-black uppercase text-[10px] tracking-[0.2em]">Total TVA</span>
-                <span className="text-xl font-black">{formatCurrency(totals.totalTVA)}</span>
-              </div>
-              <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                <span className="text-white/60 font-black uppercase text-[10px] tracking-[0.2em]">Droit de Timbre</span>
-                <span className="text-xl font-black">1.000</span>
-              </div>
-              <div className="flex justify-between items-center pt-4">
-                <div>
-                  <span className="text-white font-black uppercase text-xs tracking-[0.3em] block mb-1">TOTAL TTC</span>
-                  <span className="text-[10px] font-bold text-white/50 italic">Dinars Tunisiens</span>
+            <aside className="space-y-6 xl:col-span-4 xl:sticky xl:top-6 xl:self-start">
+              <section className="overflow-hidden rounded-[28px] border border-white/70 bg-white/92 shadow-[0_18px_60px_rgba(15,23,42,0.06)] backdrop-blur">
+                <div className="flex items-center gap-3 border-b border-slate-100 px-6 py-5">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+                    <Percent size={20} />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-black uppercase tracking-[0.3em] text-slate-900">Récapitulatif TVA</h2>
+                    <p className="mt-1 text-xs font-medium text-slate-500">Répartition fiscale calculée automatiquement</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-4xl font-black block tracking-tighter">{formatCurrency(totals.totalTTC)}</span>
+                <div className="p-6">
+                  {totals.tvaSummary.length > 0 ? (
+                    <div className="overflow-hidden rounded-2xl border border-slate-100">
+                      <table className="w-full border-collapse text-left">
+                        <thead className="bg-slate-50/80">
+                          <tr className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                            <th className="px-4 py-3">TVA</th>
+                            <th className="px-4 py-3 text-right">Base HT</th>
+                            <th className="px-4 py-3 text-right">Montant TVA</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50 bg-white">
+                          {totals.tvaSummary.map((t, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50/70">
+                              <td className="px-4 py-3 text-sm font-bold text-slate-900">TVA {t.taux}%</td>
+                              <td className="px-4 py-3 text-right text-sm font-medium text-slate-600">
+                                {formatCurrency(t.base)}
+                              </td>
+                              <td className="px-4 py-3 text-right text-sm font-black text-slate-900">
+                                {formatCurrency(t.montant)}
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="border-t border-slate-100 bg-slate-50/80">
+                            <td className="px-4 py-3 text-xs font-black uppercase tracking-[0.25em] text-slate-500">Total</td>
+                            <td className="px-4 py-3 text-right text-xs font-black text-slate-700">
+                              {formatCurrency(totals.tvaSummary.reduce((a, t) => a + t.base, 0))}
+                            </td>
+                            <td className="px-4 py-3 text-right text-xs font-black text-slate-700">
+                              {formatCurrency(totals.totalTVA)}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-8 text-center text-xs font-medium italic text-slate-400">
+                      Aucun article ajouté pour le moment
+                    </div>
+                  )}
                 </div>
-              </div>
-              
-              <button 
-                onClick={handleSubmit}
-                disabled={loading || totals.totalTTC <= 1.0}
-                className="w-full mt-4 py-4 bg-white text-[#0052CC] rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-slate-50 transition-all active:scale-95 shadow-xl disabled:opacity-50"
-              >
-                {loading ? 'Traitement en cours...' : 'Confirmer et Enregistrer'}
-              </button>
-            </div>
-          </div>
+              </section>
 
-          {/* Quick Info Card */}
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-start gap-4">
-            <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
-              <RefreshCw size={24} />
-            </div>
-            <div>
-              <p className="text-xs font-black text-slate-900 uppercase tracking-tight">Recalcul en temps réel</p>
-              <p className="text-[11px] text-slate-500 font-medium mt-1 leading-relaxed">
-                Toutes les modifications sur les quantités, prix ou remises mettent à jour instantanément les totaux et la TVA.
-              </p>
-            </div>
+              <section className="overflow-hidden rounded-[32px] border border-[#0052CC] bg-[#0052CC] text-white shadow-[0_24px_70px_rgba(0,82,204,0.25)]">
+                <div className="flex items-center gap-3 border-b border-white/10 bg-white/5 px-6 py-5">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15 text-white">
+                    <Calculator size={22} />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-black uppercase tracking-[0.3em] text-white">Calculateur devis</h2>
+                    <p className="mt-1 text-xs font-medium text-white/60">Synthèse financière en temps réel</p>
+                  </div>
+                </div>
+                <div className="space-y-3 p-6">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/70">Total HT brut</span>
+                    <span className="text-base font-black">{formatCurrency(totals.totalHTBrut)}</span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/70">Total remise</span>
+                    <span className="text-base font-black">{formatCurrency(totals.totalRemise)}</span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/70">Total net HT</span>
+                    <span className="text-base font-black">{formatCurrency(totals.totalNetHT)}</span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/70">Total TVA</span>
+                    <span className="text-base font-black">{formatCurrency(totals.totalTVA)}</span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/70">Droit timbre</span>
+                    <span className="text-base font-black">{formatCurrency(totals.timbre)}</span>
+                  </div>
+                  <div className="flex items-end justify-between gap-4 pt-2">
+                    <div>
+                      <span className="mb-1 block text-[10px] font-black uppercase tracking-[0.35em] text-white/70">Total TTC</span>
+                      <span className="text-[10px] font-bold italic text-white/50">Dinars tunisiens</span>
+                    </div>
+                    <span className="text-4xl font-black leading-none">{formatCurrency(totals.totalTTC)}</span>
+                  </div>
+
+                  <button
+                    onClick={handleSubmit}
+                    disabled={loading || totals.totalNetHT <= 0}
+                    className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 py-4 text-sm font-black uppercase tracking-[0.25em] text-[#0052CC] shadow-[0_16px_40px_rgba(255,255,255,0.18)] transition-all hover:-translate-y-0.5 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {loading ? 'Traitement en cours...' : 'Confirmer et enregistrer'}
+                  </button>
+                </div>
+              </section>
+            </aside>
           </div>
         </div>
-      </div>
       </div>
 
       <ArticleSelectionModal

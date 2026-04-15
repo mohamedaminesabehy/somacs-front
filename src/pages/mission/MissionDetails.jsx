@@ -62,6 +62,19 @@ function InfoItem({ label, value, icon: Icon, colorClass = "text-slate-500" }) {
   )
 }
 
+function buildGroupedEmployeesDisplay(missionLike) {
+  const primary = String(missionLike?.employee || '').trim()
+  const fromArray = Array.isArray(missionLike?.groupedEmployees)
+    ? missionLike.groupedEmployees.map((name) => String(name || '').trim()).filter(Boolean)
+    : []
+  const fromDisplay = String(missionLike?.employeeDisplay || '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean)
+
+  return Array.from(new Set([primary, ...fromArray, ...fromDisplay].filter(Boolean))).join(', ')
+}
+
 export default function MissionDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -84,6 +97,7 @@ export default function MissionDetails() {
   const [showStatusAttention, setShowStatusAttention] = useState(false)
   const [statusAttentionText, setStatusAttentionText] = useState('')
   const [docViewer, setDocViewer] = useState({ open: false, url: '', type: '', name: '', isPdf: false, downloadUrl: '', publicId: '' })
+  const [groupedEmployeesDisplay, setGroupedEmployeesDisplay] = useState('')
 
   const attachments = useMemo(() => {
     const list = Array.isArray(mission?.attachments) ? mission.attachments : []
@@ -128,7 +142,7 @@ export default function MissionDetails() {
     ;(async () => {
       setIsLoadingMission(true)
       try {
-        const response = await apiFetch(`/missions/${id}`, { auth: true })
+        const response = await apiFetch(`/missions/${id}`, { auth: true, cache: 'no-store' })
         if (!response.ok) {
           setMission(null)
           return
@@ -137,6 +151,7 @@ export default function MissionDetails() {
         setMission(data)
         setStatus(data?.status || 'À faire')
         setNotes(data?.notes || '')
+        setGroupedEmployeesDisplay(buildGroupedEmployeesDisplay(data))
       } catch {
         setMission(null)
       } finally {
@@ -165,15 +180,19 @@ export default function MissionDetails() {
 
     const refresh = async () => {
       try {
-        const missionRes = await apiFetch(`/missions/${mission.id}`, { auth: true })
+        const missionRes = await apiFetch(`/missions/${mission.id}`, { auth: true, cache: 'no-store' })
+        let nextMission = null
         if (missionRes.ok) {
           const data = await missionRes.json()
+          nextMission = data
           const nextStatus = data?.status || 'À faire'
-          setMission((prev) => (prev ? { ...prev, status: nextStatus } : prev))
+          setMission((prev) => (prev ? { ...prev, ...data, status: nextStatus } : data))
           setStatus((prev) => (prev !== nextStatus ? nextStatus : prev))
+          setGroupedEmployeesDisplay(buildGroupedEmployeesDisplay(data))
         }
+
         if (mission.interventionId) {
-          const interventionRes = await apiFetch(`/interventions/${mission.interventionId}`, { auth: true })
+          const interventionRes = await apiFetch(`/interventions/${mission.interventionId}`, { auth: true, cache: 'no-store' })
           if (interventionRes.ok) {
             const iv = await interventionRes.json()
             setIntervention(iv)
@@ -184,7 +203,7 @@ export default function MissionDetails() {
 
     const onFocus = () => refresh()
     window.addEventListener('focus', onFocus)
-    refreshTimerRef.current = window.setInterval(refresh, 15000)
+    refreshTimerRef.current = window.setInterval(refresh, 5000)
     return () => {
       window.removeEventListener('focus', onFocus)
       if (refreshTimerRef.current) window.clearInterval(refreshTimerRef.current)
@@ -258,6 +277,31 @@ export default function MissionDetails() {
             setStatusJustChangedTo('')
             statusAnimTimerRef.current = null
           }, 700)
+          // Pull latest state to reflect synchronized status across grouped missions.
+          if (refreshTimerRef.current) {
+            window.clearInterval(refreshTimerRef.current)
+            refreshTimerRef.current = null
+          }
+          const missionRes = await apiFetch(`/missions/${mission.id}`, { auth: true, cache: 'no-store' })
+          if (missionRes.ok) {
+            const latestMission = await missionRes.json().catch(() => null)
+            if (latestMission) {
+              setMission((prev) => (prev ? { ...prev, ...latestMission, status: latestMission.status || newStatus } : latestMission))
+              setStatus(latestMission.status || newStatus)
+              setGroupedEmployeesDisplay(buildGroupedEmployeesDisplay(latestMission))
+            }
+          }
+          refreshTimerRef.current = window.setInterval(async () => {
+            try {
+              const pollRes = await apiFetch(`/missions/${mission.id}`, { auth: true, cache: 'no-store' })
+              if (!pollRes.ok) return
+              const pollData = await pollRes.json()
+              const nextStatus = pollData?.status || 'À faire'
+              setMission((prev) => (prev ? { ...prev, ...pollData, status: nextStatus } : pollData))
+              setStatus((prev) => (prev !== nextStatus ? nextStatus : prev))
+              setGroupedEmployeesDisplay(buildGroupedEmployeesDisplay(pollData))
+            } catch {}
+          }, 5000)
           setShowSaveToast(`Cette mission est ${newStatus}`)
           setTimeout(() => setShowSaveToast(false), 3000)
         }
@@ -269,16 +313,31 @@ export default function MissionDetails() {
 
   const handleSave = () => {
     setIsSaving(true)
+    const missionId = mission?.id
+    const nextStatus = status
+    const nextNotes = notes
+    if (missionId) {
+      setMission((prev) => (prev ? { ...prev, status: nextStatus, notes: nextNotes } : prev))
+    }
     ;(async () => {
       try {
-        const response = await apiFetch(`/missions/${mission.id}`, {
+        const response = await apiFetch(`/missions/${missionId}`, {
           method: 'PATCH',
-          body: { status, notes },
+          body: { status: nextStatus, notes: nextNotes },
           auth: true,
         })
         if (response.ok) {
-          const saved = await response.json().catch(() => null)
-          if (saved) setMission(saved)
+          await response.json().catch(() => null)
+          const fullRes = await apiFetch(`/missions/${missionId}`, { auth: true, cache: 'no-store' })
+          if (fullRes.ok) {
+            const full = await fullRes.json().catch(() => null)
+            if (full) {
+              setMission((prev) => (prev ? { ...prev, ...full } : full))
+              setStatus(full?.status || nextStatus)
+              setNotes(full?.notes || nextNotes)
+              setGroupedEmployeesDisplay(buildGroupedEmployeesDisplay(full))
+            }
+          }
         }
         setShowSaveToast(true)
         setTimeout(() => setShowSaveToast(false), 3000)
@@ -550,7 +609,7 @@ export default function MissionDetails() {
                     <button 
                       onClick={() => {
                         if (intervention.status === 'CLOSED') setShowInterventionPreview(true)
-                        else navigate(`/interventions/${intervention.id}`, { state: { assignedTechnicianName: mission.employee, missionId: mission.id } })
+                        else navigate(`/interventions/${intervention.id}`, { state: { assignedTechnicianName: mission.employee, missionId: mission.id, fromMissionDetails: true } })
                       }}
                       className={`w-full mt-2 py-3 rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center gap-2 group ${
                         intervention.status === 'CLOSED'
@@ -633,7 +692,7 @@ export default function MissionDetails() {
                       <p className="text-sm font-black text-slate-900">{mission.dueTime || '—'}</p>
                     </div>
                   </div>
-                  <InfoItem label="Employé assigné" value={mission.employee} icon={User} colorClass="text-blue-500" />
+                  <InfoItem label="Employé(s) assigné(s)" value={groupedEmployeesDisplay || mission.employee} icon={User} colorClass="text-blue-500" />
                 </div>
               </div>
             </div>

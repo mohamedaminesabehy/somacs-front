@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, CheckSquare, Package, Wrench,
   FileText, PieChart, History, LogOut, Send,
-  ChevronDown, ChevronRight, List, PlusCircle, ClipboardList,
+  ChevronDown, ChevronRight, List, PlusCircle, ClipboardList, Settings,
 } from 'lucide-react'
 import logo from '../../assets/logo.jpg'
 
@@ -66,7 +66,8 @@ function SidebarContent({ onClose, currentUser, onLogout }) {
     navigate('/login')
   }
 
-  const isTechnicien = currentUser?.role === 'Technicien'
+  const normalizedRole = String(currentUser?.role || '').trim().toLowerCase()
+  const isTechnicien = normalizedRole === 'technicien'
 
   return (
     <>
@@ -94,6 +95,34 @@ function SidebarContent({ onClose, currentUser, onLogout }) {
               Espace Technicien
             </div>
             <div className="space-y-1">
+              <NavLink
+                to="/dashboard/technicien"
+                className={({ isActive }) =>
+                  `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                    isActive
+                      ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  }`
+                }
+                onClick={onClose}
+              >
+                <LayoutDashboard size={20} className="group-hover:scale-110 transition-transform" />
+                <span className="font-medium">Tableau de bord</span>
+              </NavLink>
+              <NavLink
+                to="/machines"
+                className={({ isActive }) =>
+                  `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                    isActive
+                      ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  }`
+                }
+                onClick={onClose}
+              >
+                <Settings size={20} className="group-hover:scale-110 transition-transform" />
+                <span className="font-medium">Parc Machines</span>
+              </NavLink>
               <NavLink
                 to="/missions/my"
                 className={({ isActive }) =>
@@ -146,21 +175,6 @@ function SidebarContent({ onClose, currentUser, onLogout }) {
                 <LayoutDashboard size={20} className="group-hover:scale-110 transition-transform" />
                 <span className="font-medium">Tableau de bord</span>
               </NavLink>
-
-              <NavLink
-                to="/devis"
-                className={({ isActive }) =>
-                  `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
-                    isActive
-                      ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
-                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                  }`
-                }
-                onClick={onClose}
-              >
-                <FileText size={20} className="group-hover:scale-110 transition-transform shrink-0" />
-                <span className="font-medium flex-1">Gestion Devis</span>
-              </NavLink>
             </div>
 
             <div className="mb-8">
@@ -183,32 +197,29 @@ function SidebarContent({ onClose, currentUser, onLogout }) {
                   <span className="font-medium">Utilisateurs</span>
                 </NavLink>
 
+                <NavLink
+                  to="/machines"
+                  className={({ isActive }) =>
+                    `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                      isActive
+                        ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    }`
+                  }
+                  onClick={onClose}
+                >
+                  <Settings size={20} className="group-hover:scale-110 transition-transform" />
+                  <span className="font-medium">Parc Machines</span>
+                </NavLink>
+
                 <SubMenu
                   icon={CheckSquare}
                   label="Missions Terrain"
-                  matchPaths={['/missions/assign', '/missions/my']}
+                  matchPaths={['/missions', '/missions/assign']}
                 >
                   <SubLink to="/missions" end icon={List} label="Liste des missions" onClick={onClose} />
                   <SubLink to="/missions/assign" icon={Send} label="Affecter une mission" onClick={onClose} />
-                  {isTechnicien && <SubLink to="/missions/my" icon={ClipboardList} label="Mes missions" onClick={onClose} />}
                 </SubMenu>
-
-                {isTechnicien && (
-                  <NavLink
-                    to="/stock"
-                    className={({ isActive }) =>
-                      `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
-                        isActive
-                          ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
-                          : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                      }`
-                    }
-                    onClick={onClose}
-                  >
-                    <Package size={20} className="group-hover:scale-110 transition-transform" />
-                    <span className="font-medium">Gestion Stock</span>
-                  </NavLink>
-                )}
               </div>
             </div>
 
@@ -226,16 +237,9 @@ function SidebarContent({ onClose, currentUser, onLogout }) {
                   <SubLink to="/interventions/create" icon={PlusCircle} label="Nouveau dossier" onClick={onClose} />
                   <SubLink to="/interventions/history" icon={History} label="Historique pannes" onClick={onClose} />
                 </SubMenu>
-              </div>
-            </div>
 
-            <div className="mb-8">
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] px-4 mb-4 opacity-80">
-                Finance &amp; Rapports
-              </div>
-              <div className="space-y-1">
                 <NavLink
-                  to="/quotes"
+                  to="/devis"
                   className={({ isActive }) =>
                     `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
                       isActive
@@ -246,21 +250,7 @@ function SidebarContent({ onClose, currentUser, onLogout }) {
                   onClick={onClose}
                 >
                   <FileText size={20} className="group-hover:scale-110 transition-transform" />
-                  <span className="font-medium">Devis &amp; Factures</span>
-                </NavLink>
-                <NavLink
-                  to="/reports"
-                  className={({ isActive }) =>
-                    `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
-                      isActive
-                        ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
-                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                    }`
-                  }
-                  onClick={onClose}
-                >
-                  <PieChart size={20} className="group-hover:scale-110 transition-transform" />
-                  <span className="font-medium">Analyses d'activité</span>
+                  <span className="font-medium">Devis</span>
                 </NavLink>
               </div>
             </div>

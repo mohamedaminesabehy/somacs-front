@@ -45,6 +45,8 @@ function normalizeIntervention(row) {
     id: row?.id,
     status,
     technicianName,
+    assignedEmployeesDisplay: row?.assignedEmployeesDisplay || technicianName,
+    missionId: row?.missionId || null,
     clientName,
     machine,
     siteName,
@@ -63,6 +65,20 @@ function formatClientAddress(client) {
   return zone ? `${city}, ${zone}` : city
 }
 
+function buildAssignedEmployeesDisplay(missionLike, fallback = '') {
+  const primary = String(missionLike?.employee || '').trim()
+  const fromArray = Array.isArray(missionLike?.groupedEmployees)
+    ? missionLike.groupedEmployees.map((name) => String(name || '').trim()).filter(Boolean)
+    : []
+  const fromDisplay = String(missionLike?.employeeDisplay || '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean)
+  const fallbackName = String(fallback || '').trim()
+  const names = Array.from(new Set([primary, ...fromArray, ...fromDisplay, fallbackName].filter(Boolean)))
+  return names.join(', ')
+}
+
 function mapRawToInterventionData(raw) {
   const clientEntity = raw?.clientEntity || null
   const machineEntity = raw?.machineEntity || null
@@ -72,7 +88,7 @@ function mapRawToInterventionData(raw) {
     startTime: raw?.startTime || '',
     endTime: raw?.endTime || '',
     totalTime: raw?.totalTime || '',
-    technicianName: raw?.technicianName || raw?.assignedTo || raw?.assignee || raw?.technician || '',
+    technicianName: raw?.assignedEmployeesDisplay || raw?.technicianName || raw?.assignedTo || raw?.assignee || raw?.technician || '',
     ficheNumber: raw?.ficheNumber || '',
     siteName: raw?.siteName || raw?.site || machineEntity?.site || '',
     clientName: raw?.clientName || raw?.client || clientEntity?.name || '',
@@ -468,17 +484,58 @@ export default function EmployeeHistory() {
           setResolvedRole(found?.role || '')
         }
 
-        const interventionsRes = await apiFetch('/interventions', { auth: true })
+        const [interventionsRes, missionsRes] = await Promise.all([
+          apiFetch('/interventions', { auth: true, cache: 'no-store' }),
+          apiFetch('/missions', { auth: true, cache: 'no-store' }),
+        ])
         if (!interventionsRes.ok) {
           setInterventions([])
           return
         }
         const data = await interventionsRes.json()
+        const missionsData = missionsRes.ok ? await missionsRes.json().catch(() => []) : []
         const list = Array.isArray(data) ? data : []
-        const normalized = list.map(normalizeIntervention)
+        const missionsList = Array.isArray(missionsData) ? missionsData : []
+
+        const missionAggregateByIntervention = new Map()
+        for (const mission of missionsList) {
+          const interventionId = mission?.interventionId
+          if (!interventionId) continue
+          const key = String(interventionId)
+          if (!missionAggregateByIntervention.has(key)) {
+            missionAggregateByIntervention.set(key, { names: new Set(), missionId: mission?.id || null })
+          }
+          const aggregate = missionAggregateByIntervention.get(key)
+          const names = buildAssignedEmployeesDisplay(mission)
+            .split(',')
+            .map((name) => name.trim())
+            .filter(Boolean)
+          names.forEach((name) => aggregate.names.add(name))
+          if (!aggregate.missionId && mission?.id) aggregate.missionId = mission.id
+        }
+
+        const normalized = list.map((row) => {
+          const aggregate = missionAggregateByIntervention.get(String(row?.id || ''))
+          const assignedEmployeesDisplay =
+            aggregate && aggregate.names.size > 0
+              ? Array.from(aggregate.names).join(', ')
+              : String(row?.technicianName || row?.assignedTo || row?.assignee || row?.technician || '')
+          return normalizeIntervention({
+            ...row,
+            assignedEmployeesDisplay,
+            missionId: aggregate?.missionId || null,
+          })
+        })
         const closed = normalized.filter((row) => String(row.status).toUpperCase() === 'CLOSED')
         const byEmployee = resolvedEmployeeName
-          ? closed.filter((row) => String(row.technicianName || '').trim() === String(resolvedEmployeeName).trim())
+          ? closed.filter((row) => {
+              const target = String(resolvedEmployeeName).trim()
+              const names = String(row.assignedEmployeesDisplay || row.technicianName || '')
+                .split(',')
+                .map((name) => name.trim())
+                .filter(Boolean)
+              return names.includes(target)
+            })
           : closed
         setInterventions(byEmployee)
       } catch {
@@ -663,7 +720,7 @@ export default function EmployeeHistory() {
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-sm font-semibold text-slate-900">{row.clientName || '—'}</p>
-                        <p className="text-xs text-slate-500 font-semibold">{row.technicianName || ''}</p>
+                        <p className="text-xs text-slate-500 font-semibold">{row.assignedEmployeesDisplay || row.technicianName || ''}</p>
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-sm font-semibold text-slate-700">{row.machine || '—'}</p>
@@ -688,7 +745,8 @@ export default function EmployeeHistory() {
                               onClick={() =>
                                 navigate(`/interventions/${row.id}`, {
                                   state: {
-                                    assignedTechnicianName: row.technicianName,
+                                    assignedTechnicianName: row.assignedEmployeesDisplay || row.technicianName,
+                                    missionId: row.missionId,
                                     returnTo: `${window.location.pathname}${window.location.search}`,
                                   },
                                 })

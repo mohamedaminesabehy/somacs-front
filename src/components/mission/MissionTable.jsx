@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useState, useEffect, useCallback } from 'react'
+import { forwardRef, useImperativeHandle, useState, useEffect, useCallback, useRef } from 'react'
 import { AlertCircle, Package, ClipboardList, Users, Eye, Edit, Trash2, MapPin, Building2, Phone, Calendar, Wrench, Paperclip, FileText, Clock, UserCheck, Hourglass, Link2, Settings, Download } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 import technicien from '../../assets/technicien.avif'
@@ -33,8 +33,53 @@ function getAvatarFromName(name) {
   return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase()
 }
 
+function getStatusColorKey(status) {
+  if (status === 'En cours') return 'yellow'
+  if (status === 'Terminée') return 'green'
+  if (status === 'Bloquée') return 'red'
+  return 'blue'
+}
+
+function getGroupedEmployeeNames(mission) {
+  const fromDisplay = String(mission?.employeeDisplay || '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean)
+  const fromArray = Array.isArray(mission?.groupedEmployees)
+    ? mission.groupedEmployees.map((name) => String(name || '').trim()).filter(Boolean)
+    : []
+  const primary = String(mission?.employee || '').trim()
+  return Array.from(new Set([...fromDisplay, ...fromArray, primary].filter(Boolean)))
+}
+
+function getGroupedEmployeeStatuses(mission) {
+  const rows = Array.isArray(mission?.groupedEmployeeStatuses) ? mission.groupedEmployeeStatuses : []
+  if (rows.length > 0) {
+    return rows
+      .map((row) => ({
+        name: String(row?.employeeName || '').trim(),
+        status: String(row?.status || '').trim() || 'À faire',
+        notes: String(row?.notes || '').trim(),
+      }))
+      .filter((row) => row.name)
+  }
+
+  const names = getGroupedEmployeeNames(mission)
+  return names.map((name) => ({
+    name,
+    status: String(mission?.status || 'À faire'),
+    notes: String(mission?.notes || '').trim(),
+  }))
+}
+
 function MissionTableInner(props, ref) {
-  const { missions: missionsProp, onMissionsChanged } = props || {}
+  const {
+    missions: missionsProp,
+    onMissionsChanged,
+    onRequestDelete,
+    highlightMissionId,
+    highlightAssignmentGroupId,
+  } = props || {}
   const [missions, setMissions] = useState([])
   const [interventionsList, setInterventionsList] = useState([])
   const [employeeUsers, setEmployeeUsers] = useState([])
@@ -49,6 +94,7 @@ function MissionTableInner(props, ref) {
   const [formDueTime, setFormDueTime] = useState('')
   const [formNotes, setFormNotes] = useState('')
   const [formStatus, setFormStatus] = useState('À faire')
+  const [formEmployeeIds, setFormEmployeeIds] = useState([]) // NOUVEAU: array d'IDs sélectionnés
 
   const [missionType, setMissionType] = useState('Normal')
   const [selectedInterventionId, setSelectedInterventionId] = useState('')
@@ -62,8 +108,12 @@ function MissionTableInner(props, ref) {
   const [viewMission, setViewMission] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 5
+  const highlightRowRef = useRef(null)
 
   const displayMissions = Array.isArray(missionsProp) ? missionsProp : missions
+  const activeHighlightMissionId = String(highlightMissionId || '').trim()
+  const activeHighlightGroupId = String(highlightAssignmentGroupId || '').trim()
+  const hasHighlight = Boolean(activeHighlightMissionId || activeHighlightGroupId)
 
   const fetchMissions = useCallback(async () => {
     try {
@@ -108,11 +158,15 @@ function MissionTableInner(props, ref) {
   }, [])
 
   useEffect(() => {
-    if (!Array.isArray(missionsProp)) {
-      fetchMissions()
-    }
-    fetchInterventions()
-    fetchEmployees()
+    if (typeof window === 'undefined') return
+    const t = window.setTimeout(() => {
+      if (!Array.isArray(missionsProp)) {
+        void fetchMissions()
+      }
+      void fetchInterventions()
+      void fetchEmployees()
+    }, 0)
+    return () => window.clearTimeout(t)
   }, [fetchMissions, fetchInterventions, fetchEmployees, missionsProp])
 
   // Only show PENDING and ASSIGNED interventions in the "Lier à une intervention" dropdown
@@ -128,12 +182,37 @@ function MissionTableInner(props, ref) {
   const endIndex = startIndex + pageSize
   const paginatedMissions = displayMissions.slice(startIndex, endIndex)
 
+  useEffect(() => {
+    if (!hasHighlight) return
+    const idx = displayMissions.findIndex((m) => {
+      if (activeHighlightMissionId && String(m?.id) === activeHighlightMissionId) return true
+      if (activeHighlightGroupId && String(m?.assignmentGroupId || '').trim() === activeHighlightGroupId) return true
+      return false
+    })
+    if (idx < 0) return
+    const nextPage = Math.floor(idx / pageSize) + 1
+    if (nextPage === currentPage) return
+    const t = window.setTimeout(() => setCurrentPage(nextPage), 0)
+    return () => window.clearTimeout(t)
+  }, [activeHighlightGroupId, activeHighlightMissionId, currentPage, displayMissions, hasHighlight, pageSize])
+
+  useEffect(() => {
+    if (!hasHighlight) return
+    const t = window.setTimeout(() => {
+      if (highlightRowRef.current?.scrollIntoView) {
+        highlightRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }, 80)
+    return () => window.clearTimeout(t)
+  }, [hasHighlight, paginatedMissions.length, safeCurrentPage])
+
   const handleOpenCreateModal = () => {
     setModalMode('create')
     setFormMissionId(null)
     setFormTitle('')
     setFormDescription('')
-    setFormEmployee(employeeOptions[0]?.id ? String(employeeOptions[0].id) : '')
+    setFormEmployee('') // Vider pour forcer nouvelle sélection
+    setFormEmployeeIds([]) // NOUVEAU: array vide
     setFormPriority('Moyenne')
     setFormDueDate('')
     setFormDueTime('')
@@ -216,7 +295,17 @@ function MissionTableInner(props, ref) {
   const handleSubmitModal = async (event) => {
     event.preventDefault()
 
-    if (!formTitle || !formDescription || !formEmployee) {
+    if (!formTitle || !formDescription) {
+      alert('Veuillez remplir le titre et la description.')
+      return
+    }
+
+    // Support PLUSIEURS employés
+    const hasMultipleEmployees = Array.isArray(formEmployeeIds) && formEmployeeIds.length > 0
+    const hasSingleEmployee = formEmployee && String(formEmployee).trim() !== ''
+
+    if (!hasMultipleEmployees && !hasSingleEmployee) {
+      alert('Veuillez sélectionner au moins un employé.')
       return
     }
 
@@ -225,6 +314,42 @@ function MissionTableInner(props, ref) {
       return
     }
 
+    // CAS 1: PLUSIEURS employés
+    if (hasMultipleEmployees) {
+      const baseMission = {
+        title: formTitle,
+        description: formDescription,
+        priority: formPriority,
+        status: 'À faire',
+        dueDate: formDueDate || "Aujourd'hui",
+        dueTime: formDueTime || null,
+        notes: formNotes,
+        type: missionType,
+        site: missionType === 'Normal' ? formSite : selectedIntervention?.client,
+        address: missionType === 'Normal' ? formAddress : 'N/A',
+        interventionId: missionType === 'Intervention' ? selectedInterventionId : null,
+        employeeUserIds: formEmployeeIds, // ← ARRAY D'IDs
+      }
+
+      try {
+        const response = await apiFetch('/missions', {
+          method: 'POST',
+          body: baseMission,
+          auth: true,
+        })
+
+        if (response.ok) {
+          if (typeof onMissionsChanged === 'function') onMissionsChanged()
+          else fetchMissions()
+          setIsModalOpen(false)
+        }
+      } catch (error) {
+        console.error('Error saving missions:', error)
+      }
+      return
+    }
+
+    // CAS 2: UN SEUL employé (backward compatible)
     const selectedEmployee = employeeUsers.find((u) => String(u.id) === String(formEmployee)) || null
     const selectedEmployeeName = selectedEmployee?.name || ''
 
@@ -354,11 +479,23 @@ function MissionTableInner(props, ref) {
           {paginatedMissions.map((mission) => {
             const IconComponent = mission.type === 'Intervention' ? Wrench : ClipboardList
             const priorityColor = mission.priority === 'Critique' ? 'red' : mission.priority === 'Haute' ? 'orange' : mission.priority === 'Moyenne' ? 'yellow' : 'gray'
-            const statusColor = mission.status === 'En cours' ? 'yellow' : mission.status === 'Terminée' ? 'green' : mission.status === 'Bloquée' ? 'red' : 'blue'
-            const avatar = getAvatarFromName(mission.employee)
+            const statusColor = getStatusColorKey(mission.status)
+            const employeeDisplay = mission.employeeDisplay || mission.employee
+            const groupedStatuses = getGroupedEmployeeStatuses(mission)
+            const isGroupedMission = groupedStatuses.length > 1
+            const avatar = getAvatarFromName(employeeDisplay)
+            const isHighlighted =
+              (activeHighlightMissionId && String(mission?.id) === activeHighlightMissionId) ||
+              (activeHighlightGroupId && String(mission?.assignmentGroupId || '').trim() === activeHighlightGroupId)
 
             return (
-              <tr key={mission.id} className="hover:bg-gray-50 transition-colors">
+              <tr
+                key={mission.id}
+                ref={isHighlighted ? highlightRowRef : null}
+                className={`transition-colors ${
+                  isHighlighted ? 'bg-emerald-50 ring-2 ring-emerald-200 animate-pulse' : 'hover:bg-gray-50'
+                }`}
+              >
                 <td className="px-4 sm:px-6 py-4">
                   <div className="flex items-start gap-3">
                     <div className={`mt-1 w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${mission.type === 'Intervention' ? 'bg-blue-50' : 'bg-gray-100'}`}>
@@ -380,7 +517,7 @@ function MissionTableInner(props, ref) {
                     <div className="w-8 h-8 rounded-full bg-[#0052CC] text-white flex items-center justify-center text-xs font-bold">
                       {avatar}
                     </div>
-                    <span className="text-sm text-gray-900">{mission.employee}</span>
+                    <span className="text-sm text-gray-900">{employeeDisplay}</span>
                   </div>
                 </td>
                 <td className="px-4 sm:px-6 py-4">
@@ -393,14 +530,34 @@ function MissionTableInner(props, ref) {
                   </span>
                 </td>
                 <td className="px-4 sm:px-6 py-4">
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${statusColors[statusColor]}`}>
-                    {mission.status === 'En cours' && '●'}
-                    {mission.status === 'À faire' && '●'}
-                    {mission.status === 'Terminée' && '✓'}
-                    {mission.status === 'Bloquée' && '⊗'}
-                    {' '}
-                    {mission.status}
-                  </span>
+                  {isGroupedMission ? (
+                    <div className="space-y-1.5 min-w-[180px]">
+                      {groupedStatuses.map((entry) => {
+                        const entryStatusColor = getStatusColorKey(entry.status)
+                        return (
+                        <div key={`${mission.id}_${entry.name}`} className="flex items-center justify-between gap-2">
+                          <span className="text-xs text-gray-700 font-medium truncate">{entry.name}</span>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${statusColors[entryStatusColor]}`}>
+                            {entry.status === 'En cours' && '●'}
+                            {entry.status === 'À faire' && '●'}
+                            {entry.status === 'Terminée' && '✓'}
+                            {entry.status === 'Bloquée' && '⊗'}
+                            {' '}
+                            {entry.status}
+                          </span>
+                        </div>
+                      )})}
+                    </div>
+                  ) : (
+                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${statusColors[statusColor]}`}>
+                      {mission.status === 'En cours' && '●'}
+                      {mission.status === 'À faire' && '●'}
+                      {mission.status === 'Terminée' && '✓'}
+                      {mission.status === 'Bloquée' && '⊗'}
+                      {' '}
+                      {mission.status}
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 sm:px-6 py-4">
                   {mission.type === 'Intervention' ? (
@@ -439,19 +596,22 @@ function MissionTableInner(props, ref) {
                       type="button"
                       className="p-1 text-gray-500 hover:text-red-700 hover:bg-red-50 rounded"
                       onClick={async () => {
-                        if (window.confirm('Êtes-vous sûr de vouloir supprimer cette mission ?')) {
-                          try {
-                            const response = await apiFetch(`/missions/${mission.id}`, {
-                              method: 'DELETE',
-                              auth: true,
-                            })
-                            if (response.ok) {
-                              if (typeof onMissionsChanged === 'function') onMissionsChanged()
-                              else fetchMissions()
-                            }
-                          } catch (error) {
-                            console.error('Error deleting mission:', error)
+                        if (typeof onRequestDelete === 'function') {
+                          onRequestDelete(mission)
+                          return
+                        }
+                        if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette mission ?')) return
+                        try {
+                          const response = await apiFetch(`/missions/${mission.id}`, {
+                            method: 'DELETE',
+                            auth: true,
+                          })
+                          if (response.ok) {
+                            if (typeof onMissionsChanged === 'function') onMissionsChanged()
+                            else fetchMissions()
                           }
+                        } catch (error) {
+                          console.error('Error deleting mission:', error)
                         }
                       }}
                     >
@@ -733,20 +893,67 @@ function MissionTableInner(props, ref) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
                       <div className="space-y-1.5">
-                        <label className="block text-sm font-medium text-gray-700">Employé assigné</label>
-                        <select
-                          value={formEmployee}
-                          onChange={(event) => setFormEmployee(event.target.value)}
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC] bg-white transition-all hover:border-gray-300"
-                          required
-                        >
-                          <option value="">Sélectionner</option>
-                          {employeeOptions.map((employee) => (
-                            <option key={employee.id} value={employee.id}>
-                              {employee.name}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="flex items-center justify-between">
+                          <label className="block text-sm font-medium text-gray-700">
+                            {formEmployeeIds.length > 0 ? 'Employés sélectionnés' : 'Employé assigné (mode simple)'}
+                          </label>
+                          {formEmployeeIds.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setFormEmployeeIds([])}
+                              className="text-xs font-bold text-red-600 hover:text-red-700"
+                            >
+                              Annuler sélection multiple
+                            </button>
+                          )}
+                        </div>
+                        
+                        {/* Mode SIMPLE: Un seul employé */}
+                        {formEmployeeIds.length === 0 && (
+                          <select
+                            value={formEmployee}
+                            onChange={(event) => setFormEmployee(event.target.value)}
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC] bg-white transition-all hover:border-gray-300"
+                          >
+                            <option value="">Sélectionner un employé OU utiliser la sélection multiple ci-dessous</option>
+                            {employeeOptions.map((employee) => (
+                              <option key={employee.id} value={employee.id}>
+                                {employee.name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        
+                        {/* Mode MULTIPLE: Checkboxes */}
+                        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50/50 space-y-2 max-h-64 overflow-y-auto">
+                          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-3">
+                            Sélectionner PLUSIEURS employés pour créer une mission groupée:
+                          </p>
+                          {employeeOptions.length === 0 ? (
+                            <p className="text-sm text-gray-500">Aucun employé disponible</p>
+                          ) : (
+                            employeeOptions.map((employee) => (
+                              <label key={employee.id} className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded transition-colors">
+                                <input
+                                  type="checkbox"
+                                  checked={formEmployeeIds.includes(employee.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setFormEmployeeIds((prev) => [...prev, employee.id])
+                                    } else {
+                                      setFormEmployeeIds((prev) => prev.filter((id) => id !== employee.id))
+                                    }
+                                  }}
+                                  className="w-4 h-4 rounded border-gray-300 text-[#0052CC] focus:ring-2 focus:ring-[#0052CC] cursor-pointer"
+                                />
+                                <span className="text-sm text-gray-700 font-medium">{employee.name}</span>
+                                {formEmployeeIds.includes(employee.id) && (
+                                  <span className="ml-auto text-xs font-bold text-[#0052CC] bg-blue-50 px-2 py-1 rounded">✓ Sélectionné</span>
+                                )}
+                              </label>
+                            ))
+                          )}
+                        </div>
                       </div>
                       {modalMode === 'edit' && (
                         <div className="space-y-1.5">
@@ -934,9 +1141,9 @@ function MissionTableInner(props, ref) {
       {/* ═══ VIEW MODAL ═══ */}
       {isViewOpen && viewMission && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-          <div className="w-full max-w-lg bg-white rounded-xl shadow-2xl overflow-hidden">
+          <div className="w-full max-w-lg bg-white rounded-xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
             {/* View Header */}
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white">
+            <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
               <div className="flex items-center gap-3">
                 <img
                   src={technicien}
@@ -945,8 +1152,8 @@ function MissionTableInner(props, ref) {
                   className="w-12 h-12 rounded-full object-cover shadow-inner"
                 />
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">{viewMission.employee}</h2>
-                  <p className="text-xs text-gray-500 font-medium">Responsable de la mission</p>
+                  <h2 className="text-xl font-bold text-gray-900">{viewMission.employeeDisplay || viewMission.employee}</h2>
+                  <p className="text-xs text-gray-500 font-medium">Employé(s) assigné(s)</p>
                 </div>
               </div>
               <button
@@ -958,7 +1165,7 @@ function MissionTableInner(props, ref) {
             </div>
 
             {/* View Body */}
-            <div className="p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
               <div className="grid grid-cols-1 gap-6">
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Titre de la mission</p>
@@ -979,7 +1186,7 @@ function MissionTableInner(props, ref) {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Priorité</p>
                     <span
@@ -994,19 +1201,39 @@ function MissionTableInner(props, ref) {
                   </div>
                   <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Statut</p>
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusColors[viewMission.statusColor]}`}
-                    >
-                      {viewMission.status === 'En cours' && '● '}
-                      {viewMission.status === 'À faire' && '● '}
-                      {viewMission.status === 'Terminée' && '✓ '}
-                      {viewMission.status === 'Bloquée' && '⊗ '}
-                      {viewMission.status}
-                    </span>
+                    {getGroupedEmployeeStatuses(viewMission).length > 1 ? (
+                      <div className="space-y-1.5">
+                        {getGroupedEmployeeStatuses(viewMission).map((entry) => {
+                          const entryStatusColor = getStatusColorKey(entry.status)
+                          return (
+                            <div key={`${viewMission.id}_${entry.name}`} className="flex items-center justify-between gap-2">
+                              <span className="text-xs text-gray-700 font-medium truncate">{entry.name}</span>
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap ${statusColors[entryStatusColor]}`}>
+                                {entry.status === 'En cours' && '● '}
+                                {entry.status === 'À faire' && '● '}
+                                {entry.status === 'Terminée' && '✓ '}
+                                {entry.status === 'Bloquée' && '⊗ '}
+                                {entry.status}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusColors[viewMission.statusColor]}`}
+                      >
+                        {viewMission.status === 'En cours' && '● '}
+                        {viewMission.status === 'À faire' && '● '}
+                        {viewMission.status === 'Terminée' && '✓ '}
+                        {viewMission.status === 'Bloquée' && '⊗ '}
+                        {viewMission.status}
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="flex items-start gap-3">
                     <div className="mt-1 p-2 bg-blue-50 rounded-lg">
                       <Calendar size={16} className="text-[#0052CC]" />
@@ -1023,9 +1250,20 @@ function MissionTableInner(props, ref) {
                     </div>
                     <div className="min-w-0">
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Note technicien</p>
-                      <p className="text-sm font-semibold text-gray-900 break-words">
-                        {viewMission.notes || '—'}
-                      </p>
+                      {getGroupedEmployeeStatuses(viewMission).length > 1 ? (
+                        <div className="mt-1 space-y-1.5">
+                          {getGroupedEmployeeStatuses(viewMission).map((entry) => (
+                            <div key={`${viewMission.id}_note_${entry.name}`} className="flex items-start justify-between gap-3">
+                              <span className="text-xs text-gray-700 font-semibold whitespace-nowrap">{entry.name}</span>
+                              <span className="text-xs text-gray-900 break-words text-right">{entry.notes || '—'}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm font-semibold text-gray-900 break-words">
+                          {viewMission.notes || '—'}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1035,7 +1273,7 @@ function MissionTableInner(props, ref) {
                     <div className="flex items-center justify-between gap-3 mb-3">
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Documents</p>
                       <div className="text-[10px] font-bold text-gray-400 truncate">
-                        {viewMission.employee} · {viewMission.dueDate}{viewMission.dueTime ? ` ${viewMission.dueTime}` : ''}
+                        {(viewMission.employeeDisplay || viewMission.employee)} · {viewMission.dueDate}{viewMission.dueTime ? ` ${viewMission.dueTime}` : ''}
                       </div>
                     </div>
                     <div className="space-y-3">
@@ -1097,7 +1335,7 @@ function MissionTableInner(props, ref) {
                 )}
 
                 {(viewMission.site || viewMission.address) && (
-                  <div className="pt-4 border-t border-gray-100 flex items-center gap-4">
+                  <div className="pt-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                     {viewMission.site && (
                       <div className="flex items-center gap-2 text-xs text-gray-600">
                         <Building2 size={14} className="text-gray-400" />
@@ -1107,7 +1345,7 @@ function MissionTableInner(props, ref) {
                     {viewMission.address && (
                       <div className="flex items-center gap-2 text-xs text-gray-600">
                         <MapPin size={14} className="text-gray-400" />
-                        <span className="font-medium truncate max-w-[200px]">{viewMission.address}</span>
+                        <span className="font-medium break-words">{viewMission.address}</span>
                       </div>
                     )}
                   </div>
@@ -1116,7 +1354,7 @@ function MissionTableInner(props, ref) {
             </div>
 
             {/* View Footer */}
-            <div className="px-6 py-4 bg-gray-50 flex justify-end">
+            <div className="px-4 sm:px-6 py-4 bg-gray-50 flex justify-end">
               <button
                 type="button"
                 onClick={handleCloseViewModal}

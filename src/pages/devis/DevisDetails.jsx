@@ -62,6 +62,62 @@ const toNumber = (value, fallback = 0) => {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
+const normalizeRate = (value) => Math.max(0, toNumber(value, 0))
+
+const extractTauxFromCode = (codeTva) => {
+  if (!codeTva) return 0
+  const match = String(codeTva).match(/(\d+(?:\.\d+)?)/)
+  if (match) return parseFloat(match[1])
+  return 0
+}
+
+const resolveTVA = (line) => {
+  const taux = normalizeRate(line?.TVA)
+  if (taux > 0) return taux
+  return extractTauxFromCode(line?.CodeTVA)
+}
+
+const getLineNetHT = (line) => {
+  const fromApi = toNumber(line?.Total_HT, NaN)
+  if (Number.isFinite(fromApi) && fromApi >= 0) return fromApi
+  const alt = toNumber(line?.TotalNetHT, NaN)
+  if (Number.isFinite(alt) && alt >= 0) return alt
+  const qte = Math.max(0, toNumber(line?.Qte))
+  const pu = Math.max(0, toNumber(line?.PU_HT))
+  const remise = normalizeRate(line?.Remise)
+  return qte * pu * (1 - remise / 100)
+}
+
+const computeTotals = (lines, footer = [], header = {}) => {
+  const articleLines = (Array.isArray(lines) ? lines : []).filter((d) => (d?.Code || d?.Designation) && toNumber(d?.Qte) > 0)
+
+  const totalHTBrut = articleLines.reduce((acc, d) => acc + toNumber(d.Qte) * toNumber(d.PU_HT), 0)
+  const totalRemise = articleLines.reduce(
+    (acc, d) => acc + toNumber(d.Qte) * toNumber(d.PU_HT) * (normalizeRate(d.Remise) / 100),
+    0,
+  )
+  const totalNetHT = articleLines.reduce((acc, d) => acc + getLineNetHT(d), 0)
+  const computedTVA = articleLines.reduce((acc, d) => acc + getLineNetHT(d) * (resolveTVA(d) / 100), 0)
+
+  const footerRows = Array.isArray(footer) ? footer : []
+  const footerTVA = footerRows.reduce((acc, f) => acc + toNumber(f?.Montant_TVA), 0)
+  const totalTVA = footerRows.length > 0 ? footerTVA : computedTVA
+
+  const timbreCandidates = [
+    header?.TIMBRE,
+    header?.Timbre,
+    header?.DROITTIMBRE,
+    header?.DroitTimbre,
+    header?.DROIT_TIMBRE,
+  ]
+  const timbreParsed = timbreCandidates.map((v) => toNumber(v, NaN)).find((v) => Number.isFinite(v) && v >= 0)
+  const timbre = Number.isFinite(timbreParsed) ? timbreParsed : 1.0
+
+  const totalTTC = totalNetHT + totalTVA + timbre
+
+  return { totalHTBrut, totalRemise, totalNetHT, totalTVA, timbre, totalTTC }
+}
+
 const normalizeDevisPayload = (payload) => {
   const toText = (value, fallback = '') => {
     if (value === null || value === undefined) {
@@ -113,6 +169,7 @@ function DevisFiche({ data }) {
   if (!data || !data.header) return null
 
   const { header, details, footer } = data
+  const totals = computeTotals(details, footer, header)
 
   return (
     <div className="bg-white shadow-2xl px-7 pt-5 pb-8 relative overflow-hidden border border-slate-300 text-slate-900 leading-tight" 
@@ -232,27 +289,27 @@ function DevisFiche({ data }) {
           <div className="flex flex-col gap-1 text-[10px]">
             <div className="flex justify-between px-2">
               <span className="font-bold">Total HT Brut :</span>
-              <span className="font-black">{formatPrice(header.TotNetHT + header.TOTREM)}</span>
+              <span className="font-black">{formatPrice(totals.totalHTBrut)}</span>
             </div>
             <div className="flex justify-between px-2">
               <span className="font-bold">Total Remise :</span>
-              <span className="font-black">{formatPrice(header.TOTREM)}</span>
+              <span className="font-black">{formatPrice(totals.totalRemise)}</span>
             </div>
             <div className="flex justify-between px-2">
               <span className="font-bold">Total Net HT :</span>
-              <span className="font-black">{formatPrice(header.TotNetHT)}</span>
+              <span className="font-black">{formatPrice(totals.totalNetHT)}</span>
             </div>
             <div className="flex justify-between px-2">
               <span className="font-bold">Total TVA :</span>
-              <span className="font-black">{formatPrice(header.TOTTAX)}</span>
+              <span className="font-black">{formatPrice(totals.totalTVA)}</span>
             </div>
             <div className="flex justify-between px-2">
               <span className="font-bold">Droit Timbre :</span>
-              <span className="font-black">1.000</span>
+              <span className="font-black">{formatPrice(totals.timbre)}</span>
             </div>
             <div className="flex justify-between bg-slate-50 border border-slate-900 p-1 px-2 mt-1">
               <span className="font-black uppercase">TOTAL TTC</span>
-              <span className="font-black">{formatPrice(header.TOTTTCDV)}</span>
+              <span className="font-black">{formatPrice(totals.totalTTC)}</span>
             </div>
           </div>
         </div>
@@ -369,6 +426,7 @@ export default function DevisDetails() {
   }
 
   const { header, details, footer } = data
+  const totals = computeTotals(details, footer, header)
 
   return (
     <div className="p-4 sm:p-6 bg-[#f8fafc] min-h-screen">
@@ -549,17 +607,29 @@ export default function DevisDetails() {
               </div>
               <div className="p-6 space-y-4">
                 <div className="flex justify-between items-center border-b border-white/10 pb-3">
-                  <span className="text-white/70 font-bold uppercase text-[10px] tracking-widest">Total Net HT</span>
-                  <span className="text-lg font-black">{formatCurrency(header.TotNetHT)}</span>
+                  <span className="text-white/70 font-bold uppercase text-[10px] tracking-widest">Total HT brut</span>
+                  <span className="text-lg font-black">{formatCurrency(totals.totalHTBrut)}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                  <span className="text-white/70 font-bold uppercase text-[10px] tracking-widest">Total remise</span>
+                  <span className="text-lg font-black">{formatCurrency(totals.totalRemise)}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                  <span className="text-white/70 font-bold uppercase text-[10px] tracking-widest">Total net HT</span>
+                  <span className="text-lg font-black">{formatCurrency(totals.totalNetHT)}</span>
                 </div>
                 <div className="flex justify-between items-center border-b border-white/10 pb-3">
                   <span className="text-white/70 font-bold uppercase text-[10px] tracking-widest">Total TVA</span>
-                  <span className="text-lg font-black">{formatCurrency(header.TOTTAX)}</span>
+                  <span className="text-lg font-black">{formatCurrency(totals.totalTVA)}</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                  <span className="text-white/70 font-bold uppercase text-[10px] tracking-widest">Droit de timbre</span>
+                  <span className="text-lg font-black">{formatCurrency(totals.timbre)}</span>
                 </div>
                 <div className="flex justify-between items-center pt-2">
                   <span className="text-white font-black uppercase text-xs tracking-[0.2em]">Total TTC</span>
                   <div className="text-right">
-                    <span className="text-3xl font-black block">{formatCurrency(header.TOTTTCDV)}</span>
+                    <span className="text-3xl font-black block">{formatCurrency(totals.totalTTC)}</span>
                     <span className="text-[10px] font-bold text-white/60">Dinars Tunisiens</span>
                   </div>
                 </div>

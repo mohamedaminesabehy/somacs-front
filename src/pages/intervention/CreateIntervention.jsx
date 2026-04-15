@@ -40,6 +40,17 @@ const steps = [
   { id: 4, title: 'Validation', description: 'Clôture dossier', icon: ClipboardCheck },
 ]
 
+function generateFicheNumber() {
+  const d = new Date()
+  const yyyy = String(d.getFullYear())
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const HH = String(d.getHours()).padStart(2, '0')
+  const MM = String(d.getMinutes()).padStart(2, '0')
+  const SS = String(d.getSeconds()).padStart(2, '0')
+  return `${yyyy}/${mm}/${dd} ${HH}${MM}${SS}`
+}
+
 // ── Shared fiche content (identical layout for both desktop preview and mobile modal) ──
 function FicheContent({ interventionData, parts, laborPrice, logo }) {
   return (
@@ -311,12 +322,20 @@ function MobilePreviewModal({ onClose, interventionData, parts, laborPrice, logo
   useEffect(() => {
     computeScale()
     window.addEventListener('resize', computeScale)
-    return () => window.removeEventListener('resize', computeScale)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', computeScale)
+    }
+    return () => {
+      window.removeEventListener('resize', computeScale)
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', computeScale)
+      }
+    }
   }, [computeScale])
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 xl:hidden animate-in fade-in duration-300">
-      <div className="bg-white w-full max-w-2xl h-[92vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl">
+      <div className="bg-white w-[min(100%,42rem)] h-[92dvh] max-h-[92dvh] rounded-3xl overflow-hidden flex flex-col shadow-2xl">
         {/* Header */}
         <div className="px-5 py-4 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -367,10 +386,12 @@ function MobilePreviewModal({ onClose, interventionData, parts, laborPrice, logo
 export default function CreateIntervention() {
   const navigate = useNavigate()
   const [currentStep, setCurrentStep] = useState(1)
+  const [uiZoomPercent, setUiZoomPercent] = useState(100)
   const [showMobilePreview, setShowMobilePreview] = useState(false)
   const [isClientModalOpen, setIsClientModalOpen] = useState(false)
   const [isMachineModalOpen, setIsMachineModalOpen] = useState(false)
-  const [formData, setFormData] = useState({
+  const baseDprRef = useRef(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
+  const [formData, setFormData] = useState(() => ({
     clientId: '',
     clientName: '',
     clientCode: '',
@@ -390,12 +411,12 @@ export default function CreateIntervention() {
     interventionType: 'Réparation',
     interventionDate: new Date().toISOString().split('T')[0],
     totalTime: '',
-    ficheNumber: '',
+    ficheNumber: generateFicheNumber(),
     technicianName: '',
     numEssai: '',
     essaiConcluant: null,
     laborPrice: ''
-  })
+  }))
   const previewInterventionData = {
     ...formData,
     startTime: '',
@@ -405,16 +426,47 @@ export default function CreateIntervention() {
   const previewLaborPrice = Number(formData.laborPrice) || ''
 
   useEffect(() => {
-    if (formData.ficheNumber) return
-    const d = new Date()
-    const yyyy = String(d.getFullYear())
-    const mm = String(d.getMonth() + 1).padStart(2, '0')
-    const dd = String(d.getDate()).padStart(2, '0')
-    const HH = String(d.getHours()).padStart(2, '0')
-    const MM = String(d.getMinutes()).padStart(2, '0')
-    const SS = String(d.getSeconds()).padStart(2, '0')
-    setFormData((prev) => ({ ...prev, ficheNumber: `${yyyy}/${mm}/${dd} ${HH}${MM}${SS}` }))
-  }, [formData.ficheNumber])
+    if (typeof window === 'undefined') return undefined
+
+    const toPercent = (value) => {
+      const n = Number(value)
+      if (!Number.isFinite(n) || n <= 0) return null
+      return Math.round(n * 100)
+    }
+
+    const computeZoomPercent = () => {
+      const base = baseDprRef.current || 1
+      const current = window.devicePixelRatio || 1
+      const byDpr = Math.round((current / base) * 100)
+
+      const byWindowRatio =
+        window.innerWidth > 0 && window.outerWidth > 0
+          ? Math.round((window.outerWidth / window.innerWidth) * 100)
+          : null
+
+      const viewportScale = window.visualViewport?.scale
+      const byViewport = toPercent(viewportScale)
+
+      // Prefer sources that actually change with browser zoom.
+      let next = byWindowRatio
+      if (!next || next === 100) next = byViewport
+      if (!next || next === 100) next = byDpr
+      if (!next || !Number.isFinite(next)) next = 100
+
+      setUiZoomPercent(next)
+    }
+
+    computeZoomPercent()
+    window.addEventListener('resize', computeZoomPercent)
+    window.visualViewport?.addEventListener('resize', computeZoomPercent)
+
+    return () => {
+      window.removeEventListener('resize', computeZoomPercent)
+      window.visualViewport?.removeEventListener('resize', computeZoomPercent)
+    }
+  }, [])
+
+  const useHorizontalProgress = uiZoomPercent > 80
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -429,7 +481,9 @@ export default function CreateIntervention() {
       clientCode: client.code,
       clientPhone: client.phone,
       clientEmail: client.email,
-      clientAddress: `${client.city}${client.zone ? `, ${client.zone}` : ''}`
+      clientAddress: String(client.address || '').trim()
+        ? String(client.address || '').trim()
+        : `${client.city}${client.zone ? `, ${client.zone}` : ''}`
     }))
   }
 
@@ -439,9 +493,9 @@ export default function CreateIntervention() {
       machineId: machine.id,
       machineType: machine.designation,
       machineBrand: machine.brand,
-      machineModel: machine.year, // Using year as model as requested or appropriate
+      machineModel: String(machine.model || '').trim() ? machine.model : machine.year,
       serialNumber: machine.serialNumber,
-      siteName: machine.site
+      siteName: String(prev.siteName || '').trim() ? prev.siteName : (machine.site || '')
     }))
   }
 
@@ -450,6 +504,10 @@ export default function CreateIntervention() {
 
   const createIntervention = async () => {
     try {
+      if (!formData.clientId || !formData.machineId) {
+        alert('Veuillez sélectionner un client et une machine avant de créer le dossier.')
+        return
+      }
       const response = await apiFetch('/interventions', {
         method: 'POST',
         body: {
@@ -459,9 +517,7 @@ export default function CreateIntervention() {
           ficheNumber: formData.ficheNumber,
           totalTime: formData.totalTime,
           siteName: formData.siteName,
-          clientAddress: formData.clientAddress,
           requestorName: formData.requestorName,
-          machineModel: formData.machineModel,
           problemDescription: formData.problemDescription,
           telephoneDiagnostic: formData.telephoneDiagnostic,
           interventionType: formData.interventionType,
@@ -481,7 +537,7 @@ export default function CreateIntervention() {
       const createdId = created?.id
       const highlight = createdId ? `?highlight=${encodeURIComponent(createdId)}&toast=created` : '?toast=created'
       navigate(`/interventions${highlight}`, { state: { createdInterventionId: createdId } })
-    } catch (error) {
+    } catch {
       alert('Impossible de joindre le serveur.')
     }
   }
@@ -491,7 +547,7 @@ export default function CreateIntervention() {
       case 1:
         return (
           <div className="space-y-10 animate-in fade-in zoom-in-95 duration-500">
-            <div className="pb-6 border-b-2 border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="pb-6 border-b-2 border-slate-100 flex flex-col items-start gap-4">
               <div>
                 <h2 className="text-2xl font-black text-slate-900 mb-2 flex items-center gap-3">
                   <Building2 className="text-[#0052CC]" size={28} />
@@ -502,7 +558,7 @@ export default function CreateIntervention() {
               <button
                 type="button"
                 onClick={() => setIsClientModalOpen(true)}
-                className="flex items-center justify-center gap-2 px-6 py-3.5 bg-[#0052CC] hover:bg-blue-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl shadow-blue-100 shrink-0"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 min-h-12 w-fit whitespace-nowrap bg-[#0052CC] hover:bg-blue-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider leading-none transition-colors shadow-xl shadow-blue-100 shrink-0"
               >
                 <Users size={18} />
                 Créer / Sélectionner Client
@@ -523,7 +579,7 @@ export default function CreateIntervention() {
                     name="clientName"
                     value={formData.clientName}
                     onChange={handleChange}
-                    readOnly={Boolean(formData.clientId)}
+                    readOnly
                     placeholder="Ex: Garage Automobile Central"
                     className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
                     required
@@ -542,7 +598,7 @@ export default function CreateIntervention() {
                     name="clientCode"
                     value={formData.clientCode}
                     onChange={handleChange}
-                    readOnly={Boolean(formData.clientId)}
+                    readOnly
                     placeholder="CLT-2026-001"
                     className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
                   />
@@ -577,6 +633,7 @@ export default function CreateIntervention() {
                     name="clientPhone"
                     value={formData.clientPhone}
                     onChange={handleChange}
+                    readOnly
                     placeholder="+216 XX XXX XXX"
                     className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
                   />
@@ -594,7 +651,7 @@ export default function CreateIntervention() {
                     name="clientEmail"
                     value={formData.clientEmail}
                     onChange={handleChange}
-                    readOnly={Boolean(formData.clientId)}
+                    readOnly
                     placeholder="contact@exemple.com"
                     className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
                   />
@@ -627,6 +684,7 @@ export default function CreateIntervention() {
                     name="clientAddress"
                     value={formData.clientAddress}
                     onChange={handleChange}
+                    readOnly
                     placeholder="Saisissez l'adresse physique complète : rue, ville, code postal..."
                     className="w-full px-5 py-4 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal h-32 resize-none shadow-sm hover:border-slate-300 leading-relaxed"
                   />
@@ -638,7 +696,7 @@ export default function CreateIntervention() {
       case 2:
         return (
           <div className="space-y-10 animate-in fade-in zoom-in-95 duration-500">
-            <div className="pb-6 border-b-2 border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="pb-6 border-b-2 border-slate-100 flex flex-col items-start gap-4">
               <div>
                 <h2 className="text-2xl font-black text-slate-900 mb-2 flex items-center gap-3">
                   <Settings className="text-orange-500" size={28} />
@@ -649,7 +707,7 @@ export default function CreateIntervention() {
               <button
                 type="button"
                 onClick={() => setIsMachineModalOpen(true)}
-                className="flex items-center justify-center gap-2 px-6 py-3.5 bg-orange-600 hover:bg-orange-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl shadow-orange-100 shrink-0"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 min-h-12 w-fit whitespace-nowrap bg-orange-600 hover:bg-orange-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider leading-none transition-colors shadow-xl shadow-orange-100 shrink-0"
               >
                 <Cpu size={18} />
                 Créer / Choisir Machine
@@ -670,7 +728,7 @@ export default function CreateIntervention() {
                     name="machineType"
                     value={formData.machineType}
                     onChange={handleChange}
-                    readOnly={Boolean(formData.machineId)}
+                    readOnly
                     placeholder="Ex: Pont Élévateur 4 Colonnes"
                     className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
                     required
@@ -688,7 +746,7 @@ export default function CreateIntervention() {
                     name="machineBrand"
                     value={formData.machineBrand}
                     onChange={handleChange}
-                    readOnly={Boolean(formData.machineId)}
+                    readOnly
                     placeholder="Ex: Ravaglioli, Hofmann, etc."
                     className="w-full px-5 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
                   />
@@ -705,7 +763,7 @@ export default function CreateIntervention() {
                     name="machineModel"
                     value={formData.machineModel}
                     onChange={handleChange}
-                    readOnly={Boolean(formData.machineId)}
+                    readOnly
                     placeholder="Ex: RAV-3000, KPH-370"
                     className="w-full px-5 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
                   />
@@ -723,7 +781,7 @@ export default function CreateIntervention() {
                     name="serialNumber"
                     value={formData.serialNumber}
                     onChange={handleChange}
-                    readOnly={Boolean(formData.machineId)}
+                    readOnly
                     placeholder="SN-123456789"
                     className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-slate-800 font-bold font-mono placeholder:text-slate-400 placeholder:font-normal tracking-wider shadow-sm hover:border-slate-300"
                   />
@@ -924,7 +982,7 @@ export default function CreateIntervention() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 overflow-x-hidden">
 
       {/* ── Header ── */}
       <div className="bg-white border-b-2 border-slate-200 px-4 sm:px-8 py-4 sm:py-6 flex items-center justify-between shrink-0 shadow-sm">
@@ -957,7 +1015,7 @@ export default function CreateIntervention() {
       </div>
 
       {/* ── Mobile / Tablet horizontal stepper ── */}
-      <div className="lg:hidden bg-white border-b border-slate-100 px-4 py-3 shrink-0">
+      <div className={`${useHorizontalProgress ? 'bg-white border-b border-slate-100 px-4 py-3 shrink-0' : 'lg:hidden bg-white border-b border-slate-100 px-4 py-3 shrink-0'}`}>
         <div className="flex items-center justify-between max-w-lg mx-auto">
           {steps.map((step, index) => {
             const isActive = currentStep === step.id
@@ -986,10 +1044,10 @@ export default function CreateIntervention() {
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden min-w-0">
 
         {/* ── Desktop left stepper sidebar ── */}
-        <div className="hidden lg:flex w-[320px] border-r border-slate-50 bg-slate-50/30 flex-col p-8 shrink-0">
+        <div className={`${useHorizontalProgress ? 'hidden' : 'hidden lg:flex w-[320px] border-r border-slate-50 bg-slate-50/30 flex-col p-8 shrink-0 min-w-0'}`}>
           <div className="space-y-2 mb-12">
             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Progression</h4>
             <div className="h-1 w-12 bg-[#0052CC] rounded-full"></div>
@@ -1028,8 +1086,8 @@ export default function CreateIntervention() {
         </div>
 
         {/* ── Form area ── */}
-        <div className="flex-1 overflow-y-auto no-scrollbar bg-white flex flex-col">
-          <div className="flex-1 px-4 sm:px-8 md:px-12 py-8 sm:py-12 md:py-16 max-w-4xl mx-auto w-full">
+        <div className="flex-1 overflow-y-auto no-scrollbar bg-white flex flex-col min-w-0">
+          <div className="flex-1 px-4 sm:px-8 md:px-12 py-8 sm:py-12 md:py-16 max-w-4xl mx-auto w-full min-w-0">
             <form
               onSubmit={(e) => {
                 e.preventDefault()
@@ -1097,7 +1155,7 @@ export default function CreateIntervention() {
         </div>
 
         {/* ── Desktop fiche preview ── */}
-        <div className="hidden xl:flex w-[620px] bg-slate-100 border-l border-slate-200 flex-col items-center justify-start overflow-y-auto no-scrollbar py-8 px-6">
+        <div className="hidden xl:flex w-[620px] bg-slate-100 border-l border-slate-200 flex-col items-center justify-start overflow-y-auto no-scrollbar py-8 px-6 min-w-0">
           <div className="w-full space-y-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Aperçu de la fiche officielle</h4>

@@ -277,6 +277,20 @@ function formatClientAddress(client) {
   return zone ? `${city}, ${zone}` : city
 }
 
+function buildAssignedEmployeesDisplay(missionLike, fallback = '') {
+  const primary = String(missionLike?.employee || '').trim()
+  const fromArray = Array.isArray(missionLike?.groupedEmployees)
+    ? missionLike.groupedEmployees.map((name) => String(name || '').trim()).filter(Boolean)
+    : []
+  const fromDisplay = String(missionLike?.employeeDisplay || '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean)
+  const fallbackName = String(fallback || '').trim()
+  const names = Array.from(new Set([primary, ...fromArray, ...fromDisplay, fallbackName].filter(Boolean)))
+  return names.join(', ')
+}
+
 function mapEntryToInterventionData(entry, assignedTechnicianName) {
   const clientEntity = entry?.clientEntity || null
   const machineEntity = entry?.machineEntity || null
@@ -588,12 +602,20 @@ function MobilePreviewModal({ onClose, interventionData, parts, laborPrice, logo
   useEffect(() => {
     computeScale()
     window.addEventListener('resize', computeScale)
-    return () => window.removeEventListener('resize', computeScale)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', computeScale)
+    }
+    return () => {
+      window.removeEventListener('resize', computeScale)
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', computeScale)
+      }
+    }
   }, [computeScale])
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 xl:hidden animate-in fade-in duration-300">
-      <div className="bg-white w-full max-w-2xl h-[92vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl">
+      <div className="bg-white w-[min(100%,42rem)] h-[92dvh] max-h-[92dvh] rounded-3xl overflow-hidden flex flex-col shadow-2xl">
         {/* Header */}
         <div className="px-5 py-4 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -664,12 +686,16 @@ export default function InterventionDetails() {
   const [completedUpTo, setCompletedUpTo] = useState(() => (dbEntry?.completedUpToSection || 1))
 
   const [activeSection, setActiveSection] = useState(() => statusToSection[dbEntry?.status] || 1)
+  const [uiZoomPercent, setUiZoomPercent] = useState(100)
   const [status, setStatus] = useState(dbEntry?.status || 'PENDING')
   const [isEditing, setIsEditing] = useState(() => (isReadOnlyView ? false : (isEmployeeHistoryEditFlow ? true : (dbEntry?.status || 'PENDING') !== 'CLOSED')))
   const [laborPrice, setLaborPrice] = useState(dbEntry?.laborPrice || 0)
   const [showMobilePreview, setShowMobilePreview] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [interventionData, setInterventionData] = useState(() => mapEntryToInterventionData(dbEntry, assignedTechnicianName))
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false)
+  const [assignedMissionEmployees, setAssignedMissionEmployees] = useState(() => assignedTechnicianName)
+  const [interventionData, setInterventionData] = useState(() => mapEntryToInterventionData(dbEntry, assignedMissionEmployees || assignedTechnicianName))
+  const baseDprRef = useRef(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
 
   const selectedClient = useMemo(
     () => clients.find((c) => String(c.id) === String(interventionData.clientId)),
@@ -740,13 +766,65 @@ export default function InterventionDetails() {
   }, [])
 
   useEffect(() => {
+    let cancelled = false
+
+    ;(async () => {
+      try {
+        if (missionId) {
+          const response = await apiFetch(`/missions/${missionId}`, { cache: 'no-store' })
+          if (!response.ok) {
+            if (!cancelled) setAssignedMissionEmployees(assignedTechnicianName)
+            return
+          }
+          const missionData = await response.json()
+          if (!cancelled) {
+            setAssignedMissionEmployees(buildAssignedEmployeesDisplay(missionData, assignedTechnicianName))
+          }
+          return
+        }
+
+        const listResponse = await apiFetch('/missions', { cache: 'no-store' })
+        if (!listResponse.ok) {
+          if (!cancelled) setAssignedMissionEmployees(assignedTechnicianName)
+          return
+        }
+        const missions = await listResponse.json().catch(() => [])
+        const rows = Array.isArray(missions) ? missions : []
+        const linkedRows = rows.filter((m) => String(m?.interventionId || '') === String(id))
+        if (linkedRows.length === 0) {
+          if (!cancelled) setAssignedMissionEmployees(assignedTechnicianName)
+          return
+        }
+
+        const names = new Set()
+        for (const row of linkedRows) {
+          const display = buildAssignedEmployeesDisplay(row, assignedTechnicianName)
+            .split(',')
+            .map((name) => name.trim())
+            .filter(Boolean)
+          display.forEach((name) => names.add(name))
+        }
+        if (!cancelled) {
+          setAssignedMissionEmployees(names.size > 0 ? Array.from(names).join(', ') : assignedTechnicianName)
+        }
+      } catch {
+        if (!cancelled) setAssignedMissionEmployees(assignedTechnicianName)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [missionId, assignedTechnicianName, id])
+
+  useEffect(() => {
     setCompletedUpTo(dbEntry?.completedUpToSection || 1)
     setActiveSection(statusToSection[dbEntry?.status] || 1)
     setStatus(dbEntry?.status || 'PENDING')
     setLaborPrice(dbEntry?.laborPrice || 0)
     setParts(Array.isArray(dbEntry?.parts) ? dbEntry.parts : [])
-    setInterventionData(mapEntryToInterventionData(dbEntry, assignedTechnicianName))
-  }, [dbEntry, assignedTechnicianName])
+    setInterventionData(mapEntryToInterventionData(dbEntry, assignedMissionEmployees || assignedTechnicianName))
+  }, [dbEntry, assignedMissionEmployees, assignedTechnicianName])
 
   useEffect(() => {
     if (!selectedClient) return
@@ -766,9 +844,12 @@ export default function InterventionDetails() {
       ...prev,
       machineType: selectedMachine.designation || prev.machineType,
       machineBrand: selectedMachine.brand || prev.machineBrand,
-      machineModel: selectedMachine.year || prev.machineModel,
+      machineModel:
+        (String(selectedMachine.model || '').trim()
+          ? selectedMachine.model
+          : selectedMachine.year) || prev.machineModel,
       serialNumber: selectedMachine.serialNumber || prev.serialNumber,
-      siteName: selectedMachine.site || prev.siteName,
+      siteName: prev.siteName || selectedMachine.site,
     }))
   }, [selectedMachine])
 
@@ -778,6 +859,49 @@ export default function InterventionDetails() {
       setInterventionData((prev) => ({ ...prev, totalTime: computed }))
     }
   }, [computeTotalTime, interventionData.startTime, interventionData.endTime, interventionData.totalTime])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const toPercent = (value) => {
+      const n = Number(value)
+      if (!Number.isFinite(n) || n <= 0) return null
+      return Math.round(n * 100)
+    }
+
+    const computeZoomPercent = () => {
+      const base = baseDprRef.current || 1
+      const current = window.devicePixelRatio || 1
+      const byDpr = Math.round((current / base) * 100)
+
+      const byWindowRatio =
+        window.innerWidth > 0 && window.outerWidth > 0
+          ? Math.round((window.outerWidth / window.innerWidth) * 100)
+          : null
+
+      const viewportScale = window.visualViewport?.scale
+      const byViewport = toPercent(viewportScale)
+
+      // Prefer sources that actually change with browser zoom.
+      let next = byWindowRatio
+      if (!next || next === 100) next = byViewport
+      if (!next || next === 100) next = byDpr
+      if (!next || !Number.isFinite(next)) next = 100
+
+      setUiZoomPercent(next)
+    }
+
+    computeZoomPercent()
+    window.addEventListener('resize', computeZoomPercent)
+    window.visualViewport?.addEventListener('resize', computeZoomPercent)
+
+    return () => {
+      window.removeEventListener('resize', computeZoomPercent)
+      window.visualViewport?.removeEventListener('resize', computeZoomPercent)
+    }
+  }, [])
+
+  const useHorizontalProgress = uiZoomPercent > 80
 
   const addPart = () => {
     setParts([...parts, { id: Date.now(), reference: '', designation: '', quantity: 1 }])
@@ -789,6 +913,600 @@ export default function InterventionDetails() {
 
   const updatePart = (partId, field, value) => {
     setParts(parts.map(p => p.id === partId ? { ...p, [field]: value } : p))
+  }
+
+  const escapeHtml = (value) =>
+    String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+
+  const buildFichePrintHtml_UNUSED = () => {
+    return `<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"/>
+  <title>Fiche d'intervention de S.A.V</title>
+  <style>
+    @page { size: A4 portrait; margin: 12mm 12mm 14mm 12mm; }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; color: #000; margin: 0; font-size: 9px; }
+    .sheet { width: 100%; position: relative; }
+
+    /* ── Header ── */
+    .header { display: flex; align-items: center; border-bottom: 1.5px solid #000; padding-bottom: 6px; margin-bottom: 5px; }
+    .header-logo { width: 52px; height: 52px; object-fit: contain; }
+    .header-center { flex: 1; text-align: center; padding: 0 8px; }
+    .header-center h1 { font-size: 15px; font-weight: 900; text-transform: uppercase; margin: 0 0 2px 0; letter-spacing: 0.03em; }
+    .header-center .tagline { font-size: 9px; font-style: italic; color: #444; margin: 0 0 2px 0; }
+    .header-center .company { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin: 0; }
+
+    /* ── Tables ── */
+    table { width: 100%; border-collapse: collapse; margin-bottom: 5px; }
+    td, th { border: 1px solid #000; padding: 3px 4px; font-size: 9px; vertical-align: middle; }
+    .lbl { font-weight: 700; text-transform: uppercase; background: #f0f0f0; white-space: nowrap; }
+    .center { text-align: center; }
+    .val { font-weight: 400; }
+
+    /* ── Info header table ── */
+    .tbl-info td { height: 18px; }
+    .col-lbl { width: 22%; }
+    .col-val { width: 18%; }
+    .col-lbl2 { width: 14%; }
+    .col-val2 { width: 12%; }
+    .col-pec { width: 20%; vertical-align: top; }
+
+    /* ── Type d'intervention ── */
+    .tbl-type th { background: #f0f0f0; font-weight: 700; text-transform: uppercase; text-align: center; font-size: 9px; }
+    .type-cell { height: 18px; font-size: 11px; font-weight: 700; }
+
+    /* ── Réservé SOMACS ── */
+    .reserved-wrap { display: flex; border: 1px solid #000; margin-bottom: 5px; }
+    .reserved-label { width: 16px; background: #f0f0f0; border-right: 1px solid #000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .reserved-label span { font-size: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; white-space: nowrap; writing-mode: vertical-rl; transform: rotate(180deg); color: #333; }
+    .reserved-table { flex: 1; border-collapse: collapse; }
+    .reserved-table td { border: 1px solid #000; border-left: none; border-right: none; padding: 3px 4px; font-size: 9px; vertical-align: middle; height: 17px; }
+    .reserved-table td:first-child { border-left: none; }
+    .reserved-table tr:last-child td { border-bottom: none; }
+    .reserved-table .lbl { width: 20%; }
+    .reserved-table .val-wide { width: 42%; }
+    .reserved-table .lbl2 { width: 16%; }
+    .reserved-table .val2 { width: 22%; }
+
+    /* ── Détail intervention ── */
+    .detail-wrap { border: 1px solid #000; margin-bottom: 5px; }
+    .detail-title { background: #f0f0f0; border-bottom: 1px solid #000; padding: 3px 4px; text-align: center; font-weight: 700; text-transform: uppercase; font-size: 9px; letter-spacing: 0.05em; }
+    .diag-row { border-bottom: 1px solid #000; padding: 3px 4px; font-size: 9px; }
+    .diag-row b { text-transform: uppercase; text-decoration: underline; }
+    .detail-lines { padding: 4px; min-height: 90px; font-size: 9px; background: repeating-linear-gradient(to bottom, #fff 0px, #fff 14px, #ccc 14px, #ccc 14.5px); }
+    .detail-lines b { text-transform: uppercase; text-decoration: underline; }
+    .essai-row { display: flex; border-top: 1px solid #000; }
+    .essai-left { display: flex; border-right: 1px solid #000; }
+    .essai-lbl { background: #f0f0f0; border-right: 1px solid #000; padding: 3px 6px; font-weight: 700; text-transform: uppercase; font-size: 8px; display: flex; align-items: center; }
+    .essai-val { padding: 3px 10px; font-size: 9px; display: flex; align-items: center; min-width: 30px; }
+    .essai-spacer { flex: 1; }
+    .essai-right { display: flex; border-left: 1px solid #000; }
+    .essai-oui { border-right: 1px solid #000; padding: 3px 8px; font-size: 8px; font-weight: 700; display: flex; align-items: center; }
+    .essai-non { padding: 3px 8px; font-size: 8px; font-weight: 700; display: flex; align-items: center; }
+    .checked-bg { background: #d1fae5; }
+    .checked-no-bg { background: #fee2e2; }
+
+    /* ── Articles ── */
+    .articles-wrap { display: flex; border: 1px solid #000; margin-bottom: 5px; }
+    .articles-label { width: 16px; background: #f0f0f0; border-right: 1px solid #000; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .articles-label span { font-size: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; white-space: nowrap; writing-mode: vertical-rl; transform: rotate(180deg); color: #333; }
+    .articles-table { flex: 1; border-collapse: collapse; }
+    .articles-table th { border: 1px solid #000; border-left: none; padding: 3px 4px; background: #f0f0f0; font-weight: 700; text-transform: uppercase; text-align: center; font-size: 9px; }
+    .articles-table td { border: 1px solid #000; border-left: none; padding: 3px 4px; font-size: 8px; height: 16px; }
+    .articles-table tr:last-child td { border-bottom: none; }
+    .part-ref { width: 28%; }
+    .part-des { }
+    .part-qty { width: 16%; text-align: center; }
+
+    /* ── Prix MO ── */
+    .prix-wrap { display: flex; justify-content: center; margin-bottom: 7px; }
+    .prix-box { display: flex; border: 1px solid #000; }
+    .prix-lbl { background: #f0f0f0; border-right: 1px solid #000; padding: 4px 10px; font-weight: 700; text-transform: uppercase; font-size: 9px; display: flex; align-items: center; }
+    .prix-val { padding: 4px 20px; font-size: 9px; min-width: 80px; display: flex; align-items: center; justify-content: center; }
+
+    /* ── Signatures ── */
+    .sig-wrap { display: flex; gap: 20px; margin-bottom: 6px; }
+    .sig-box { flex: 1; border: 1px solid #000; }
+    .sig-title { background: #f0f0f0; border-bottom: 1px solid #000; padding: 3px 4px; text-align: center; font-weight: 700; text-transform: uppercase; font-size: 9px; }
+    .sig-area { height: 50px; }
+
+    /* ── Footer ── */
+    .footer { border-top: 1px solid #aaa; padding-top: 4px; display: flex; justify-content: space-between; font-size: 7.5px; color: #555; margin-top: 6px; }
+    .footer b { font-weight: 700; }
+  </style>
+</head>
+<body>
+<div class="sheet">
+
+  <!-- HEADER -->
+  <div class="header">
+    <img class="header-logo" src="${logoSrc}" alt="Logo" />
+    <div class="header-center">
+      <h1>Fiche d'intervention de S.A.V</h1>
+      <p class="tagline">Nous vous garantissons la qualité</p>
+      <p class="company">SOMACS SERVICE S.A.R.L</p>
+    </div>
+    <img class="header-logo" src="${logoSrc}" alt="Logo" />
+  </div>
+
+  <!-- DATE / FICHE / SITE -->
+  <table class="tbl-info">
+    <tr>
+      <td class="lbl col-lbl">Date de l'intervention</td>
+      <td class="val center col-val">${escapeHtml(dateDisplay)}</td>
+      <td class="lbl col-lbl2">Heure d'entrée</td>
+      <td class="val center col-val2">${escapeHtml(interventionData.startTime || '........h..........')}</td>
+      <td class="lbl center col-pec" rowspan="3" style="vertical-align:top;padding-top:4px;">
+        <div style="font-weight:700;text-transform:uppercase;font-size:9px;">Prise en charge par</div>
+        <div style="font-weight:400;margin-top:6px;font-size:9px;">${escapeHtml(interventionData.technicianName || '')}</div>
+      </td>
+    </tr>
+    <tr>
+      <td class="lbl col-lbl">Numéro de la fiche</td>
+      <td class="val center col-val">${escapeHtml(interventionData.ficheNumber || '')}</td>
+      <td class="lbl col-lbl2">Heure de sortie</td>
+      <td class="val center col-val2">${escapeHtml(interventionData.endTime || '........h..........')}</td>
+    </tr>
+    <tr>
+      <td class="lbl col-lbl">Site</td>
+      <td class="val center col-val">${escapeHtml(interventionData.siteName || '')}</td>
+      <td class="lbl col-lbl2">TOTAL</td>
+      <td class="val center col-val2">${escapeHtml(interventionData.totalTime || '')}</td>
+    </tr>
+  </table>
+
+  <!-- TYPE D'INTERVENTION -->
+  <table class="tbl-type">
+    <thead>
+      <tr>
+        <th style="width:22%;">Type<br/>d'intervention</th>
+        <th>Devis</th><th>Livraison</th><th>Formation</th><th>Installation</th><th>Réparation</th><th>Garantie</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="lbl" style="background:#f0f0f0;"></td>
+        ${typeCheckboxes}
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- RÉSERVÉ À SOMACS SERVICE -->
+  <div class="reserved-wrap">
+    <div class="reserved-label"><span>Réservé à SOMACS SERVICE</span></div>
+    <table class="reserved-table">
+      <tr>
+        <td class="lbl">Client</td>
+        <td class="val val-wide">${escapeHtml(interventionData.clientName || '')}</td>
+        <td class="lbl lbl2">Code client</td>
+        <td class="val val2">${escapeHtml(interventionData.clientCode || '')}</td>
+      </tr>
+      <tr>
+        <td class="lbl">Adresse</td>
+        <td class="val" colspan="3">${escapeHtml(interventionData.clientAddress || '')}</td>
+      </tr>
+      <tr>
+        <td class="lbl">Demandeur</td>
+        <td class="val">${escapeHtml(interventionData.requestorName || '')}</td>
+        <td class="lbl">Téléphone</td>
+        <td class="val">${escapeHtml(interventionData.clientPhone || '')}</td>
+      </tr>
+      <tr>
+        <td class="lbl">E-mail</td>
+        <td class="val" colspan="3">${escapeHtml(interventionData.clientEmail || '')}</td>
+      </tr>
+      <tr>
+        <td class="lbl">Equipement</td>
+        <td class="val" colspan="3">${escapeHtml(interventionData.machineType || '')}</td>
+      </tr>
+      <tr>
+        <td class="lbl">Marque</td>
+        <td class="val" colspan="3">${escapeHtml(interventionData.machineBrand || '')}</td>
+      </tr>
+      <tr>
+        <td class="lbl">Modèle</td>
+        <td class="val" colspan="3">${escapeHtml(interventionData.machineModel || '')}</td>
+      </tr>
+      <tr>
+        <td class="lbl">Numéro de série</td>
+        <td class="val" colspan="3">${escapeHtml(interventionData.serialNumber || '')}</td>
+      </tr>
+      <tr>
+        <td class="lbl">Type de panne</td>
+        <td class="val" colspan="3">${escapeHtml(interventionData.problemDescription || '')}</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- DÉTAIL DE L'INTERVENTION -->
+  <div class="detail-wrap">
+    <div class="detail-title">Détail de l'intervention</div>
+    <div class="diag-row"><b>Diagnostic téléphonique :</b>&nbsp;${escapeHtml(interventionData.telephoneDiagnostic || '')}</div>
+    <div class="detail-lines"><b>Solution d'intervention :</b>&nbsp;${escapeHtml(interventionData.interventionDetail || '')}</div>
+    <div class="essai-row">
+      <div class="essai-left">
+        <div class="essai-lbl">Nombre d'essai</div>
+        <div class="essai-val">${escapeHtml(String(interventionData.numEssai || ''))}</div>
+      </div>
+      <div class="essai-spacer"></div>
+      <div class="essai-right">
+        <div class="essai-lbl">Essai concluant</div>
+        <div class="essai-oui${yes ? ' checked-bg' : ''}">Oui</div>
+        <div class="essai-non${no ? ' checked-no-bg' : ''}">Non</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LES ARTICLES UTILISÉS -->
+  <div class="articles-wrap">
+    <div class="articles-label"><span>Les articles utilisés</span></div>
+    <table class="articles-table">
+      <thead>
+        <tr>
+          <th class="part-ref">Référence</th>
+          <th>Désignation</th>
+          <th class="part-qty">Quantité</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${partRows}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- PRIX M.O -->
+  <div class="prix-wrap">
+    <div class="prix-box">
+      <div class="prix-lbl">Prix M.O (HT) :</div>
+      <div class="prix-val">${escapeHtml(String(laborPrice || ''))}</div>
+    </div>
+  </div>
+
+  <!-- SIGNATURES -->
+  <div class="sig-wrap">
+    <div class="sig-box">
+      <div class="sig-title">Signature du technicien</div>
+      <div class="sig-area"></div>
+    </div>
+    <div class="sig-box">
+      <div class="sig-title">Signature et cachet client</div>
+      <div class="sig-area"></div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <span>Adresse : 2/2 Rue El Fouledh , Z.I &nbsp; Mégrine Riadh 2014 Ben Arous &nbsp;&nbsp; GSM : 98326746 &nbsp;&nbsp; Tel : 71296493</span>
+    <span><b>MF : 1420197A/A/M/000</b></span>
+  </div>
+
+</div>
+</body>
+</html>`
+  }
+
+  const buildFichePrintHtml = () => {
+    const TYPES = ['Devis', 'Livraison', 'Formation', 'Installation', 'Réparation', 'Garantie']
+    const currentType = interventionData.interventionType || ''
+    const essaiOui = interventionData.essaiConcluant === true
+    const essaiNon = interventionData.essaiConcluant === false
+    const partRows6 = [0,1,2,3,4,5].map(i => parts[i] || null)
+    const dateDisplay = interventionData.interventionDate
+      ? interventionData.interventionDate.split('-').reverse().join('/')
+      : '.…/.…./2026'
+
+    return `<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<title>Fiche d'intervention de S.A.V</title>
+<style>
+  @page { size: A4 portrait; margin: 10mm 10mm 12mm 10mm; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 8.5pt; color: #000; background: #fff; }
+
+  /* ── HEADER ── */
+  .hdr { display: flex; align-items: center; padding-bottom: 5pt; margin-bottom: 4pt; border-bottom: 1.5pt solid #000; }
+  .hdr-logo { width: 48pt; height: 48pt; object-fit: contain; flex-shrink: 0; }
+  .hdr-mid { flex: 1; text-align: center; padding: 0 6pt; }
+  .hdr-mid .title { font-size: 14pt; font-weight: 900; text-transform: uppercase; letter-spacing: 0.02em; line-height: 1.1; }
+  .hdr-mid .sub   { font-size: 8pt; font-style: italic; color: #555; margin-top: 2pt; }
+  .hdr-mid .brand { font-size: 9.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2pt; }
+
+  /* ── TABLES ── */
+  table { width: 100%; border-collapse: collapse; margin-bottom: 3pt; }
+  td, th { border: 0.75pt solid #000; padding: 2pt 3pt; vertical-align: middle; font-size: 8pt; }
+  .bg { background: #efefef; }
+  .bold { font-weight: 700; }
+  .upper { text-transform: uppercase; }
+  .center { text-align: center; }
+  .small { font-size: 7pt; }
+
+  /* ── TABLE 1 : date/heure ── */
+  .t1 td { height: 16pt; }
+  .t1 .c-lbl  { width: 21%; }
+  .t1 .c-val  { width: 17%; }
+  .t1 .c-lbl2 { width: 13%; }
+  .t1 .c-val2 { width: 11%; }
+  .t1 .c-pec  { width: 19%; vertical-align: top; padding-top: 3pt; }
+
+  /* ── TABLE 2 : type d'intervention ── */
+  .t2 th, .t2 td { height: 15pt; text-align: center; }
+  .t2 .t2-lbl { width: 21%; text-align: center; }
+  .t2 .chk { font-size: 11pt; font-weight: 900; }
+
+  /* ── BLOC RÉSERVÉ ── */
+  .bloc-res { display: flex; border: 0.75pt solid #000; margin-bottom: 3pt; }
+  .res-bar  { width: 14pt; background: #efefef; border-right: 0.75pt solid #000; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
+  .res-bar span { font-size: 5.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; white-space: nowrap; writing-mode: vertical-rl; transform: rotate(180deg); color: #222; }
+  .res-tbl { flex: 1; border-collapse: collapse; }
+  .res-tbl td { border: 0.75pt solid #000; border-left: none; padding: 2pt 3pt; font-size: 8pt; height: 15pt; vertical-align: middle; }
+  .res-tbl tr:last-child td { border-bottom: none; }
+  .res-tbl .rl  { width: 19%; }
+  .res-tbl .rv  { width: 40%; }
+  .res-tbl .rl2 { width: 15%; }
+  .res-tbl .rv2 { }
+
+  /* ── DÉTAIL ── */
+  .bloc-det { border: 0.75pt solid #000; margin-bottom: 3pt; }
+  .det-title { background: #efefef; border-bottom: 0.75pt solid #000; padding: 2pt 4pt; text-align: center; font-weight: 700; text-transform: uppercase; font-size: 8pt; letter-spacing: 0.04em; }
+  .det-diag  { border-bottom: 0.75pt solid #000; padding: 2.5pt 4pt; font-size: 8pt; min-height: 28pt; }
+  .det-body  { padding: 3pt 4pt; min-height: 88pt; font-size: 8pt;
+               background: repeating-linear-gradient(to bottom, #fff 0pt, #fff 13pt, #bbb 13pt, #bbb 13.5pt); }
+  .det-essai { display: flex; border-top: 0.75pt solid #000; }
+  .de-lbl    { background: #efefef; border-right: 0.75pt solid #000; padding: 2pt 5pt; font-weight: 700; text-transform: uppercase; font-size: 7.5pt; display: flex; align-items: center; white-space: nowrap; }
+  .de-val    { padding: 2pt 8pt; font-size: 8pt; display: flex; align-items: center; min-width: 28pt; }
+  .de-space  { flex: 1; }
+  .de-conc   { display: flex; border-left: 0.75pt solid #000; }
+  .de-oui    { border-right: 0.75pt solid #000; padding: 2pt 7pt; font-size: 7.5pt; font-weight: 700; display: flex; align-items: center; }
+  .de-non    { padding: 2pt 7pt; font-size: 7.5pt; font-weight: 700; display: flex; align-items: center; }
+
+  /* ── ARTICLES ── */
+  .bloc-art { display: flex; border: 0.75pt solid #000; margin-bottom: 3pt; }
+  .art-bar  { width: 14pt; background: #efefef; border-right: 0.75pt solid #000; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
+  .art-bar span { font-size: 5.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; white-space: nowrap; writing-mode: vertical-rl; transform: rotate(180deg); color: #222; }
+  .art-tbl { flex: 1; border-collapse: collapse; }
+  .art-tbl th { border: 0.75pt solid #000; border-left: none; padding: 2pt 3pt; background: #efefef; font-weight: 700; text-transform: uppercase; text-align: center; font-size: 8pt; }
+  .art-tbl td { border: 0.75pt solid #000; border-left: none; padding: 2pt 3pt; font-size: 7.5pt; height: 14pt; }
+  .art-tbl tr:last-child td { border-bottom: none; }
+  .art-ref { width: 27%; }
+  .art-des { }
+  .art-qty { width: 14%; text-align: center; }
+
+  /* ── PRIX ── */
+  .prix-row { display: flex; justify-content: flex-end; margin-bottom: 4pt; padding-right: 0; }
+  .prix-box { display: inline-flex; border: 0.75pt solid #000; }
+  .prix-lbl { background: #efefef; border-right: 0.75pt solid #000; padding: 3pt 8pt; font-weight: 700; text-transform: uppercase; font-size: 8pt; display: flex; align-items: center; white-space: nowrap; }
+  .prix-val { padding: 3pt 16pt; font-size: 8pt; min-width: 70pt; display: flex; align-items: center; }
+
+  /* ── SIGNATURES ── */
+  .sig-row { display: flex; gap: 16pt; margin-bottom: 5pt; }
+  .sig-box { flex: 1; border: 0.75pt solid #000; }
+  .sig-ttl { background: #efefef; border-bottom: 0.75pt solid #000; padding: 2pt 4pt; text-align: center; font-weight: 700; text-transform: uppercase; font-size: 8pt; }
+  .sig-area { height: 44pt; }
+
+  /* ── FOOTER ── */
+  .ftr { border-top: 0.75pt solid #999; padding-top: 3pt; margin-top: 4pt; display: flex; justify-content: space-between; align-items: center; font-size: 7pt; color: #444; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="hdr">
+  <img class="hdr-logo" src="${logo}" alt="Logo SOMACS"/>
+  <div class="hdr-mid">
+    <div class="title">Fiche d'intervention de S.A.V</div>
+    <div class="sub">Nous vous garantissons la qualité</div>
+    <div class="brand">SOMACS SERVICE S.A.R.L</div>
+  </div>
+  <img class="hdr-logo" src="${logo}" alt="Logo SOMACS"/>
+</div>
+
+<!-- TABLE 1 : Date / Heure / Prise en charge -->
+<table class="t1">
+  <tr>
+    <td class="bg bold upper small c-lbl">Date de l'intervention</td>
+    <td class="center c-val">${escapeHtml(dateDisplay)}</td>
+    <td class="bg bold upper small c-lbl2">Heure d'entrée</td>
+    <td class="center c-val2">${escapeHtml(interventionData.startTime || '………..…h………………')}</td>
+    <td class="bg bold upper small center c-pec" rowspan="3">
+      Prise en charge par<br/><br/>
+      <span style="font-weight:400">${escapeHtml(interventionData.technicianName || '')}</span>
+    </td>
+  </tr>
+  <tr>
+    <td class="bg bold upper small c-lbl">Numéro de la fiche</td>
+    <td class="center c-val">${escapeHtml(interventionData.ficheNumber || '')}</td>
+    <td class="bg bold upper small c-lbl2">Heure de sortie</td>
+    <td class="center c-val2">${escapeHtml(interventionData.endTime || '………..…h………………')}</td>
+  </tr>
+  <tr>
+    <td class="bg bold upper small c-lbl">Site</td>
+    <td class="center c-val">${escapeHtml(interventionData.siteName || '')}</td>
+    <td class="bg bold upper small c-lbl2">TOTAL</td>
+    <td class="center c-val2">${escapeHtml(interventionData.totalTime || '…………..….')}</td>
+  </tr>
+</table>
+
+<!-- TABLE 2 : Type d'intervention -->
+<table class="t2">
+  <thead>
+    <tr>
+      <th class="bg t2-lbl">Type<br/>d'intervention</th>
+      ${TYPES.map(t => `<th class="bg">${t}</th>`).join('')}
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="bg t2-lbl"></td>
+      ${TYPES.map(t => `<td class="chk center">${t === currentType ? '&#10003;' : ''}</td>`).join('')}
+    </tr>
+  </tbody>
+</table>
+
+<!-- BLOC RÉSERVÉ À SOMACS SERVICE -->
+<div class="bloc-res">
+  <div class="res-bar"><span>Réservé à SOMACS SERVICE</span></div>
+  <table class="res-tbl">
+    <tr>
+      <td class="bg bold upper small rl">Client</td>
+      <td class="rv">${escapeHtml(interventionData.clientName || '')}</td>
+      <td class="bg bold upper small rl2">Code client</td>
+      <td class="rv2">${escapeHtml(interventionData.clientCode || '')}</td>
+    </tr>
+    <tr>
+      <td class="bg bold upper small rl">Adresse</td>
+      <td colspan="3">${escapeHtml(interventionData.clientAddress || '')}</td>
+    </tr>
+    <tr>
+      <td class="bg bold upper small rl">Demandeur</td>
+      <td class="rv">${escapeHtml(interventionData.requestorName || '')}</td>
+      <td class="bg bold upper small rl2">Téléphone</td>
+      <td class="rv2">${escapeHtml(interventionData.clientPhone || '')}</td>
+    </tr>
+    <tr>
+      <td class="bg bold upper small rl">E-mail</td>
+      <td colspan="3">${escapeHtml(interventionData.clientEmail || '')}</td>
+    </tr>
+    <tr>
+      <td class="bg bold upper small rl">Equipement</td>
+      <td colspan="3">${escapeHtml(interventionData.machineType || '')}</td>
+    </tr>
+    <tr>
+      <td class="bg bold upper small rl">Marque</td>
+      <td colspan="3">${escapeHtml(interventionData.machineBrand || '')}</td>
+    </tr>
+    <tr>
+      <td class="bg bold upper small rl">Modèle</td>
+      <td colspan="3">${escapeHtml(interventionData.machineModel || '')}</td>
+    </tr>
+    <tr>
+      <td class="bg bold upper small rl">Numéro de série</td>
+      <td colspan="3">${escapeHtml(interventionData.serialNumber || '')}</td>
+    </tr>
+    <tr>
+      <td class="bg bold upper small rl">Type de panne</td>
+      <td colspan="3">${escapeHtml(interventionData.problemDescription || '')}</td>
+    </tr>
+  </table>
+</div>
+
+<!-- DÉTAIL DE L'INTERVENTION -->
+<div class="bloc-det">
+  <div class="det-title">Détail de l'intervention</div>
+  <div class="det-diag">
+    <span class="bold upper" style="text-decoration:underline">Diagnostic téléphonique</span>
+    &nbsp;&nbsp;${escapeHtml(interventionData.telephoneDiagnostic || '')}
+  </div>
+  <div class="det-body">${escapeHtml(interventionData.interventionDetail || '')}</div>
+  <div class="det-essai">
+    <div class="de-lbl">Nombre d'essai</div>
+    <div class="de-val">${escapeHtml(String(interventionData.numEssai || ''))}</div>
+    <div class="de-space"></div>
+    <div class="de-conc">
+      <div class="de-lbl">Essai concluant</div>
+      <div class="de-oui">${essaiOui ? '&#10003;&nbsp;' : ''}Oui</div>
+      <div class="de-non">${essaiNon ? '&#10003;&nbsp;' : ''}Non</div>
+    </div>
+  </div>
+</div>
+
+<!-- LES ARTICLES UTILISÉS -->
+<div class="bloc-art">
+  <div class="art-bar"><span>Les articles utilisés</span></div>
+  <table class="art-tbl">
+    <thead>
+      <tr>
+        <th class="art-ref">Référence</th>
+        <th>Désignation</th>
+        <th class="art-qty">Quantité</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${partRows6.map(p => `<tr>
+        <td class="art-ref">${escapeHtml(p?.reference || '')}</td>
+        <td>${escapeHtml(p?.designation || '')}</td>
+        <td class="art-qty center">${escapeHtml(String(p?.quantity ?? ''))}</td>
+      </tr>`).join('')}
+    </tbody>
+  </table>
+</div>
+
+<!-- PRIX M.O (HT) -->
+<div class="prix-row">
+  <div class="prix-box">
+    <div class="prix-lbl">Prix M.O (HT) :</div>
+    <div class="prix-val">${escapeHtml(String(laborPrice || ''))}</div>
+  </div>
+</div>
+
+<!-- SIGNATURES -->
+<div class="sig-row">
+  <div class="sig-box">
+    <div class="sig-ttl">Signature du technicien</div>
+    <div class="sig-area"></div>
+  </div>
+  <div class="sig-box">
+    <div class="sig-ttl">Signature et cachet client</div>
+    <div class="sig-area"></div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="ftr">
+  <span>Adresse : 2/2 Rue El Fouledh ,Z.I &nbsp; Mégrine Riadh 2014 Ben Arous &nbsp;&nbsp;&nbsp; GSM : 98326746 &nbsp;&nbsp; Tel : 71296493</span>
+  <span><strong>MF : 1420197A/A/M/000</strong></span>
+</div>
+
+</body>
+</html>`
+  }
+
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank', 'width=960,height=700')
+    if (!printWindow) {
+      alert("Impossible d'ouvrir la fenetre d'impression.")
+      return
+    }
+    printWindow.document.open()
+    printWindow.document.write(buildFichePrintHtml())
+    printWindow.document.close()
+    printWindow.focus()
+    printWindow.onload = () => {
+      printWindow.print()
+      printWindow.close()
+    }
+  }
+
+  const handleDownloadPdf = async () => {
+    setIsDownloadingPdf(true)
+    try {
+      const response = await apiFetch(`/interventions/${id}/pdf`, { method: 'GET' })
+      if (!response.ok) {
+        alert('Erreur lors du telechargement du PDF.')
+        return
+      }
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `fiche-intervention-${id}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch {
+      alert('Impossible de telecharger le PDF.')
+    } finally {
+      setIsDownloadingPdf(false)
+    }
   }
 
   const handleSave = async (options = {}) => {
@@ -808,9 +1526,7 @@ export default function InterventionDetails() {
         endTime: interventionData.endTime,
         totalTime: interventionData.totalTime,
         siteName: interventionData.siteName,
-        clientAddress: interventionData.clientAddress,
         requestorName: interventionData.requestorName,
-        machineModel: interventionData.machineModel,
         clientId: interventionData.clientId || null,
         machineId: interventionData.machineId || null,
         problemDescription: interventionData.problemDescription,
@@ -967,10 +1683,31 @@ export default function InterventionDetails() {
                     <MapPin className="absolute left-4 top-4 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={18} />
                     <textarea
                       name="clientAddress"
-                      value={interventionData.clientAddress}
-                      onChange={handleChange}
-                      readOnly={Boolean(interventionData.clientId)}
+                      value={
+                        selectedClient
+                          ? String(selectedClient.address || '').trim() ||
+                            `${selectedClient.city || ''}${selectedClient.zone ? `, ${selectedClient.zone}` : ''}`
+                          : interventionData.clientAddress
+                      }
+                      readOnly
                       className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold h-20 sm:h-24 resize-none shadow-sm hover:border-slate-300 leading-relaxed" />
+                  </div>
+                </div>
+                <div className="md:col-span-2 space-y-2 sm:space-y-3 group">
+                  <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-[#0052CC] transition-colors">
+                    <span className="w-1.5 h-1.5 bg-slate-300 rounded-full"></span>
+                    Site / Localisation
+                  </label>
+                  <div className="relative">
+                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={18} />
+                    <input
+                      type="text"
+                      name="siteName"
+                      value={interventionData.siteName || ''}
+                      onChange={handleChange}
+                      readOnly={Boolean(isReadOnlyView || !isEditing)}
+                      className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm hover:border-slate-300"
+                    />
                   </div>
                 </div>
               </div>
@@ -1029,9 +1766,14 @@ export default function InterventionDetails() {
                   <input
                     type="text"
                     name="machineModel"
-                    value={selectedMachine?.year || interventionData.machineModel}
-                    onChange={handleChange}
-                    readOnly={Boolean(interventionData.machineId)}
+                    value={
+                      selectedMachine
+                        ? String(selectedMachine.model || '').trim()
+                          ? selectedMachine.model
+                          : selectedMachine.year
+                        : interventionData.machineModel
+                    }
+                    readOnly
                     className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm hover:border-slate-300" />
                 </div>
                 <div className="space-y-2 sm:space-y-3 group">
@@ -1405,7 +2147,7 @@ export default function InterventionDetails() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 to-slate-100 overflow-hidden">
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 overflow-x-hidden overflow-hidden">
       {/* --- HEADER --- */}
       <div className="bg-white border-b-2 border-slate-200 px-4 sm:px-8 py-4 sm:py-6 flex items-center justify-between shrink-0 shadow-sm z-30">
         <div className="flex items-center gap-3 sm:gap-6">
@@ -1413,6 +2155,10 @@ export default function InterventionDetails() {
             onClick={() => {
               if (isEmployeeHistoryEditFlow && returnTo) {
                 navigate(returnTo)
+                return
+              }
+              if (location.state?.fromMissionDetails && missionId) {
+                navigate(`/missions/${missionId}`)
                 return
               }
               navigate('/interventions')
@@ -1445,10 +2191,25 @@ export default function InterventionDetails() {
             <span className="text-sm font-black text-slate-700">{interventionData.technicianName || 'Non assigné'}</span>
           </div>
           
-          <button className="flex items-center justify-center gap-2 px-3 sm:px-5 py-2.5 sm:py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm hover:shadow-md active:scale-95">
-            <Printer size={18} /> 
-            <span className="hidden md:inline">Imprimer</span>
-          </button>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="flex items-center justify-center gap-2 px-3 sm:px-5 py-2.5 sm:py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm hover:shadow-md active:scale-95"
+            >
+              <Printer size={18} />
+              <span className="hidden md:inline">Imprimer</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={isDownloadingPdf}
+              className="flex items-center justify-center gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-[#0052CC] hover:bg-blue-700 text-white rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider transition-all shadow-sm hover:shadow-md active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <FileText size={16} />
+              <span>{isDownloadingPdf ? 'Generation...' : 'PDF'}</span>
+            </button>
+          </div>
           
           {isEmployeeHistoryEditFlow ? (
             <>
@@ -1482,9 +2243,9 @@ export default function InterventionDetails() {
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden flex-col lg:flex-row">
+      <div className="flex flex-1 overflow-hidden flex-col min-w-0">
         {/* --- HORIZONTAL STEPPER (MOBILE/TABLET) --- */}
-        <div className="lg:hidden bg-white border-b border-slate-100 px-4 py-3 shrink-0">
+        <div className={`${useHorizontalProgress ? 'bg-white border-b border-slate-100 px-4 py-3 shrink-0' : 'lg:hidden bg-white border-b border-slate-100 px-4 py-3 shrink-0'}`}>
           <div className="flex items-center justify-between max-w-lg mx-auto">
             {sections.map((section, idx) => {
               const isActive = activeSection === section.id
@@ -1516,8 +2277,10 @@ export default function InterventionDetails() {
           </div>
         </div>
 
+        <div className="flex flex-1 overflow-hidden min-w-0">
+
         {/* --- SIDEBAR (DESKTOP) --- */}
-        <div className="hidden lg:flex w-[320px] border-r border-slate-50 bg-slate-50/30 flex-col p-8 shrink-0">
+        <div className={`${useHorizontalProgress ? 'hidden' : 'hidden lg:flex w-[320px] border-r border-slate-50 bg-slate-50/30 flex-col p-8 shrink-0 min-w-0'}`}>
           <div className="space-y-2 mb-12">
             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Progression</h4>
             <div className="h-1 w-12 bg-[#0052CC] rounded-full"></div>
@@ -1566,8 +2329,8 @@ export default function InterventionDetails() {
         </div>
 
         {/* --- MAIN CONTENT --- */}
-        <div className="flex-1 overflow-y-auto no-scrollbar bg-white flex flex-col relative">
-          <div className="flex-1 px-4 sm:px-8 md:px-12 py-8 sm:py-12 md:py-16 max-w-4xl mx-auto w-full">
+        <div className="flex-1 overflow-y-auto no-scrollbar bg-white flex flex-col relative min-w-0">
+          <div className="flex-1 px-4 sm:px-8 md:px-12 py-8 sm:py-12 md:py-16 max-w-4xl mx-auto w-full min-w-0">
             <div className="h-full flex flex-col">
               <div className="flex-1">
                 <fieldset disabled={isReadOnlyView || (status === 'CLOSED' && !isEditing)} className="contents">
@@ -1695,7 +2458,7 @@ export default function InterventionDetails() {
         </div>
 
         {/* --- DESKTOP PREVIEW --- */}
-        <div className="hidden xl:flex w-[620px] bg-slate-100 border-l border-slate-200 flex-col items-center justify-start overflow-y-auto no-scrollbar py-8 px-6">
+        <div className="hidden xl:flex w-[620px] bg-slate-100 border-l border-slate-200 flex-col items-center justify-start overflow-y-auto no-scrollbar py-8 px-6 min-w-0">
           <div className="w-full space-y-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Aperçu de la fiche officielle</h4>
@@ -1714,6 +2477,7 @@ export default function InterventionDetails() {
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       {/* --- MOBILE PREVIEW MODAL --- */}

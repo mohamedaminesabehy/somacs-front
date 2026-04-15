@@ -163,7 +163,7 @@ const DevisList = () => {
         </span>
       )
     }
-    if (item.ETATDOC === 'C') {
+    if (item.ETATDOC === 'C' || item.ETATDOC === 3) {
       return (
         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-green-50 text-green-700 border border-green-100">
           Validé
@@ -177,220 +177,298 @@ const DevisList = () => {
     )
   }
 
+  const stats = {
+    total: pagination.total,
+    shown: devis.length,
+    validated: devis.filter((item) => item.ETATDOC === 'C' || item.ETATDOC === 3).length,
+    cancelled: devis.filter((item) => item.IsAnnuler).length,
+  }
+
   return (
-    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Gestion des Devis</h1>
-          <p className="text-slate-500 text-sm font-medium">Consultez et gérez vos devis clients (SQL Server)</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={fetchDevis}
-            className="p-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-all shadow-sm"
-          >
-            <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-          </button>
-          <button 
-            onClick={() => navigate('/devis/create')}
-            className="flex items-center gap-2 bg-[#0052CC] text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-blue-200 hover:bg-[#0747A6] transition-all transform hover:-translate-y-0.5"
-          >
-            <Plus size={20} />
-            Nouveau Devis
-          </button>
-        </div>
-      </div>
-
-      {/* Filters & Search */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row gap-4 items-center">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-          <input
-            type="text"
-            placeholder="Rechercher par numéro, nom ou code client..."
-            className="w-full pl-12 pr-4 py-3 bg-slate-50 border-none rounded-xl text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500/20 transition-all font-medium"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          <button 
-            onClick={handleSort}
-            className="flex items-center gap-2 px-4 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-all flex-1 md:flex-none justify-center"
-          >
-            <Calendar size={18} />
-            Trier par date création {sortOrder === 'asc' ? '↑' : '↓'}
-          </button>
-          <button className="p-3 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-all">
-            <Download size={20} />
-          </button>
-        </div>
-      </div>
-
-      {/* Table Section */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 p-4 rounded-2xl flex items-center gap-3 text-red-700 animate-in fade-in slide-in-from-top-4">
-          <AlertTriangle size={20} className="shrink-0" />
-          <p className="font-bold text-sm">{error}</p>
-        </div>
-      )}
-
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Numéro</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Type</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest cursor-pointer hover:text-blue-600 transition-colors" onClick={handleSort}>
-                  Date de création {sortOrder === 'asc' ? '↑' : '↓'}
-                </th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Client (Code & Nom)</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Montant TTC</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">État</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {loading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="animate-pulse">
-                    <td colSpan="7" className="px-6 py-4"><div className="h-10 bg-slate-100 rounded-lg w-full" /></td>
-                  </tr>
-                ))
-              ) : devis.length > 0 ? (
-                devis.map((item) => (
-                  <tr
-                    key={item.NUMERO}
-                    className={`hover:bg-slate-50/80 transition-colors group cursor-pointer ${item.IsAnnuler ? 'opacity-60 bg-red-50/30' : ''}`}
-                    onClick={() => navigate(`/devis/${item.NUMERO}`)}
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg transition-colors ${item.IsAnnuler ? 'bg-red-100 text-red-600' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white'}`}>
-                          <FileText size={16} />
-                        </div>
-                        <span className={`font-bold ${item.IsAnnuler ? 'text-red-900 line-through' : 'text-slate-900'}`}>{item.NUMERO}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 uppercase">
-                        {item.TYPDOC}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <Calendar size={14} />
-                        <span className="text-sm font-medium">{formatDate(item.DATDOC)}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className={`font-bold ${item.IsAnnuler ? 'text-red-900/70' : 'text-slate-900'}`}>{item.NOMTIE || 'Client inconnu'}</span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{item.DESTINA || item.CODTIE}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <span className={`font-black ${item.IsAnnuler ? 'text-red-600' : 'text-slate-900'}`}>{formatCurrency(item.TOTTTCDV)}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {getStatusBadge(item)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-center gap-2">
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/devis/${item.NUMERO}`);
-                          }}
-                          className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                        >
-                          <Eye size={18} />
-                        </button>
-                        {!item.IsAnnuler && (
-                          <button className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all">
-                            <Edit2 size={18} />
-                          </button>
-                        )}
-                        <button className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="p-4 bg-slate-50 rounded-full text-slate-300">
-                        <FileText size={48} />
-                      </div>
-                      <p className="text-slate-500 font-medium">Aucun devis trouvé correspondant à votre recherche</p>
-                      <p className="text-slate-400 text-xs italic mt-2">Note: Le système recherche les documents avec les types 'DE' (Devis) et 'DP' (Devis Proforma) détectés dans la base SQL Server.</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination Controls */}
-        {!loading && pagination.totalPages > 0 && (
-          <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-sm text-slate-500 font-medium">
-              Affichage de <span className="font-bold text-slate-900">{devis.length}</span> sur <span className="font-bold text-slate-900">{pagination.total}</span> devis
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handlePageChange(pagination.page - 1)}
-                disabled={pagination.page === 1}
-                className="p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
-              >
-                <ChevronLeft size={20} />
-              </button>
-              
-              <div className="flex items-center gap-1">
-                {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                  let pageNum;
-                  if (pagination.totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (pagination.page <= 3) {
-                    pageNum = i + 1;
-                  } else if (pagination.page >= pagination.totalPages - 2) {
-                    pageNum = pagination.totalPages - 4 + i;
-                  } else {
-                    pageNum = pagination.page - 2 + i;
-                  }
-                  
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => handlePageChange(pageNum)}
-                      className={`w-10 h-10 rounded-lg font-bold text-sm transition-all ${
-                        pagination.page === pageNum
-                          ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-200'
-                          : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm'
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(0,82,204,0.08),_transparent_30%),linear-gradient(180deg,#f8fbff_0%,#eef4fb_100%)] px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-6">
+        <section className="overflow-hidden rounded-[32px] border border-white/70 bg-white/85 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="flex flex-col gap-6 p-6 lg:p-8 xl:flex-row xl:items-end xl:justify-between">
+            <div className="max-w-3xl space-y-4">
+              <div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.35em] text-[#0052CC]">
+                <span className="rounded-full bg-blue-50 px-3 py-1">Devis</span>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-500">Gestion commerciale</span>
               </div>
+              <div className="space-y-3">
+                <h1 className="text-3xl font-black tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">
+                  Gestion des devis
+                </h1>
+                <p className="max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
+                  Consultez, filtrez et gérez vos devis dans une interface claire, rapide et professionnelle, conçue pour une lecture fluide sur desktop et mobile.
+                </p>
+              </div>
+            </div>
 
+            <div className="flex flex-col gap-3 sm:flex-row xl:flex-col xl:items-end">
               <button
-                onClick={() => handlePageChange(pagination.page + 1)}
-                disabled={pagination.page === pagination.totalPages}
-                className="p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                onClick={() => fetchDevis(pagination.page)}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50"
               >
-                <ChevronRightIcon size={20} />
+                <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                Actualiser
+              </button>
+              <button
+                onClick={() => navigate('/devis/create')}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0052CC] px-6 py-3 text-sm font-black text-white shadow-[0_18px_40px_rgba(0,82,204,0.25)] transition-all hover:-translate-y-0.5 hover:bg-[#0747A6]"
+              >
+                <Plus size={18} />
+                Nouveau devis
               </button>
             </div>
           </div>
+
+          <div className="grid gap-4 border-t border-slate-100 p-6 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Total devis</div>
+              <div className="mt-2 text-2xl font-black text-slate-950">{stats.total}</div>
+              <p className="mt-1 text-xs font-medium text-slate-500">Résultats disponibles dans la base</p>
+            </div>
+            <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Affichés</div>
+              <div className="mt-2 text-2xl font-black text-slate-950">{stats.shown}</div>
+              <p className="mt-1 text-xs font-medium text-slate-500">Page {pagination.page} sur {pagination.totalPages || 1}</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4">
+              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500">Validés</div>
+              <div className="mt-2 text-2xl font-black text-emerald-700">{stats.validated}</div>
+              <p className="mt-1 text-xs font-medium text-emerald-700/70">Devis confirmés et exploitables</p>
+            </div>
+            <div className="rounded-2xl border border-rose-100 bg-rose-50/80 p-4">
+              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-rose-500">Annulés</div>
+              <div className="mt-2 text-2xl font-black text-rose-700">{stats.cancelled}</div>
+              <p className="mt-1 text-xs font-medium text-rose-700/70">Documents annulés ou obsolètes</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-[28px] border border-white/70 bg-white/90 p-4 shadow-[0_18px_60px_rgba(15,23,42,0.06)] backdrop-blur sm:p-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="relative w-full xl:max-w-2xl">
+              <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input
+                type="text"
+                placeholder="Rechercher par numéro, nom ou code client..."
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 py-3.5 pl-11 pr-4 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row xl:justify-end">
+              <button
+                onClick={handleSort}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50"
+              >
+                <Calendar size={18} className="text-slate-500" />
+                Trier par date {sortOrder === 'asc' ? '↑' : '↓'}
+              </button>
+              <button className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50">
+                <Download size={18} className="text-slate-500" />
+                Export
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {error && (
+          <div className="flex items-start gap-3 rounded-[24px] border border-red-200 bg-red-50/90 p-4 text-red-700 shadow-sm">
+            <div className="rounded-2xl bg-white p-2 text-red-500 shadow-sm">
+              <AlertTriangle size={18} />
+            </div>
+            <div>
+              <p className="text-sm font-black">Une erreur est survenue</p>
+              <p className="mt-1 text-sm font-medium text-red-700/80">{error}</p>
+            </div>
+          </div>
         )}
+
+        <section className="overflow-hidden rounded-[32px] border border-white/70 bg-white/92 shadow-[0_24px_80px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-6 py-5">
+            <div>
+              <h2 className="text-base font-black uppercase tracking-[0.3em] text-slate-900">Liste des devis</h2>
+              <p className="mt-1 text-xs font-medium text-slate-500">Tableau optimisé pour la lecture rapide, le tri et la navigation.</p>
+            </div>
+            <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 md:flex">
+              {loading ? 'Synchronisation...' : 'Vue active'}
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1100px] border-collapse text-left">
+              <thead className="sticky top-0 z-10 bg-white/95 backdrop-blur">
+                <tr className="border-b border-slate-100 bg-slate-50/70">
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Numéro</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Type</th>
+                  <th
+                    className="cursor-pointer px-6 py-4 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 transition-colors hover:text-[#0052CC]"
+                    onClick={handleSort}
+                  >
+                    Date de création {sortOrder === 'asc' ? '↑' : '↓'}
+                  </th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Client</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.3em] text-right text-slate-400">Montant TTC</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">État</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.3em] text-center text-slate-400">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {loading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i} className="animate-pulse">
+                      <td colSpan="7" className="px-6 py-5">
+                        <div className="h-14 rounded-2xl bg-slate-100/90" />
+                      </td>
+                    </tr>
+                  ))
+                ) : devis.length > 0 ? (
+                  devis.map((item) => (
+                    <tr
+                      key={item.NUMERO}
+                      className={`group cursor-pointer transition-colors hover:bg-slate-50/80 ${item.IsAnnuler ? 'bg-rose-50/30 opacity-70' : ''}`}
+                      onClick={() => navigate(`/devis/${item.NUMERO}`)}
+                    >
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-3">
+                          <div className={`flex h-11 w-11 items-center justify-center rounded-2xl transition-colors ${item.IsAnnuler ? 'bg-rose-100 text-rose-600' : 'bg-blue-50 text-[#0052CC] group-hover:bg-[#0052CC] group-hover:text-white'}`}>
+                            <FileText size={18} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className={`truncate text-sm font-black ${item.IsAnnuler ? 'text-rose-900 line-through' : 'text-slate-950'}`}>
+                              {item.NUMERO}
+                            </div>
+                            <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400">{item.TYPDOC || 'DE'}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5">
+                        <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.3em] text-slate-600">
+                          {item.TYPDOC}
+                        </span>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-2 text-slate-600">
+                          <Calendar size={14} className="text-slate-400" />
+                          <span className="text-sm font-medium">{formatDate(item.DATDOC)}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="min-w-0">
+                          <div className={`truncate text-sm font-bold ${item.IsAnnuler ? 'text-rose-900/70' : 'text-slate-900'}`}>{item.NOMTIE || 'Client inconnu'}</div>
+                          <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400">{item.DESTINA || item.CODTIE}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5 text-right">
+                        <span className={`text-sm font-black ${item.IsAnnuler ? 'text-rose-600' : 'text-slate-950'}`}>
+                          {formatCurrency(item.TOTTTCDV)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-5">{getStatusBadge(item)}</td>
+                      <td className="px-6 py-5">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              navigate(`/devis/${item.NUMERO}`)
+                            }}
+                            className="rounded-xl border border-slate-200 bg-white p-2 text-slate-400 shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:text-[#0052CC] hover:shadow-md"
+                          >
+                            <Eye size={18} />
+                          </button>
+                          {!item.IsAnnuler && (
+                            <button className="rounded-xl border border-slate-200 bg-white p-2 text-slate-400 shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-200 hover:text-amber-600 hover:shadow-md">
+                              <Edit2 size={18} />
+                            </button>
+                          )}
+                          <button className="rounded-xl border border-slate-200 bg-white p-2 text-slate-400 shadow-sm transition-all hover:-translate-y-0.5 hover:border-red-200 hover:text-red-600 hover:shadow-md">
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="7" className="px-6 py-16 text-center">
+                      <div className="mx-auto flex max-w-md flex-col items-center gap-4">
+                        <div className="flex h-20 w-20 items-center justify-center rounded-[28px] border border-slate-100 bg-slate-50 text-slate-300 shadow-sm">
+                          <FileText size={42} />
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-base font-black text-slate-900">Aucun devis trouvé</p>
+                          <p className="text-sm leading-6 text-slate-500">
+                            Aucun document ne correspond à votre recherche. Essayez un autre numéro, client ou code.
+                          </p>
+                        </div>
+                        <p className="max-w-sm text-xs font-medium italic leading-5 text-slate-400">
+                          Le système recherche les documents avec les types 'DE' (Devis) et 'DP' (Devis Proforma) détectés dans la base SQL Server.
+                        </p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {!loading && pagination.totalPages > 0 && (
+            <div className="flex flex-col gap-4 border-t border-slate-100 bg-slate-50/70 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-sm font-medium text-slate-500">
+                Affichage de <span className="font-black text-slate-950">{devis.length}</span> sur{' '}
+                <span className="font-black text-slate-950">{pagination.total}</span> devis
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  disabled={pagination.page === 1}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+
+                <div className="flex items-center gap-2">
+                  {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                    let pageNum
+                    if (pagination.totalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (pagination.page <= 3) {
+                      pageNum = i + 1
+                    } else if (pagination.page >= pagination.totalPages - 2) {
+                      pageNum = pagination.totalPages - 4 + i
+                    } else {
+                      pageNum = pagination.page - 2 + i
+                    }
+
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => handlePageChange(pageNum)}
+                        className={`inline-flex h-11 min-w-11 items-center justify-center rounded-xl px-3 text-sm font-black transition-all ${
+                          pagination.page === pageNum
+                            ? 'bg-[#0052CC] text-white shadow-[0_16px_36px_rgba(0,82,204,0.25)]'
+                            : 'border border-slate-200 bg-white text-slate-600 shadow-sm hover:-translate-y-0.5 hover:bg-slate-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <button
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  disabled={pagination.page === pagination.totalPages}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <ChevronRightIcon size={20} />
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
       </div>
     </div>
   )

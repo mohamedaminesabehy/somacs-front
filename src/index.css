@@ -28,8 +28,10 @@
 }
 
 .no-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
 }
 
 /* Gray scrollbar — used on specific panels (calendar, mission list) */
@@ -81,10 +83,12 @@ body {
     opacity: 0;
     transform: scale(0.9);
   }
+
   60% {
     opacity: 1;
     transform: scale(1.02);
   }
+
   100% {
     opacity: 1;
     transform: scale(1);
@@ -92,10 +96,12 @@ body {
 }
 
 @keyframes preloader-logo-pulse {
+
   0%,
   100% {
     transform: scale(1);
   }
+
   50% {
     transform: scale(1.03);
   }
@@ -111,6 +117,7 @@ body {
   0% {
     transform: translateX(-100%);
   }
+
   100% {
     transform: translateX(100%);
   }
@@ -143,10 +150,12 @@ body {
     transform: translateX(-10%) translateY(0);
     opacity: 0.4;
   }
+
   50% {
     transform: translateX(10%) translateY(2px);
     opacity: 0.7;
   }
+
   100% {
     transform: translateX(-10%) translateY(0);
     opacity: 0.4;
@@ -156,13 +165,11 @@ body {
 .preloader-neon-line {
   height: 2px;
   filter: blur(6px);
-  background: linear-gradient(
-    90deg,
-    rgba(255, 43, 43, 0),
-    rgba(255, 43, 43, 0.6),
-    rgba(255, 85, 85, 0.6),
-    rgba(255, 43, 43, 0)
-  );
+  background: linear-gradient(90deg,
+      rgba(255, 43, 43, 0),
+      rgba(255, 43, 43, 0.6),
+      rgba(255, 85, 85, 0.6),
+      rgba(255, 43, 43, 0));
   opacity: 0.6;
   animation: preloader-neon-wave 8s ease-in-out infinite;
 }
