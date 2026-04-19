@@ -45,6 +45,11 @@ export default function UserManagement({ currentUser }) {
   useEffect(() => { fetchUsers() }, [])
   useEffect(() => { setCurrentPage(1) }, [searchTerm, roleFilter, statusFilter])
 
+  const fallbackRoles = useMemo(
+    () => ['Administrateur', 'Technicien', 'Commerciale', 'Coordinateur', 'Responsable technicien'],
+    [],
+  )
+
   const users = useMemo(() =>
     rawUsers.map((user) => {
       const initials = user.name && typeof user.name === 'string'
@@ -235,7 +240,12 @@ export default function UserManagement({ currentUser }) {
 
       {/* ── BOTTOM PANELS ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
-        <CreateUserForm currentUser={currentUser} onUserCreated={fetchUsers} onAction={showActionToast} />
+        <CreateUserForm
+          currentUser={currentUser}
+          onUserCreated={fetchUsers}
+          onAction={showActionToast}
+          fallbackRoles={fallbackRoles}
+        />
         <RoleManagement />
       </div>
     </div>

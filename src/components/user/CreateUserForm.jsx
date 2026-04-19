@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Users } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 
-export default function CreateUserForm({ currentUser, onUserCreated, onAction }) {
+export default function CreateUserForm({ currentUser, onUserCreated, onAction, fallbackRoles = [] }) {
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [role, setRole] = useState('')
@@ -27,7 +27,10 @@ export default function CreateUserForm({ currentUser, onUserCreated, onAction })
         }
         const data = await response.json()
         if (Array.isArray(data)) {
-          setAvailableRoles(data)
+          const normalized = data
+            .map((item) => (typeof item === 'string' ? { name: item } : item))
+            .filter((item) => item && typeof item.name === 'string' && item.name.trim().length > 0)
+          setAvailableRoles(normalized)
         }
       } finally {
         setIsLoadingRoles(false)
@@ -36,6 +39,23 @@ export default function CreateUserForm({ currentUser, onUserCreated, onAction })
 
     fetchRoles()
   }, [])
+
+  const roleOptions = useMemo(() => {
+    const apiRoleNames = availableRoles
+      .map((item) => item?.name)
+      .filter((name) => typeof name === 'string' && name.trim().length > 0)
+    const combined = [...fallbackRoles, ...apiRoleNames]
+    const seen = new Set()
+    const unique = []
+    for (const name of combined) {
+      if (typeof name !== 'string') continue
+      const trimmed = name.trim()
+      if (!trimmed || seen.has(trimmed)) continue
+      seen.add(trimmed)
+      unique.push(trimmed)
+    }
+    return unique
+  }, [availableRoles, fallbackRoles])
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -198,9 +218,9 @@ export default function CreateUserForm({ currentUser, onUserCreated, onAction })
               <option value="">
                 {isLoadingRoles ? 'Chargement des rôles...' : 'Sélectionner un rôle'}
               </option>
-              {availableRoles.map((roleItem) => (
-                <option key={roleItem.name} value={roleItem.name}>
-                  {roleItem.name}
+              {roleOptions.map((roleName) => (
+                <option key={roleName} value={roleName}>
+                  {roleName}
                 </option>
               ))}
             </select>
