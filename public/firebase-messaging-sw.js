@@ -28,8 +28,8 @@ loadConfig().then((cfg) => {
       
       return self.registration.showNotification(title, {
         body,
-        icon: '/icons/icon-192.png',
-        badge: '/icons/icon-192.png',
+        icon: '/icon.svg',
+        badge: '/icon.svg',
         tag: data.notificationId || 'notification',
         requireInteraction: false,
         vibrate: [200, 100, 200],
