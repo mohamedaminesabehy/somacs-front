@@ -20,7 +20,7 @@ import {
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { apiFetch } from '../../api/apiClient'
-import logoImage from '../../assets/logo-removebg-preview.PNG'
+import logoImage from '../../assets/logo-removebg-preview.png'
 
 const BUSINESS_ACTIONS = [
   'CREATE_MACHINE',
