@@ -7,7 +7,7 @@ import {
   CheckSquare, Flag, BarChart2, Phone, Zap, Info,
   ExternalLink, MessageSquare, History, Save, Trash2,
   MoreVertical, Share2, Printer, Paperclip, File, Image, X,
-  Download, Eye, Plus
+  Download, Eye, Plus, Truck
 } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 
@@ -75,6 +75,19 @@ function buildGroupedEmployeesDisplay(missionLike) {
   return Array.from(new Set([primary, ...fromArray, ...fromDisplay].filter(Boolean))).join(', ')
 }
 
+function syncVehicleMileageState(setDepart, setRetour, missionLike) {
+  setDepart(
+    typeof missionLike?.vehicleKilometrageDepart === 'number' || typeof missionLike?.vehicleKilometrageDepart === 'string'
+      ? missionLike.vehicleKilometrageDepart
+      : '',
+  )
+  setRetour(
+    typeof missionLike?.vehicleKilometrageRetour === 'number' || typeof missionLike?.vehicleKilometrageRetour === 'string'
+      ? missionLike.vehicleKilometrageRetour
+      : '',
+  )
+}
+
 export default function MissionDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -96,8 +109,15 @@ export default function MissionDetails() {
   const lastInterventionStatusRef = useRef('')
   const [showStatusAttention, setShowStatusAttention] = useState(false)
   const [statusAttentionText, setStatusAttentionText] = useState('')
+  const [missionActionError, setMissionActionError] = useState('')
   const [docViewer, setDocViewer] = useState({ open: false, url: '', type: '', name: '', isPdf: false, downloadUrl: '', publicId: '' })
   const [groupedEmployeesDisplay, setGroupedEmployeesDisplay] = useState('')
+  const [vehicleKilometrageDepart, setVehicleKilometrageDepart] = useState('')
+  const [vehicleKilometrageRetour, setVehicleKilometrageRetour] = useState('')
+  const [vehicleMileageError, setVehicleMileageError] = useState('')
+  // Track whether the user is actively editing the mileage fields so the
+  // background polling never overwrites what they are typing.
+  const mileageEditingRef = useRef(false)
 
   const attachments = useMemo(() => {
     const list = Array.isArray(mission?.attachments) ? mission.attachments : []
@@ -144,6 +164,9 @@ export default function MissionDetails() {
       try {
         const response = await apiFetch(`/missions/${id}`, { auth: true, cache: 'no-store' })
         if (!response.ok) {
+          if (response.status === 403) {
+            setMissionActionError("Accès refusé : vous n'avez pas la permission (403).")
+          }
           setMission(null)
           return
         }
@@ -152,6 +175,7 @@ export default function MissionDetails() {
         setStatus(data?.status || 'À faire')
         setNotes(data?.notes || '')
         setGroupedEmployeesDisplay(buildGroupedEmployeesDisplay(data))
+          syncVehicleMileageState(setVehicleKilometrageDepart, setVehicleKilometrageRetour, data)
       } catch {
         setMission(null)
       } finally {
@@ -189,6 +213,11 @@ export default function MissionDetails() {
           setMission((prev) => (prev ? { ...prev, ...data, status: nextStatus } : data))
           setStatus((prev) => (prev !== nextStatus ? nextStatus : prev))
           setGroupedEmployeesDisplay(buildGroupedEmployeesDisplay(data))
+          // Only sync mileage fields from the server if the user is not
+          // currently typing in them — otherwise the poll would erase input.
+          if (!mileageEditingRef.current) {
+            syncVehicleMileageState(setVehicleKilometrageDepart, setVehicleKilometrageRetour, data)
+          }
         }
 
         if (mission.interventionId) {
@@ -239,7 +268,7 @@ export default function MissionDetails() {
         <div className="w-20 h-20 bg-white rounded-3xl border-2 border-slate-200 flex items-center justify-center shadow-sm">
           <AlertTriangle size={36} className="text-slate-300" />
         </div>
-        <p className="text-slate-500 font-black text-lg">Mission introuvable</p>
+        <p className="text-slate-500 font-black text-lg">{missionActionError || 'Mission introuvable'}</p>
         <button
           onClick={() => navigate('/missions/my')}
           className="flex items-center gap-2 px-6 py-3 bg-[#0052CC] text-white rounded-xl text-sm font-black shadow-lg shadow-blue-200 hover:bg-[#0042a3] transition-colors"
@@ -258,6 +287,15 @@ export default function MissionDetails() {
   const StatusIcon = statusCfg.icon
 
   const handleStatusChange = (newStatus) => {
+    // Si on termine la mission avec un véhicule, valider le kilométrage retour
+    if (newStatus === 'Terminée' && mission.vehicleId) {
+      const retourNum = vehicleKilometrageRetour !== '' ? Number(vehicleKilometrageRetour) : null
+      if (typeof retourNum !== 'number' || isNaN(retourNum)) {
+        setMissionActionError('Le kilométrage retour est requis pour terminer cette mission.')
+        return
+      }
+    }
+
     if (statusAnimTimerRef.current) {
       window.clearTimeout(statusAnimTimerRef.current)
       statusAnimTimerRef.current = null
@@ -266,47 +304,78 @@ export default function MissionDetails() {
     setMission((prev) => (prev ? { ...prev, status: newStatus } : prev))
     ;(async () => {
       try {
+        // Si Terminée avec véhicule, enregistrer le kilométrage en premier
+        if (newStatus === 'Terminée' && mission.vehicleId) {
+          const departText = String(vehicleKilometrageDepart ?? '').trim()
+          const retourText = String(vehicleKilometrageRetour ?? '').trim()
+          const depart = departText === '' ? null : Number(departText)
+          const retour = retourText === '' ? null : Number(retourText)
+          const kmRes = await apiFetch(`/missions/${mission.id}/vehicle-kilometrage`, {
+            method: 'PATCH',
+            body: { vehicleKilometrageDepart: depart, vehicleKilometrageRetour: retour },
+            auth: true,
+          })
+          if (!kmRes.ok) {
+            const kmErr = await kmRes.json().catch(() => ({}))
+            throw new Error(kmErr.message || 'Impossible de mettre à jour le kilométrage.')
+          }
+        }
+
         const response = await apiFetch(`/missions/${mission.id}`, {
           method: 'PATCH',
           body: { status: newStatus },
           auth: true,
         })
-        if (response.ok) {
-          setStatusJustChangedTo(newStatus)
-          statusAnimTimerRef.current = window.setTimeout(() => {
-            setStatusJustChangedTo('')
-            statusAnimTimerRef.current = null
-          }, 700)
-          // Pull latest state to reflect synchronized status across grouped missions.
-          if (refreshTimerRef.current) {
-            window.clearInterval(refreshTimerRef.current)
-            refreshTimerRef.current = null
-          }
-          const missionRes = await apiFetch(`/missions/${mission.id}`, { auth: true, cache: 'no-store' })
-          if (missionRes.ok) {
-            const latestMission = await missionRes.json().catch(() => null)
-            if (latestMission) {
-              setMission((prev) => (prev ? { ...prev, ...latestMission, status: latestMission.status || newStatus } : latestMission))
-              setStatus(latestMission.status || newStatus)
-              setGroupedEmployeesDisplay(buildGroupedEmployeesDisplay(latestMission))
-            }
-          }
-          refreshTimerRef.current = window.setInterval(async () => {
-            try {
-              const pollRes = await apiFetch(`/missions/${mission.id}`, { auth: true, cache: 'no-store' })
-              if (!pollRes.ok) return
-              const pollData = await pollRes.json()
-              const nextStatus = pollData?.status || 'À faire'
-              setMission((prev) => (prev ? { ...prev, ...pollData, status: nextStatus } : pollData))
-              setStatus((prev) => (prev !== nextStatus ? nextStatus : prev))
-              setGroupedEmployeesDisplay(buildGroupedEmployeesDisplay(pollData))
-            } catch {}
-          }, 5000)
-          setShowSaveToast(`Cette mission est ${newStatus}`)
-          setTimeout(() => setShowSaveToast(false), 3000)
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || 'Impossible de mettre à jour le statut.')
         }
+        setMissionActionError('')
+        setVehicleMileageError('')
+        setStatusJustChangedTo(newStatus)
+        statusAnimTimerRef.current = window.setTimeout(() => {
+          setStatusJustChangedTo('')
+          statusAnimTimerRef.current = null
+        }, 700)
+        if (refreshTimerRef.current) {
+          window.clearInterval(refreshTimerRef.current)
+          refreshTimerRef.current = null
+        }
+        const missionRes = await apiFetch(`/missions/${mission.id}`, { auth: true, cache: 'no-store' })
+        if (missionRes.ok) {
+          const latestMission = await missionRes.json().catch(() => null)
+          if (latestMission) {
+            setMission((prev) => (prev ? { ...prev, ...latestMission, status: latestMission.status || newStatus } : latestMission))
+            setStatus(latestMission.status || newStatus)
+            setGroupedEmployeesDisplay(buildGroupedEmployeesDisplay(latestMission))
+            syncVehicleMileageState(setVehicleKilometrageDepart, setVehicleKilometrageRetour, latestMission)
+            try {
+              window.dispatchEvent(new CustomEvent('mission:updated', { detail: latestMission }))
+            } catch {}
+          }
+        }
+        refreshTimerRef.current = window.setInterval(async () => {
+          try {
+            const pollRes = await apiFetch(`/missions/${mission.id}`, { auth: true, cache: 'no-store' })
+            if (!pollRes.ok) return
+            const pollData = await pollRes.json()
+            const nextStatus = pollData?.status || 'À faire'
+            setMission((prev) => (prev ? { ...prev, ...pollData, status: nextStatus } : pollData))
+            setStatus((prev) => (prev !== nextStatus ? nextStatus : prev))
+            setGroupedEmployeesDisplay(buildGroupedEmployeesDisplay(pollData))
+            if (!mileageEditingRef.current) {
+              syncVehicleMileageState(setVehicleKilometrageDepart, setVehicleKilometrageRetour, pollData)
+            }
+          } catch {}
+        }, 5000)
+        setShowSaveToast(`Cette mission est ${newStatus}`)
+        setTimeout(() => setShowSaveToast(false), 3000)
       } catch (error) {
         console.error('Erreur MAJ statut:', error)
+        setMissionActionError(error?.message || 'Impossible de mettre à jour le statut.')
+        // Rétablir le statut précédent en cas d'erreur
+        setStatus(mission.status)
+        setMission((prev) => (prev ? { ...prev, status: mission.status } : prev))
       }
     })()
   }
@@ -336,6 +405,7 @@ export default function MissionDetails() {
               setStatus(full?.status || nextStatus)
               setNotes(full?.notes || nextNotes)
               setGroupedEmployeesDisplay(buildGroupedEmployeesDisplay(full))
+                try { window.dispatchEvent(new CustomEvent('mission:updated', { detail: full })) } catch {}
             }
           }
         }
@@ -345,7 +415,6 @@ export default function MissionDetails() {
       setIsSaving(false)
     })()
   }
-
   const progressPct =
     status === 'À faire'  ? 10  :
     status === 'En cours' ? 50  :
@@ -481,6 +550,87 @@ export default function MissionDetails() {
               </div>
             </div>
 
+            {/* Véhicule Affecté Card */}
+            {mission.vehicle && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="p-4 sm:p-6">
+                  <SectionHeader icon={Truck} title="Véhicule affecté" />
+                  
+                  <div className="space-y-4 mt-4">
+                    {/* Vehicle Identity Section */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5">Matricule</p>
+                        <p className="text-sm font-bold text-slate-900 font-mono">{mission.vehicle.matricule}</p>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5">Marque / Modèle</p>
+                        <p className="text-sm font-bold text-slate-900">{mission.vehicle.marque} {mission.vehicle.modele}</p>
+                      </div>
+                    </div>
+
+                    {/* Current Mileage */}
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5">Kilométrage actuel du véhicule</p>
+                      <p className="text-sm font-bold text-slate-900">
+                        {typeof mission.vehicle.kilometrage === 'number' ? `${mission.vehicle.kilometrage.toLocaleString('fr-FR')} km` : '—'}
+                      </p>
+                    </div>
+
+                    {/* Mileage Inputs */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <label className="block">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-2 block">Kilométrage départ</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="999999"
+                          value={vehicleKilometrageDepart}
+                          onFocus={() => { mileageEditingRef.current = true }}
+                          onBlur={() => { mileageEditingRef.current = false }}
+                          onChange={(e) => {
+                            const v = e.target.value
+                            if (v === '' || (Number(v) >= 0 && Number(v) <= 999999)) {
+                              setVehicleKilometrageDepart(v)
+                            }
+                          }}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-900 outline-none transition focus:border-[#0052CC] focus:ring-2 focus:ring-[#0052CC]/10"
+                          placeholder="0"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-2 block">Kilométrage retour</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="999999"
+                          value={vehicleKilometrageRetour}
+                          onFocus={() => { mileageEditingRef.current = true }}
+                          onBlur={() => { mileageEditingRef.current = false }}
+                          onChange={(e) => {
+                            const v = e.target.value
+                            if (v === '' || (Number(v) >= 0 && Number(v) <= 999999)) {
+                              setVehicleKilometrageRetour(v)
+                            }
+                          }}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-900 outline-none transition focus:border-[#0052CC] focus:ring-2 focus:ring-[#0052CC]/10"
+                          placeholder="0"
+                        />
+                      </label>
+                    </div>
+
+                    {/* Error Display */}
+                    {vehicleMileageError && (
+                      <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-red-200 bg-red-50">
+                        <AlertTriangle size={14} className="text-red-500 shrink-0" />
+                        <span className="text-xs font-semibold text-red-700">{vehicleMileageError}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div
               className={`bg-white rounded-2xl border-2 shadow-sm overflow-hidden transition-all ${
                 showStatusAttention
@@ -490,6 +640,18 @@ export default function MissionDetails() {
             >
               <div className="p-4 sm:p-6">
                 <SectionHeader icon={Zap} title="Actions & État" />
+
+                {missionActionError && (
+                  <div className="mt-3 mb-2 px-4 py-3 rounded-xl border border-red-200 bg-red-50 text-red-700 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <AlertTriangle size={16} className="text-red-500 shrink-0" />
+                      <span className="text-xs sm:text-sm font-black truncate">{missionActionError}</span>
+                    </div>
+                    <button type="button" onClick={() => setMissionActionError('')} className="text-[10px] font-black uppercase tracking-wider text-red-600 hover:text-red-700">
+                      Fermer
+                    </button>
+                  </div>
+                )}
 
                 {showStatusAttention ? (
                   <div className="mt-3 mb-2 px-4 py-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 flex items-center justify-between gap-3 animate-in fade-in zoom-in-95 duration-200">
@@ -507,12 +669,22 @@ export default function MissionDetails() {
                     const Icon = cfg.icon
                     const isActive = status === s
                     const shouldAnimate = isActive && statusJustChangedTo === s
+                    
+                    // Check if Terminée button should be disabled
+                    const isTermineeDisabled = s === 'Terminée' && mission.vehicleId && 
+                      (typeof vehicleKilometrageRetour !== 'number' && 
+                       (vehicleKilometrageRetour === '' || vehicleKilometrageRetour === null || isNaN(Number(vehicleKilometrageRetour))))
+                    
                     return (
                       <button
                         key={s}
                         onClick={() => handleStatusChange(s)}
+                        disabled={isTermineeDisabled}
+                        title={isTermineeDisabled ? 'Renseignez le kilométrage retour pour terminer' : ''}
                         className={`flex flex-col items-center justify-center gap-3 p-4 rounded-xl border-2 transition-all ${
-                          isActive
+                          isTermineeDisabled
+                            ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed opacity-50'
+                            : isActive
                             ? `${cfg.border} ${cfg.bg} ${cfg.color} scale-[1.02] shadow-sm ${shouldAnimate ? 'ring-2 ring-offset-2 ring-[#0052CC] animate-in zoom-in-95 duration-200' : ''}`
                             : 'border-slate-50 bg-slate-50 text-slate-400 hover:border-slate-200 hover:bg-white hover:text-slate-600'
                         }`}

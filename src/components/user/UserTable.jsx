@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Eye, Edit2, Trash2, Shield, Clock, AlertCircle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Edit2, Trash2, Shield, Clock, AlertCircle } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 
 const roleColors = {
@@ -11,10 +12,6 @@ const roleColors = {
 const statusColors = {
   green: 'bg-green-100 text-green-700',
   gray: 'bg-gray-100 text-gray-700',
-}
-
-const avatarBgColors = {
-  default: 'bg-[#0052CC]',
 }
 
 export default function UserTable({
@@ -30,9 +27,10 @@ export default function UserTable({
   statusFilter,
   onStatusChange,
 }) {
+  const navigate = useNavigate()
+
   const [userList, setUserList] = useState(users)
   const [selectedUser, setSelectedUser] = useState(null)
-  const [isViewOpen, setIsViewOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [editEmail, setEditEmail] = useState('')
@@ -71,16 +69,6 @@ export default function UserTable({
     fetchRoles()
   }, [])
 
-  const handleOpenView = (user) => {
-    setSelectedUser(user)
-    setIsViewOpen(true)
-  }
-
-  const handleCloseView = () => {
-    setIsViewOpen(false)
-    setSelectedUser(null)
-  }
-
   const handleOpenEdit = (user) => {
     setSelectedUser(user)
     setEditEmail(user.email)
@@ -109,7 +97,7 @@ export default function UserTable({
 
     const token = typeof window !== 'undefined' ? window.localStorage.getItem('auth_token') : null
     if (!token) {
-      setActionError("Session expirée. Veuillez vous reconnecter.")
+      setActionError('Session expiree. Veuillez vous reconnecter.')
       return
     }
 
@@ -130,7 +118,7 @@ export default function UserTable({
         const message =
           response.status === 403
             ? "Vous n'avez pas l'autorisation pour modifier cet utilisateur."
-            : "Impossible de modifier l'utilisateur. Réessayez plus tard."
+            : "Impossible de modifier l'utilisateur. Reessayez plus tard."
         setActionError(message)
         return
       }
@@ -172,9 +160,9 @@ export default function UserTable({
         const prevStatus = selectedUser.status
         const nextStatus = editStatus
         if (prevStatus !== nextStatus) {
-          onAction(nextStatus === 'Inactif' ? 'Utilisateur désactivé' : 'Utilisateur réactivé')
+          onAction(nextStatus === 'Inactif' ? 'Utilisateur desactive' : 'Utilisateur reactive')
         } else {
-          onAction('Utilisateur modifié')
+          onAction('Utilisateur modifie')
         }
       }
     } catch {
@@ -207,7 +195,7 @@ export default function UserTable({
 
     const token = typeof window !== 'undefined' ? window.localStorage.getItem('auth_token') : null
     if (!token) {
-      setActionError("Session expirée. Veuillez vous reconnecter.")
+      setActionError('Session expiree. Veuillez vous reconnecter.')
       return
     }
 
@@ -222,7 +210,7 @@ export default function UserTable({
         const message =
           response.status === 403
             ? "Vous n'avez pas l'autorisation pour supprimer cet utilisateur."
-            : "Impossible de supprimer l'utilisateur. Réessayez plus tard."
+            : "Impossible de supprimer l'utilisateur. Reessayez plus tard."
         setActionError(message)
         return
       }
@@ -235,7 +223,7 @@ export default function UserTable({
         onUsersChanged()
       }
       if (onAction) {
-        onAction('Utilisateur supprimé')
+        onAction('Utilisateur supprime')
       }
     } catch {
       setActionError("Erreur lors de la suppression de l'utilisateur.")
@@ -246,8 +234,6 @@ export default function UserTable({
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-
-      {/* ── FILTERS BAR ── */}
       <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap gap-3 items-center bg-slate-50/50">
         <div className="relative flex-1 min-w-[200px]">
           <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -264,7 +250,7 @@ export default function UserTable({
           onChange={(e) => onRoleChange(e.target.value)}
           className="w-full sm:w-auto px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] transition-all cursor-pointer"
         >
-          <option>Tous les rôles</option>
+          <option>Tous les roles</option>
           {availableRoles.map((role) => (
             <option key={role.name} value={role.name}>{role.name}</option>
           ))}
@@ -280,17 +266,16 @@ export default function UserTable({
         </select>
       </div>
 
-      {/* ── TABLE ── */}
       <div className="overflow-x-auto">
         <table className="w-full min-w-[840px]">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-100">
               <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Utilisateur</th>
               <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Email</th>
-              <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Département</th>
-              <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Rôle</th>
+              <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Departement</th>
+              <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Role</th>
               <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Statut</th>
-              <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Dernière connexion</th>
+              <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Derniere connexion</th>
               <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
             </tr>
           </thead>
@@ -308,8 +293,8 @@ export default function UserTable({
                   <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center">
                     <Shield size={24} className="text-slate-300" />
                   </div>
-                  <p className="font-bold text-slate-500">Aucun utilisateur trouvé</p>
-                  <p className="text-sm text-slate-400">Modifiez vos critères ou créez un nouveau compte.</p>
+                  <p className="font-bold text-slate-500">Aucun utilisateur trouve</p>
+                  <p className="text-sm text-slate-400">Modifiez vos criteres ou creez un nouveau compte.</p>
                 </div>
               </td></tr>
             ) : (
@@ -324,7 +309,7 @@ export default function UserTable({
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-500 font-medium">{user.email}</td>
-                  <td className="px-6 py-4 text-sm text-slate-500 font-medium">{user.department || '—'}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500 font-medium">{user.department || '-'}</td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold ${roleColors[user.roleColor]}`}>
                       {user.role === 'Administrateur' && <Shield size={12} />}
@@ -344,21 +329,33 @@ export default function UserTable({
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex gap-1">
-                      <button type="button" onClick={() => handleOpenView(user)}
-                        className="p-2 text-slate-400 hover:text-[#0052CC] hover:bg-blue-50 rounded-xl transition-all" title="Voir le profil">
-                        <Eye size={16} />
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/users/${user.id}/details`)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:border-blue-200 hover:bg-blue-100 hover:text-blue-800"
+                        title="Historique"
+                        aria-label={`Historique ${user.name}`}
+                      >
+                        Historique
                       </button>
-                      <button type="button" onClick={() => handleOpenEdit(user)}
-                        className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all" title="Modifier">
-                        <Edit2 size={16} />
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(user)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:border-amber-200 hover:bg-amber-100 hover:text-amber-800"
+                        title="Modifier"
+                        aria-label={`Modifier ${user.name}`}
+                      >
+                        Modifier
                       </button>
-                      <button type="button" onClick={() => handleOpenDelete(user)}
-                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all" title="Supprimer">
-                        <Trash2 size={16} />
-                      </button>
-                      <button className="p-2 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-xl transition-all" title="Gérer les droits">
-                        <Shield size={16} />
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDelete(user)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:border-rose-200 hover:bg-rose-100 hover:text-rose-800"
+                        title="Supprimer"
+                        aria-label={`Supprimer ${user.name}`}
+                      >
+                        Supprimer
                       </button>
                     </div>
                   </td>
@@ -368,77 +365,6 @@ export default function UserTable({
           </tbody>
         </table>
       </div>
-
-      {isViewOpen && selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 animate-in fade-in duration-300">
-          <div className="w-full max-w-md bg-white rounded-2xl border border-gray-100 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="relative h-24 bg-gradient-to-r from-[#0052CC] to-[#003d99]">
-              <div className="absolute -bottom-10 left-6">
-                <div
-                  className={`w-20 h-20 rounded-2xl ${
-                    avatarBgColors[selectedUser.avatar] || 'bg-[#0052CC]'
-                  } text-white flex items-center justify-center text-2xl font-bold border-4 border-white shadow-lg`}
-                >
-                  {selectedUser.avatar}
-                </div>
-              </div>
-            </div>
-            
-            <div className="pt-14 pb-6 px-6">
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 leading-tight">{selectedUser.name}</h2>
-                <p className="text-gray-500 font-medium">{selectedUser.email}</p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Rôle</p>
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-lg text-[11px] font-bold ${roleColors[selectedUser.roleColor]}`}
-                    >
-                      {selectedUser.role === 'Administrateur' && (
-                        <Shield size={12} className="mr-1" />
-                      )}
-                      {selectedUser.role}
-                    </span>
-                  </div>
-                </div>
-                <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Département</p>
-                  <p className="text-sm font-semibold text-slate-700">{selectedUser.department || '—'}</p>
-                </div>
-                <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Statut</p>
-                  <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-lg text-[11px] font-bold ${statusColors[selectedUser.statusColor]}`}
-                  >
-                    {selectedUser.status}
-                  </span>
-                </div>
-              </div>
-
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 mb-6">
-                <div className="flex items-center gap-2 text-slate-500 mb-1">
-                  <Clock size={14} />
-                  <p className="text-[10px] font-bold uppercase tracking-widest">Dernière connexion</p>
-                </div>
-                <p className="text-sm font-semibold text-slate-700">{selectedUser.lastLogin}</p>
-              </div>
-
-              <div className="flex justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={handleCloseView}
-                  className="w-full sm:w-auto px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition-all active:scale-95"
-                >
-                  Fermer
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {isEditOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 animate-in fade-in duration-300">
@@ -481,14 +407,14 @@ export default function UserTable({
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">
-                      Département
+                      Departement
                     </label>
                     <select
                       value={editDepartment}
                       onChange={(event) => setEditDepartment(event.target.value)}
                       className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] focus:bg-white transition-all font-bold text-gray-700"
                     >
-                      <option value="">Sélectionner un département</option>
+                      <option value="">Selectionner un departement</option>
                       <option value="SOMACS Commercial">SOMACS Commercial</option>
                       <option value="SOMACS Service">SOMACS Service</option>
                     </select>
@@ -498,7 +424,7 @@ export default function UserTable({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">
-                      Rôle système
+                      Role systeme
                     </label>
                     <select
                       value={editRole}
@@ -506,7 +432,7 @@ export default function UserTable({
                       className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] focus:bg-white transition-all font-bold text-gray-700"
                     >
                       {availableRoles.length === 0 ? (
-                        <option value="">{isLoadingRoles ? 'Chargement...' : 'Aucun rôle'}</option>
+                        <option value="">{isLoadingRoles ? 'Chargement...' : 'Aucun role'}</option>
                       ) : (
                         availableRoles.map((role) => (
                           <option key={role.name} value={role.name}>
@@ -525,8 +451,8 @@ export default function UserTable({
                       onChange={(event) => setEditStatus(event.target.value)}
                       className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] focus:bg-white transition-all font-bold text-gray-700"
                     >
-                      <option value="Actif">🟢 Actif</option>
-                      <option value="Inactif">🔴 Inactif</option>
+                      <option value="Actif">Actif</option>
+                      <option value="Inactif">Inactif</option>
                     </select>
                   </div>
                 </div>
@@ -549,7 +475,7 @@ export default function UserTable({
                         <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                         Enregistrement...
                       </span>
-                    ) : 'Mettre à jour'}
+                    ) : 'Mettre a jour'}
                   </button>
                 </div>
               </form>
@@ -567,7 +493,7 @@ export default function UserTable({
               </div>
               <h2 className="text-xl font-bold text-gray-900 mb-2">Supprimer l'utilisateur</h2>
               <p className="text-sm text-gray-500 mb-6">
-                Êtes-vous sûr de vouloir supprimer <span className="font-bold text-gray-900">{selectedUser.name}</span> ? Cette action est irréversible.
+                Etes-vous sur de vouloir supprimer <span className="font-bold text-gray-900">{selectedUser.name}</span> ? Cette action est irreversible.
               </p>
 
               {actionError && (

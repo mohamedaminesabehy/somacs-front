@@ -332,9 +332,17 @@ function KpiCard({ title, value, subtitle, icon: Icon, tone = 'blue' }) {
   }
 
   const colors = toneMap[tone] || toneMap.blue
+  const bgMap = {
+    blue: 'bg-gradient-to-br from-white to-blue-50/60',
+    emerald: 'bg-gradient-to-br from-white to-emerald-50/60',
+    amber: 'bg-gradient-to-br from-white to-amber-50/60',
+    slate: 'bg-gradient-to-br from-white to-slate-50/60',
+  }
+
+  const bgClass = bgMap[tone] || bgMap.blue
 
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white/80 backdrop-blur-md p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
+    <article className={`rounded-2xl border border-slate-200 ${bgClass} backdrop-blur-md p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md`}>
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">{title}</p>
@@ -856,7 +864,7 @@ export default function OperationsDashboard({ currentUser }) {
         </section>
 
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-          <article className="xl:col-span-8 min-w-0 rounded-2xl border border-slate-200 bg-white/80 backdrop-blur-md p-5 shadow-sm">
+          <article className="xl:col-span-8 min-w-0 rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-blue-50/60 backdrop-blur-md p-5 shadow-sm">
             <SectionHeader
               title="Performance équipe"
               subtitle={`Missions clôturées — ${selectedLabel}`}
@@ -908,7 +916,7 @@ export default function OperationsDashboard({ currentUser }) {
               </>
             )}
           </article>
-          <article className="xl:col-span-4 min-w-0 rounded-2xl border border-slate-200 bg-white/80 backdrop-blur-md p-5 shadow-sm">
+          <article className="xl:col-span-4 min-w-0 rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50/60 backdrop-blur-md p-5 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Devis</h2>
@@ -951,7 +959,7 @@ export default function OperationsDashboard({ currentUser }) {
         </section>
 
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-          <article className="xl:col-span-4 min-w-0 rounded-2xl border border-slate-200 bg-white/80 backdrop-blur-md p-5 shadow-sm">
+          <article className="xl:col-span-4 min-w-0 rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-emerald-50/60 backdrop-blur-md p-5 shadow-sm">
             <SectionHeader
               title="Missions"
               subtitle={`Statuts — ${selectedLabel}`}
@@ -971,7 +979,7 @@ export default function OperationsDashboard({ currentUser }) {
             </div>
           </article>
 
-          <article className="xl:col-span-4 min-w-0 rounded-2xl border border-slate-200 bg-white/80 backdrop-blur-md p-5 shadow-sm">
+          <article className="xl:col-span-4 min-w-0 rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-amber-50/60 backdrop-blur-md p-5 shadow-sm">
             <SectionHeader
               title="Interventions"
               subtitle={`Statuts — ${selectedLabel}`}
@@ -991,7 +999,7 @@ export default function OperationsDashboard({ currentUser }) {
             </div>
           </article>
 
-          <article className="xl:col-span-4 min-w-0 rounded-2xl border border-slate-200 bg-white/80 backdrop-blur-md p-5 shadow-sm">
+          <article className="xl:col-span-4 min-w-0 rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-cyan-50/60 backdrop-blur-md p-5 shadow-sm">
             <SectionHeader
               title="Machines"
               subtitle="Documentation disponible"
@@ -1017,14 +1025,17 @@ export default function OperationsDashboard({ currentUser }) {
         </section>
 
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-          <article className="xl:col-span-8 min-w-0 rounded-2xl border border-slate-200 bg-white/80 backdrop-blur-md p-5 shadow-sm">
+          <article className="xl:col-span-8 min-w-0 rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50/60 backdrop-blur-md p-5 shadow-sm" style={{ backgroundColor: 'antiquewhite' }}>
             <SectionHeader
               title="Activité récente"
               subtitle={`Derniers événements métiers — ${selectedLabel}`}
               icon={Activity}
             />
 
-            <div className="space-y-3 max-h-[60vh] sm:max-h-[420px] overflow-y-auto overflow-x-hidden pr-1 scrollbar-gray">
+            <div
+              className="space-y-3 max-h-[60vh] sm:max-h-[420px] overflow-y-auto overflow-x-hidden pr-1 scrollbar-gray"
+              style={{ maxHeight: 575 }}
+            >
               {recentActivity.length === 0 && !isLoading && (
                 <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
                   Aucune activité récente disponible.
@@ -1074,7 +1085,7 @@ export default function OperationsDashboard({ currentUser }) {
             </div>
           </article>
 
-          <article className="xl:col-span-4 min-w-0 rounded-2xl border border-slate-200 bg-white/80 backdrop-blur-md p-5 shadow-sm">
+          <article className="xl:col-span-4 min-w-0 rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-blue-50/60 backdrop-blur-md p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Actions rapides</h2>

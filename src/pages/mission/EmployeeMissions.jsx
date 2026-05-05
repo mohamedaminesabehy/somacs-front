@@ -600,13 +600,43 @@ export default function EmployeeMissions() {
         priorityColor: getPriorityColor(m.priority),
         statusColor: getStatusColorKey(m.status),
       }))
-      setMissions(normalized)
+      setMissions((prev) => {
+        // Keep locally-known terminated missions that server may omit
+        const prevTerminees = Array.isArray(prev) ? prev.filter((m) => m.status === 'Terminée') : []
+        const existingIds = new Set(normalized.map((m) => m.id))
+        const merged = [
+          ...normalized,
+          ...prevTerminees.filter((m) => !existingIds.has(m.id))
+        ]
+        return merged
+      })
     } catch {}
   }, [currentUser])
 
   useEffect(() => {
     void refreshMissions()
   }, [refreshMissions])
+
+  // Keep local missions list in sync when a mission is updated elsewhere
+  useEffect(() => {
+    const handler = (e) => {
+      const updated = e?.detail
+      if (!updated) return
+      const normalized = {
+        ...updated,
+        avatar: getAvatarFromName(updated.employee),
+        priorityColor: getPriorityColor(updated.priority),
+        statusColor: getStatusColorKey(updated.status),
+      }
+      setMissions((prev) => {
+        const exists = prev.some((m) => m.id === normalized.id)
+        if (exists) return prev.map((m) => (m.id === normalized.id ? { ...m, ...normalized } : m))
+        return [normalized, ...prev]
+      })
+    }
+    window.addEventListener('mission:updated', handler)
+    return () => window.removeEventListener('mission:updated', handler)
+  }, [])
 
   useEffect(() => {
     const onFocus = () => {

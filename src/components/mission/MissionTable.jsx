@@ -1,5 +1,5 @@
 import { forwardRef, useImperativeHandle, useState, useEffect, useCallback, useRef } from 'react'
-import { AlertCircle, Package, ClipboardList, Users, Eye, Edit, Trash2, MapPin, Building2, Phone, Calendar, Wrench, Paperclip, FileText, Clock, UserCheck, Hourglass, Link2, Settings, Download } from 'lucide-react'
+import { AlertCircle, Package, ClipboardList, Users, Eye, Edit, Trash2, MapPin, Building2, Phone, Calendar, Wrench, Paperclip, FileText, Clock, UserCheck, Hourglass, Link2, Settings, Download, Truck } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 import technicien from '../../assets/technicien.avif'
 
@@ -70,6 +70,13 @@ function getGroupedEmployeeStatuses(mission) {
     status: String(mission?.status || 'À faire'),
     notes: String(mission?.notes || '').trim(),
   }))
+}
+
+function truncateText(value, max = 70) {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  if (text.length <= max) return text
+  return `${text.slice(0, max)}....`
 }
 
 function MissionTableInner(props, ref) {
@@ -360,7 +367,14 @@ function MissionTableInner(props, ref) {
       employeeUserId: selectedEmployee ? Number(selectedEmployee.id) : null,
       priority: formPriority,
       status: modalMode === 'create' ? 'À faire' : formStatus,
-      dueDate: formDueDate || "Aujourd'hui",
+      // On create: fall back to "Aujourd'hui" if no date given.
+      // On edit: send only if the user actually filled the field; otherwise
+      // omit so the backend keeps the existing value.
+      ...(modalMode === 'create'
+        ? { dueDate: formDueDate || "Aujourd'hui" }
+        : formDueDate
+          ? { dueDate: formDueDate }
+          : {}),
       dueTime: formDueTime || null,
       notes: formNotes,
       type: missionType,
@@ -503,7 +517,7 @@ function MissionTableInner(props, ref) {
                     </div>
                     <div>
                       <p className="font-medium text-gray-900">{mission.title}</p>
-                      <p className="text-sm text-gray-500">{mission.description}</p>
+                      <p className="text-sm text-gray-500" title={mission.description || ''}>{truncateText(mission.description)}</p>
                       {mission.type === 'Intervention' && (
                         <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-[#0052CC] bg-blue-50 px-2 py-0.5 rounded-md">
                           <Link2 size={10} /> Intervention
@@ -1183,6 +1197,20 @@ function MissionTableInner(props, ref) {
                   <div className="bg-blue-50 p-3 rounded-xl border border-blue-100">
                     <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-1.5">Intervention liée</p>
                     <span className="font-mono text-sm font-bold text-[#0052CC]">{viewMission.interventionId}</span>
+                  </div>
+                )}
+
+                {viewMission.vehicle && (
+                  <div className="flex items-center gap-3">
+                    <div className="mt-1 p-2 bg-slate-100 rounded-lg">
+                      <Truck size={16} className="text-slate-500" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Véhicule affecté</p>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {viewMission.vehicle.marque} {viewMission.vehicle.modele} — {viewMission.vehicle.matricule}
+                      </p>
+                    </div>
                   </div>
                 )}
 

@@ -97,3 +97,11 @@ export async function apiFetch(path, options = {}) {
   return response
 }
 
+export async function logoutSession() {
+  try {
+    await apiFetch('/auth/logout', { method: 'POST', auth: true })
+  } catch {
+    // Local cleanup is handled by the caller even if API logout fails.
+  }
+}
+

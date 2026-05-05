@@ -68,19 +68,33 @@ export default function ListMission() {
   const [activeTab, setActiveTab]           = useState('all')
 
   const missionsWithGroupedEmployees = useMemo(() => {
+    // Build a local name map from the current list as a fallback only.
+    // The server already decorates each mission with `employeeDisplay` and
+    // `groupedEmployees` by querying ALL missions in the group (even those
+    // not visible to the current user). Prefer those server-side values so
+    // that technician names are never lost when a user only sees a subset.
     const namesByGroup = new Map()
 
     for (const mission of missions) {
       const groupId = mission?.assignmentGroupId
+      // Collect names from server-provided groupedEmployees first
+      const serverNames = Array.isArray(mission?.groupedEmployees)
+        ? mission.groupedEmployees.map((n) => String(n || '').trim()).filter(Boolean)
+        : []
       const employeeName = String(mission?.employee || '').trim()
-      if (!groupId || !employeeName) continue
+      const allNames = serverNames.length > 0 ? serverNames : (employeeName ? [employeeName] : [])
+      if (!groupId || allNames.length === 0) continue
       if (!namesByGroup.has(groupId)) {
         namesByGroup.set(groupId, new Set())
       }
-      namesByGroup.get(groupId).add(employeeName)
+      allNames.forEach((n) => namesByGroup.get(groupId).add(n))
     }
 
     return missions.map((mission) => {
+      // Use server-provided employeeDisplay if it is non-empty
+      if (mission?.employeeDisplay && String(mission.employeeDisplay).trim()) {
+        return mission
+      }
       const groupId = mission?.assignmentGroupId
       if (!groupId || !namesByGroup.has(groupId)) {
         return { ...mission, employeeDisplay: mission?.employee || '' }

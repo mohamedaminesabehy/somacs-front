@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, CheckSquare, Package, Wrench,
   FileText, PieChart, History, LogOut, Send,
-  ChevronDown, ChevronRight, List, PlusCircle, ClipboardList, Settings,
+  ChevronDown, ChevronRight, List, PlusCircle, ClipboardList, Settings, Truck,
 } from 'lucide-react'
 import logo from '../../assets/logo.jpg'
 
@@ -89,173 +89,311 @@ function SidebarContent({ onClose, currentUser, onLogout }) {
 
       <nav className="flex-1 px-4 py-4 sm:py-6 space-y-1 overflow-y-auto no-scrollbar">
 
-        {isTechnicien ? (
-          <div className="mb-8">
-            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] px-4 mb-4 opacity-80">
-              Espace Technicien
-            </div>
-            <div className="space-y-1">
-              <NavLink
-                to="/dashboard/technicien"
-                className={({ isActive }) =>
-                  `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
-                    isActive
-                      ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
-                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                  }`
-                }
-                onClick={onClose}
-              >
-                <LayoutDashboard size={20} className="group-hover:scale-110 transition-transform" />
-                <span className="font-medium">Tableau de bord</span>
-              </NavLink>
-              <NavLink
-                to="/machines"
-                className={({ isActive }) =>
-                  `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
-                    isActive
-                      ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
-                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                  }`
-                }
-                onClick={onClose}
-              >
-                <Settings size={20} className="group-hover:scale-110 transition-transform" />
-                <span className="font-medium">Parc Machines</span>
-              </NavLink>
-              <NavLink
-                to="/missions/my"
-                className={({ isActive }) =>
-                  `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
-                    isActive
-                      ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
-                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                  }`
-                }
-                onClick={onClose}
-              >
-                <ClipboardList size={20} className="group-hover:scale-110 transition-transform" />
-                <span className="font-medium">Mes missions</span>
-              </NavLink>
-              
-              <NavLink
-                to={`/employees/${currentUser?.id || 'me'}/history`}
-                className={({ isActive }) =>
-                  `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
-                    isActive
-                      ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
-                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                  }`
-                }
-                onClick={onClose}
-              >
-                <History size={20} className="group-hover:scale-110 transition-transform" />
-                <span className="font-medium">Historique des interventions</span>
-              </NavLink>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="mb-8">
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] px-4 mb-4 opacity-80">
-                Menu Principal
-              </div>
-              <NavLink
-                to="/dashboard"
-                end
-                className={({ isActive }) =>
-                  `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
-                    isActive
-                      ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
-                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                  }`
-                }
-                onClick={onClose}
-              >
-                <LayoutDashboard size={20} className="group-hover:scale-110 transition-transform" />
-                <span className="font-medium">Tableau de bord</span>
-              </NavLink>
-            </div>
+        {
+          // Role-based menus
+          (() => {
+            const isCommerciale = normalizedRole === 'commerciale' || normalizedRole === 'commercial'
+            const isResponsable = normalizedRole === 'responsable technicien' || normalizedRole.includes('responsable')
+            const isCoordinateur = normalizedRole === 'coordinateur'
 
-            <div className="mb-8">
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] px-4 mb-4 opacity-80">
-                Gestion Opérationnelle
-              </div>
-              <div className="space-y-1">
-                <NavLink
-                  to="/users"
-                  className={({ isActive }) =>
-                    `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
-                      isActive
-                        ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
-                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                    }`
-                  }
-                  onClick={onClose}
-                >
-                  <Users size={20} className="group-hover:scale-110 transition-transform" />
-                  <span className="font-medium">Utilisateurs</span>
-                </NavLink>
+            if (isCommerciale) {
+              return (
+                <div className="mb-8">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] px-4 mb-4 opacity-80">
+                    Commercial
+                  </div>
+                  <div className="space-y-1">
+                    <NavLink
+                      to="/devis"
+                      className={({ isActive }) =>
+                        `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                          isActive
+                            ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
+                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        }`
+                      }
+                      onClick={onClose}
+                    >
+                      <FileText size={20} className="group-hover:scale-110 transition-transform" />
+                      <span className="font-medium">Devis</span>
+                    </NavLink>
+                  </div>
+                </div>
+              )
+            }
 
-                <NavLink
-                  to="/machines"
-                  className={({ isActive }) =>
-                    `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
-                      isActive
-                        ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
-                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                    }`
-                  }
-                  onClick={onClose}
-                >
-                  <Settings size={20} className="group-hover:scale-110 transition-transform" />
-                  <span className="font-medium">Parc Machines</span>
-                </NavLink>
+            if (isTechnicien) {
+              return (
+                <div className="mb-8">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] px-4 mb-4 opacity-80">
+                    Espace Technicien
+                  </div>
+                  <div className="space-y-1">
+                    <NavLink
+                      to="/missions/my"
+                      className={({ isActive }) =>
+                        `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                          isActive
+                            ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
+                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        }`
+                      }
+                      onClick={onClose}
+                    >
+                      <ClipboardList size={20} className="group-hover:scale-110 transition-transform" />
+                      <span className="font-medium">Mes missions</span>
+                    </NavLink>
 
-                <SubMenu
-                  icon={CheckSquare}
-                  label="Missions Terrain"
-                  matchPaths={['/missions', '/missions/assign']}
-                >
-                  <SubLink to="/missions" end icon={List} label="Liste des missions" onClick={onClose} />
-                  <SubLink to="/missions/assign" icon={Send} label="Affecter une mission" onClick={onClose} />
-                </SubMenu>
-              </div>
-            </div>
+                    <NavLink
+                      to={`/employees/${currentUser?.id || 'me'}/history`}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                          isActive
+                            ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
+                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        }`
+                      }
+                      onClick={onClose}
+                    >
+                      <History size={20} className="group-hover:scale-110 transition-transform" />
+                      <span className="font-medium">Historique interventions</span>
+                    </NavLink>
 
-            <div className="mb-8">
-              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] px-4 mb-4 opacity-80">
-                Service Après-Vente
-              </div>
-              <div className="space-y-1">
-                <SubMenu
-                  icon={Wrench}
-                  label="Interventions SAV"
-                  matchPaths={['/interventions']}
-                >
-                  <SubLink to="/interventions" end icon={List} label="Liste des dossiers" onClick={onClose} />
-                  <SubLink to="/interventions/create" icon={PlusCircle} label="Nouveau dossier" onClick={onClose} />
-                  <SubLink to="/interventions/history" icon={History} label="Historique pannes" onClick={onClose} />
-                </SubMenu>
+                    <NavLink
+                      to="/machines"
+                      className={({ isActive }) =>
+                        `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                          isActive
+                            ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
+                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        }`
+                      }
+                      onClick={onClose}
+                    >
+                      <Settings size={20} className="group-hover:scale-110 transition-transform" />
+                      <span className="font-medium">Machines</span>
+                    </NavLink>
+                  </div>
+                </div>
+              )
+            }
 
-                <NavLink
-                  to="/devis"
-                  className={({ isActive }) =>
-                    `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
-                      isActive
-                        ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
-                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                    }`
-                  }
-                  onClick={onClose}
-                >
-                  <FileText size={20} className="group-hover:scale-110 transition-transform" />
-                  <span className="font-medium">Devis</span>
-                </NavLink>
-              </div>
-            </div>
-          </>
-        )}
+            if (isResponsable || isCoordinateur) {
+              return (
+                <>
+                  <div className="mb-8">
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] px-4 mb-4 opacity-80">
+                      Tableau de bord
+                    </div>
+                    <NavLink
+                      to="/dashboard"
+                      end
+                      className={({ isActive }) =>
+                        `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                          isActive
+                            ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
+                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        }`
+                      }
+                      onClick={onClose}
+                    >
+                      <LayoutDashboard size={20} className="group-hover:scale-110 transition-transform" />
+                      <span className="font-medium">Tableau de bord</span>
+                    </NavLink>
+                  </div>
+
+                  <div className="mb-8">
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] px-4 mb-4 opacity-80">
+                      Gestion opérationnelle
+                    </div>
+                    <div className="space-y-1">
+                      <SubMenu
+                        icon={CheckSquare}
+                        label="Missions"
+                        matchPaths={["/missions", "/missions/assign"]}
+                      >
+                        <SubLink to="/missions" end icon={List} label="Missions" onClick={onClose} />
+                        <SubLink to="/missions/assign" icon={Send} label="Affectation de mission" onClick={onClose} />
+                      </SubMenu>
+
+                      <NavLink
+                        to="/machines"
+                        className={({ isActive }) =>
+                          `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                            isActive
+                              ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
+                              : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                          }`
+                        }
+                        onClick={onClose}
+                      >
+                        <Settings size={20} className="group-hover:scale-110 transition-transform" />
+                        <span className="font-medium">Machines</span>
+                      </NavLink>
+
+                      <NavLink
+                        to="/vehicles"
+                        className={({ isActive }) =>
+                          `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                            isActive
+                              ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
+                              : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                          }`
+                        }
+                        onClick={onClose}
+                      >
+                        <Truck size={20} className="group-hover:scale-110 transition-transform" />
+                        <span className="font-medium">Véhicules</span>
+                      </NavLink>
+
+                      <SubMenu
+                        icon={Wrench}
+                        label="Interventions SAV"
+                        matchPaths={["/interventions"]}
+                      >
+                        <SubLink to="/interventions" end icon={List} label="Interventions" onClick={onClose} />
+                        <SubLink to="/interventions/create" icon={PlusCircle} label="Nouvelle intervention" onClick={onClose} />
+                      </SubMenu>
+
+                      <NavLink
+                        to="/devis"
+                        className={({ isActive }) =>
+                          `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                            isActive
+                              ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
+                              : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                          }`
+                        }
+                        onClick={onClose}
+                      >
+                        <FileText size={20} className="group-hover:scale-110 transition-transform" />
+                        <span className="font-medium">Devis</span>
+                      </NavLink>
+                    </div>
+                  </div>
+                </>
+              )
+            }
+
+            // Default (other roles): keep full menu
+            return (
+              <>
+                <div className="mb-8">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] px-4 mb-4 opacity-80">
+                    Tableau de bord
+                  </div>
+                  <NavLink
+                    to="/dashboard"
+                    end
+                    className={({ isActive }) =>
+                      `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                        isActive
+                          ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
+                          : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                      }`
+                    }
+                    onClick={onClose}
+                  >
+                    <LayoutDashboard size={20} className="group-hover:scale-110 transition-transform" />
+                    <span className="font-medium">Tableau de bord</span>
+                  </NavLink>
+                </div>
+
+                <div className="mb-8">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] px-4 mb-4 opacity-80">
+                    Gestion opérationnelle
+                  </div>
+                  <div className="space-y-1">
+                    <SubMenu
+                      icon={CheckSquare}
+                      label="Missions"
+                      matchPaths={["/missions", "/missions/assign"]}
+                    >
+                      <SubLink to="/missions" end icon={List} label="Missions" onClick={onClose} />
+                      <SubLink to="/missions/assign" icon={Send} label="Affectation de mission" onClick={onClose} />
+                    </SubMenu>
+
+                    <NavLink
+                      to="/machines"
+                      className={({ isActive }) =>
+                        `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                          isActive
+                            ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
+                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        }`
+                      }
+                      onClick={onClose}
+                    >
+                      <Settings size={20} className="group-hover:scale-110 transition-transform" />
+                      <span className="font-medium">Machines</span>
+                    </NavLink>
+
+                    <NavLink
+                      to="/vehicles"
+                      className={({ isActive }) =>
+                        `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                          isActive
+                            ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
+                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        }`
+                      }
+                      onClick={onClose}
+                    >
+                      <Truck size={20} className="group-hover:scale-110 transition-transform" />
+                      <span className="font-medium">Véhicules</span>
+                    </NavLink>
+
+                    <NavLink
+                      to="/users"
+                      className={({ isActive }) =>
+                        `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                          isActive
+                            ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
+                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        }`
+                      }
+                      onClick={onClose}
+                    >
+                      <Users size={20} className="group-hover:scale-110 transition-transform" />
+                      <span className="font-medium">Utilisateurs</span>
+                    </NavLink>
+                  </div>
+                </div>
+
+                <div className="mb-8">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] px-4 mb-4 opacity-80">
+                    Service après-vente
+                  </div>
+                  <div className="space-y-1">
+                    <SubMenu
+                      icon={Wrench}
+                      label="Interventions SAV"
+                      matchPaths={['/interventions']}
+                    >
+                      <SubLink to="/interventions" end icon={List} label="Interventions" onClick={onClose} />
+                      <SubLink to="/interventions/create" icon={PlusCircle} label="Nouvelle intervention" onClick={onClose} />
+                    </SubMenu>
+
+                    <NavLink
+                      to="/devis"
+                      className={({ isActive }) =>
+                        `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
+                          isActive
+                            ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-900/40 translate-x-1'
+                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        }`
+                      }
+                      onClick={onClose}
+                    >
+                      <FileText size={20} className="group-hover:scale-110 transition-transform" />
+                      <span className="font-medium">Devis</span>
+                    </NavLink>
+                  </div>
+                </div>
+              </>
+            )
+          })()
+        }
 
       </nav>
 

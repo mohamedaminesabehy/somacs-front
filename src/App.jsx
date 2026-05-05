@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './components/layout/Sidebar'
 import Header from './components/layout/Header'
 import UserManagement from './pages/user/UserManagement'
+import UserDetails from './pages/user/UserDetails'
 import ListMission from './pages/mission/ListMission'
 import EmployeeMissions from './pages/mission/EmployeeMissions'
 import EmployeeHistory from './pages/mission/EmployeeHistory'
@@ -10,19 +11,22 @@ import MissionDetails from './pages/mission/MissionDetails'
 import InterventionList from './pages/intervention/InterventionList'
 import CreateIntervention from './pages/intervention/CreateIntervention'
 import InterventionDetails from './pages/intervention/InterventionDetails'
-import InterventionHistory from './pages/intervention/InterventionHistory'
 import AssignMission from './pages/mission/AssignMission'
 import LoginForm from './components/user/LoginForm'
 import OperationsDashboard from './pages/dashboard/OperationsDashboard'
-import DashboardTechnicien from './pages/dashboard/DashboardTechnicien'
+// DashboardTechnicien removed; techniciens redirected to EmployeeMissions
 import DevisList from './pages/devis/DevisList'
 import DevisDetails from './pages/devis/DevisDetails'
 import CreateDevis from './pages/devis/CreateDevis'
 import MachineList from './pages/machines/MachineList'
 import MachineForm from './pages/machines/MachineForm'
 import MachineDetails from './pages/machines/MachineDetails'
+import VehicleList from './pages/VehicleList'
+import VehicleDetails from './pages/VehicleDetails'
+import CreateVehicle from './pages/CreateVehicle'
+import EditVehicle from './pages/EditVehicle'
 import { NotificationsProvider } from './notifications/NotificationsProvider'
-import { getAuthToken, isAuthTokenUsable } from './api/apiClient'
+import { getAuthToken, isAuthTokenUsable, logoutSession } from './api/apiClient'
 
 function AppLayout({
   children,
@@ -90,7 +94,7 @@ export default function App() {
     setIsAuthenticated(true)
   }
 
-  const handleLogout = () => {
+  const clearLocalAuth = () => {
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem('auth_token')
       window.localStorage.removeItem('auth_user')
@@ -99,11 +103,16 @@ export default function App() {
     setCurrentUser(null)
   }
 
+  const handleLogout = async () => {
+    await logoutSession()
+    clearLocalAuth()
+  }
+
   useEffect(() => {
     if (typeof window === 'undefined') return undefined
 
     const onAuthInvalid = () => {
-      handleLogout()
+      clearLocalAuth()
     }
 
     window.addEventListener('auth:invalid', onAuthInvalid)
@@ -111,6 +120,7 @@ export default function App() {
   }, [])
 
   const isLoggedIn = isAuthenticated
+  const normalizedRole = String(currentUser?.role || '').trim().toLowerCase()
 
   return (
     <Routes>
@@ -118,8 +128,10 @@ export default function App() {
         path="/"
         element={
           isLoggedIn ? (
-            String(currentUser?.role || '').trim().toLowerCase() === 'technicien' ? (
-              <Navigate to="/dashboard/technicien" replace />
+            normalizedRole === 'technicien' ? (
+              <Navigate to="/missions/my" replace />
+            ) : normalizedRole === 'commerciale' ? (
+              <Navigate to="/devis" replace />
             ) : (
               <AppLayout
                 isSidebarOpen={isSidebarOpen}
@@ -144,8 +156,10 @@ export default function App() {
         path="/dashboard"
         element={
           isLoggedIn ? (
-            String(currentUser?.role || '').trim().toLowerCase() === 'technicien' ? (
-              <Navigate to="/dashboard/technicien" replace />
+            normalizedRole === 'technicien' ? (
+              <Navigate to="/missions/my" replace />
+            ) : normalizedRole === 'commerciale' ? (
+              <Navigate to="/devis" replace />
             ) : (
               <AppLayout
                 isSidebarOpen={isSidebarOpen}
@@ -162,28 +176,7 @@ export default function App() {
           )
         }
       />
-      <Route
-        path="/dashboard/technicien"
-        element={
-          isLoggedIn ? (
-            String(currentUser?.role || '').trim().toLowerCase() === 'technicien' ? (
-              <AppLayout
-                isSidebarOpen={isSidebarOpen}
-                onToggleSidebar={handleToggleSidebar}
-                onCloseSidebar={handleCloseSidebar}
-                currentUser={currentUser}
-                onLogout={handleLogout}
-              >
-                <DashboardTechnicien currentUser={currentUser} />
-              </AppLayout>
-            ) : (
-              <Navigate to="/dashboard" replace />
-            )
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
+      {/* DashboardTechnicien removed; no dedicated route for technicien */}
       <Route
         path="/users"
         element={
@@ -196,6 +189,24 @@ export default function App() {
               onLogout={handleLogout}
             >
               <UserManagement currentUser={currentUser} />
+            </AppLayout>
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+      <Route
+        path="/users/:id/details"
+        element={
+          isLoggedIn ? (
+            <AppLayout
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={handleToggleSidebar}
+              onCloseSidebar={handleCloseSidebar}
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            >
+              <UserDetails currentUser={currentUser} />
             </AppLayout>
           ) : (
             <Navigate to="/" replace />
@@ -332,15 +343,7 @@ export default function App() {
         path="/interventions/history"
         element={
           isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <InterventionHistory />
-            </AppLayout>
+            <Navigate to="/interventions" replace />
           ) : (
             <Navigate to="/" replace />
           )
@@ -473,6 +476,78 @@ export default function App() {
         }
       />
       <Route
+        path="/vehicles"
+        element={
+          isLoggedIn ? (
+            <AppLayout
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={handleToggleSidebar}
+              onCloseSidebar={handleCloseSidebar}
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            >
+              <VehicleList />
+            </AppLayout>
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+      <Route
+        path="/vehicles/create"
+        element={
+          isLoggedIn ? (
+            <AppLayout
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={handleToggleSidebar}
+              onCloseSidebar={handleCloseSidebar}
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            >
+              <CreateVehicle />
+            </AppLayout>
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+      <Route
+        path="/vehicles/:id"
+        element={
+          isLoggedIn ? (
+            <AppLayout
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={handleToggleSidebar}
+              onCloseSidebar={handleCloseSidebar}
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            >
+              <VehicleDetails />
+            </AppLayout>
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+      <Route
+        path="/vehicles/:id/edit"
+        element={
+          isLoggedIn ? (
+            <AppLayout
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={handleToggleSidebar}
+              onCloseSidebar={handleCloseSidebar}
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            >
+              <EditVehicle />
+            </AppLayout>
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+      <Route
         path="/employees/:employeeId/history"
         element={
           isLoggedIn ? (
@@ -494,8 +569,10 @@ export default function App() {
         path="*"
         element={
           isLoggedIn ? (
-            String(currentUser?.role || '').trim().toLowerCase() === 'technicien' ? (
-              <Navigate to="/dashboard/technicien" replace />
+            normalizedRole === 'technicien' ? (
+              <Navigate to="/missions/my" replace />
+            ) : normalizedRole === 'commerciale' ? (
+              <Navigate to="/devis" replace />
             ) : (
               <Navigate to="/dashboard" replace />
             )

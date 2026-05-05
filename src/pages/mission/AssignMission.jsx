@@ -26,7 +26,8 @@ import {
   ArrowRight,
   Target,
   Send,
-  Loader2
+  Loader2,
+  Truck,
 } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 
@@ -100,6 +101,9 @@ export default function AssignMission() {
   const [priority, setPriority] = useState('Moyenne')
   const [dueDate, setDueDate] = useState('')
   const [dueTime, setDueTime] = useState('')
+  const [vehicleId, setVehicleId] = useState('')
+  const [availableVehicles, setAvailableVehicles] = useState([])
+  const [availableVehiclesLoading, setAvailableVehiclesLoading] = useState(true)
 
   const siteManuallyEditedRef = useRef(false)
 
@@ -113,6 +117,42 @@ export default function AssignMission() {
     }
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        setAvailableVehiclesLoading(true)
+        const response = await apiFetch('/vehicles/available', { auth: true })
+        console.log('[AssignMission] GET /vehicles/available response:', response.status)
+        if (!response.ok) {
+          console.warn('[AssignMission] API call failed with status', response.status)
+          return
+        }
+        const data = await response.json()
+        const normalized = Array.isArray(data)
+          ? data
+              .map((vehicle) => ({
+                id: vehicle.id ?? vehicle.vehicleId ?? vehicle.vehicle_id,
+                matricule: vehicle.matricule || vehicle.immatriculation || '',
+                marque: vehicle.marque || vehicle.brand || '',
+                modele: vehicle.modele || vehicle.model || '',
+                statut: vehicle.statut || vehicle.status || '',
+                disponibilite: vehicle.disponibilite ?? vehicle.disponibility,
+                activeMission: vehicle.activeMission || null,
+              }))
+              .filter((vehicle) => Boolean(vehicle.id))
+          : []
+        console.log('[AssignMission] Available vehicles received:', normalized)
+        console.log('[AssignMission] Count:', normalized.length)
+        setAvailableVehicles(normalized)
+      } catch (err) {
+        console.error('[AssignMission] Error fetching available vehicles:', err)
+        setAvailableVehicles([])
+      } finally {
+        setAvailableVehiclesLoading(false)
+      }
+    })()
+  }, [])
 
   useEffect(() => {
     ;(async () => {
@@ -164,7 +204,7 @@ export default function AssignMission() {
   }, [])
 
   const linkableInterventions = useMemo(
-    () => interventionsList.filter((i) => i.status === 'PENDING' || i.status === 'ASSIGNED'),
+    () => interventionsList.filter((i) => i.status === 'PENDING' && !String(i.assignedTo || '').trim()),
     [interventionsList],
   )
 
@@ -294,18 +334,55 @@ export default function AssignMission() {
         if (isMountedRef.current) setIsSubmitting(false)
         return
       }
+
+      const cleanedTitle = String(formData.title || '').trim()
+      const cleanedDescription = String(formData.description || '').trim()
+      const cleanedMissionType = String(missionType || '').trim()
+
+      if (!cleanedMissionType) {
+        alert('Veuillez sélectionner un type de mission.')
+        if (isMountedRef.current) setIsSubmitting(false)
+        return
+      }
+
+      if (!cleanedTitle) {
+        alert('Le titre de la mission est requis.')
+        if (isMountedRef.current) setIsSubmitting(false)
+        return
+      }
+
+      if (!cleanedDescription && cleanedMissionType !== 'Intervention') {
+        alert('La description de la mission est requise.')
+        if (isMountedRef.current) setIsSubmitting(false)
+        return
+      }
+
+      if (selectedEmployeeObjs.length > 1 && vehicleId) {
+        alert('Un véhicule ne peut pas être affecté à plusieurs missions actives en même temps. Retirez le véhicule ou affectez un seul technicien.')
+        if (isMountedRef.current) setIsSubmitting(false)
+        return
+      }
+
       const createdMissions = []
       const assignmentGroupId =
         selectedEmployeeObjs.length > 1
           ? `AG-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
           : null
       for (const employee of selectedEmployeeObjs) {
-        const missionPayload = {
-          title: formData.title,
-          description:
-            missionType === 'Intervention'
-              ? formData.description
-              : formData.description,
+        // backend requires non-empty description; for interventions, default to the
+        // intervention request if user didn't enter a description to avoid 400.
+        const payloadDescription = cleanedDescription ||
+          (missionType === 'Intervention' && selectedIntervention?.request
+            ? String(selectedIntervention.request).trim()
+            : `Mission ${missionType}${formData.interventionId ? ` — ${formData.interventionId}` : ''}`)
+
+        const selectedVehicleId = vehicleId ? Number(vehicleId) : null
+        console.log('[AssignMission] selectedVehicleId:', selectedVehicleId)
+        console.log('[AssignMission] typeof selectedVehicleId:', typeof selectedVehicleId)
+
+        const payload = {
+          title: cleanedTitle,
+          description: payloadDescription,
           employee: employee.name,
           employeeUserId: employee.id,
           assignmentGroupId,
@@ -317,15 +394,24 @@ export default function AssignMission() {
           interventionId: missionType === 'Intervention' ? formData.interventionId : null,
           site: formData.site,
           address: formData.address,
+          // Ne pas envoyer vehicleId si null pour éviter les problèmes de transformation DTO
+          ...(selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
         }
+
+        console.log('[AssignMission] payload envoyé:', payload)
 
         const response = await apiFetch('/missions', {
           method: 'POST',
-          body: missionPayload,
+          body: payload,
           auth: true,
         })
         if (!response.ok) {
-          alert('Erreur lors de la création de la mission.')
+          const errorData = await response.json().catch(() => ({}))
+          const message = Array.isArray(errorData?.message)
+            ? errorData.message.join(', ')
+            : errorData?.message || 'Erreur lors de la création de la mission.'
+          console.error('[AssignMission] POST /missions failed:', response.status, errorData)
+          alert(message)
           if (isMountedRef.current) setIsSubmitting(false)
           return
         }
@@ -388,7 +474,13 @@ export default function AssignMission() {
         })()
       }
     } catch (error) {
-      alert('Impossible de joindre le serveur.')
+      console.error('[AssignMission] erreur inattendue:', error)
+      // Distinguer erreur réseau réelle vs erreur JS (ex: variable undefined)
+      const isNetworkError = error instanceof TypeError && error.message.toLowerCase().includes('fetch')
+      const msg = isNetworkError
+        ? 'Impossible de joindre le serveur. Vérifiez que le backend est démarré.'
+        : `Erreur: ${error?.message || 'Une erreur inattendue est survenue.'}`
+      alert(msg)
       if (isMountedRef.current) setIsSubmitting(false)
     }
   }
@@ -547,13 +639,6 @@ export default function AssignMission() {
                       {linkableInterventions.filter((i) => i.status === 'PENDING').map((inv) => (
                         <option key={inv.id} value={inv.id}>
                           {inv.id} — {inv.client} — {inv.machine}
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Affectees (deja assignees)">
-                      {linkableInterventions.filter((i) => i.status === 'ASSIGNED').map((inv) => (
-                        <option key={inv.id} value={inv.id}>
-                          {inv.id} — {inv.client} — {inv.machine} ({inv.assignedTo})
                         </option>
                       ))}
                     </optgroup>
@@ -884,6 +969,52 @@ export default function AssignMission() {
                 />
               </div>
             </div>
+
+            {/* Véhicule */}
+            <div className="space-y-3">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                <Settings size={14} className="text-[#0052CC]" />
+                Véhicule affecté (optionnel)
+              </label>
+              {availableVehiclesLoading ? (
+                <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-500">
+                  <Loader2 size={16} className="text-slate-400 shrink-0 animate-spin" />
+                  Chargement des véhicules disponibles...
+                </div>
+              ) : availableVehicles.length === 0 ? (
+                <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-500">
+                  <AlertCircle size={16} className="text-slate-400 shrink-0" />
+                  Aucun véhicule disponible actuellement
+                </div>
+              ) : (
+                <select
+                  value={vehicleId}
+                  onChange={(e) => setVehicleId(e.target.value)}
+                  disabled={selectedEmployees.length > 1}
+                  className="w-full px-5 py-4 bg-white border-2 border-slate-200 rounded-xl focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all font-semibold text-slate-700 appearance-none cursor-pointer shadow-sm hover:border-slate-300"
+                  style={{ backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")", backgroundPosition: 'right 0.75rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em' }}
+                >
+                  <option value="">-- Aucun véhicule --</option>
+                  {availableVehicles.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.matricule} — {v.marque} {v.modele}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {selectedEmployees.length > 1 && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-700">
+                  <AlertCircle size={13} className="shrink-0" />
+                  Le véhicule est désactivé pour une affectation multi-techniciens.
+                </div>
+              )}
+              {vehicleId && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-xs font-bold text-blue-700">
+                  <Truck size={13} />
+                  Véhicule sélectionné — deviendra "Affecté" après confirmation
+                </div>
+              )}
+            </div>
           </div>
         )
 
@@ -984,6 +1115,17 @@ export default function AssignMission() {
                         <div className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
                           <Clock size={13} className="text-orange-300" />
                           {dueTime}
+                        </div>
+                      </div>
+                    )}
+                    {vehicleId && (
+                      <div className="col-span-2">
+                        <p className="text-[10px] font-bold text-orange-500 uppercase tracking-wider mb-1">Véhicule affecté</p>
+                        <div className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
+                          <Truck size={13} className="text-orange-300" />
+                          {availableVehicles.find(v => String(v.id) === String(vehicleId))
+                            ? `${availableVehicles.find(v => String(v.id) === String(vehicleId)).matricule} — ${availableVehicles.find(v => String(v.id) === String(vehicleId)).marque} ${availableVehicles.find(v => String(v.id) === String(vehicleId)).modele}`
+                            : '—'}
                         </div>
                       </div>
                     )}
