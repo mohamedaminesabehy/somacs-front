@@ -1174,7 +1174,7 @@ export default function AssignMission() {
 
   // ── Main render ───────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="flex min-h-full flex-col bg-gradient-to-br from-slate-50 to-slate-100">
 
       {showMaxEmployeesPopup && (
         <div className="fixed top-4 right-4 z-[120]">
@@ -1250,10 +1250,10 @@ export default function AssignMission() {
       </div>
 
       {/* ── BODY ── */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-h-0 flex-col md:flex-row">
 
         {/* ── LEFT STEPPER (desktop only) ── */}
-        <div className="hidden md:flex md:w-[260px] lg:w-[300px] border-r border-slate-100 bg-slate-50/30 flex-col p-6 lg:p-8 shrink-0">
+        <div className="hidden md:flex md:w-[260px] lg:w-[300px] border-r border-slate-100 bg-slate-50/30 flex-col p-6 lg:p-8 shrink-0 md:sticky md:top-0 md:self-start md:max-h-[calc(100vh-4rem)] md:overflow-y-auto">
           <div className="space-y-2 mb-8">
             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Etapes</h4>
             <div className="h-1 w-12 bg-[#0052CC] rounded-full"></div>
@@ -1329,10 +1329,10 @@ export default function AssignMission() {
         </div>
 
         {/* ── CENTER FORM ── */}
-        <div className="flex-1 overflow-y-auto no-scrollbar bg-white flex flex-col">
-          <div className="flex-1 px-4 py-6 sm:px-8 sm:py-10 lg:px-12 lg:py-14 max-w-4xl mx-auto w-full">
-            <div className="h-full flex flex-col">
-              <div className="flex-1">
+        <div className="flex-1 min-h-0 bg-white flex flex-col">
+          <div className="w-full max-w-4xl mx-auto px-4 py-6 sm:px-8 sm:py-10 lg:px-12 lg:py-14">
+            <div className="flex flex-col">
+              <div>
                 {renderStep()}
               </div>
 

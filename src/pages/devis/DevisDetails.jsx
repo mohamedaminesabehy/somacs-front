@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+﻿import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronLeft,
@@ -27,6 +27,7 @@ import {
   ArrowRight
 } from 'lucide-react'
 import logo from '../../assets/logo.jpg'
+import DevisSuiviSection, { DevisSuiviTimeline, HorizontalStatusTimeline } from '../../components/devis/DevisSuiviSection.jsx'
 
 // --- Helper Functions ---
 const formatDate = (dateString) => {
@@ -356,6 +357,8 @@ export default function DevisDetails() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [data, setData] = useState(null)
+  const [activeTab, setActiveTab] = useState('informations')
+  const [sharedStatuses, setSharedStatuses] = useState(null) // null = not yet loaded
 
   const fetchDevisDetails = useCallback(async () => {
     try {
@@ -371,7 +374,21 @@ export default function DevisDetails() {
 
       if (response.ok) {
         const result = await response.json()
-        setData(normalizeDevisPayload(result))
+        const normalized = normalizeDevisPayload(result)
+        setData(normalized)
+        // Initialiser sharedStatuses depuis localStorage dès le chargement
+        const numero_ = normalized?.header?.NUMERO || ''
+        const typDoc_ = normalized?.header?.TYPDOC || ''
+        if (numero_ && typDoc_) {
+          try {
+            const key = `devis_statuses_${numero_}_${typDoc_}`
+            const raw = localStorage.getItem(key)
+            if (raw) {
+              const parsed = JSON.parse(raw)
+              if (Array.isArray(parsed) && parsed.length > 0) setSharedStatuses(parsed)
+            }
+          } catch {}
+        }
       } else {
         const errorPayload = await response.json().catch(() => null)
         const serverMessage =
@@ -470,6 +487,29 @@ export default function DevisDetails() {
         
         {/* Left Column: Information Cards */}
         <div className="xl:col-span-7 space-y-6">
+
+          {/* Tab Buttons */}
+          <div className="flex gap-2 bg-white rounded-2xl border border-slate-200 p-1.5 shadow-sm w-fit">
+            {[
+              { key: 'informations', label: 'Informations' },
+              { key: 'suivi', label: 'Suivi commercial' },
+            ].map(tab => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`px-5 py-2 rounded-xl text-sm font-black transition-all ${
+                  activeTab === tab.key
+                    ? 'bg-[#0052CC] text-white shadow-md shadow-blue-200'
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === 'informations' && (<>
           
           {/* Header Card */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
@@ -636,6 +676,25 @@ export default function DevisDetails() {
               </div>
             </div>
           </div>
+          </>)}
+
+          {activeTab === 'suivi' && (
+            <DevisSuiviSection
+              devis={{
+                numeroDevis: header.NUMERO,
+                typDoc: header.TYPDOC,
+                clientCode: header.CODTIE || '',
+                commercialCode: header.CODREP || header.NomRep || header.UserCreate || '',
+                clientLabel: header.NOMTIE || '',
+                commercialLabel: header.NomRep || header.CODREP || '',
+                montantDevis: totals.totalTTC,
+                createdAt: header.DATDOC,
+                updatedAt: header.DateMaj || header.DateCreate || header.DATDOC,
+              }}
+              enableTimeline={false}
+              onStatusesChange={setSharedStatuses}
+            />
+          )}
         </div>
 
         {/* Right Column: Fiche Preview */}
@@ -666,9 +725,27 @@ export default function DevisDetails() {
                 <p className="text-[10px] text-slate-500 font-medium mt-0.5">Cet aperçu reflète exactement le document qui sera imprimé ou envoyé au client.</p>
               </div>
             </div>
+
           </div>
         </div>
 
+      </div>
+
+      <div className="mt-6 max-w-[1600px] mx-auto">
+        <DevisSuiviTimeline
+          devis={{
+            numeroDevis: header.NUMERO,
+            typDoc: header.TYPDOC,
+            clientCode: header.CODTIE || '',
+            commercialCode: header.CODREP || header.NomRep || header.UserCreate || '',
+            clientLabel: header.NOMTIE || '',
+            commercialLabel: header.NomRep || header.CODREP || '',
+            montantDevis: totals.totalTTC,
+            createdAt: header.DATDOC,
+            updatedAt: header.DateMaj || header.DateCreate || header.DATDOC,
+          }}
+          selectedStatuses={sharedStatuses ?? undefined}
+        />
       </div>
     </div>
   )

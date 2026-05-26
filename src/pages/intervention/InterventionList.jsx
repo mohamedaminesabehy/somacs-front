@@ -93,7 +93,7 @@ function StatCard({ label, count, total, icon: Icon, active, onClick, colorClass
 function ActionMenu({ item, onNavigate }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
-  const isAlreadyAssigned = Boolean(item?.assignee) || item?.status === 'ASSIGNED'
+  const isAlreadyAssigned = Boolean(String(item?.assignee || '').trim()) || Boolean(String(item?.assignedTo || '').trim()) || Boolean(String(item?.technicianName || '').trim()) || Boolean(item?.hasLinkedMission)
 
   useEffect(() => {
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
@@ -148,6 +148,155 @@ function ActionMenu({ item, onNavigate }) {
   )
 }
 
+function DeleteConfirmationModal({
+  open,
+  item,
+  isDeleting,
+  error,
+  onCancel,
+  onConfirm,
+}) {
+  if (!open) return null
+
+  const linkedMissionCount = Number(item?.linkedMissionCount || 0)
+  const hasLinkedMission = linkedMissionCount > 0
+
+  return (
+    <div
+      className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/55 backdrop-blur-sm px-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Confirmer la suppression"
+    >
+      <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Suppression</p>
+            <h2 className="mt-1 text-xl font-black text-slate-900">
+              {hasLinkedMission ? 'Supprimer cette intervention et sa mission ?' : 'Supprimer cette intervention ?'}
+            </h2>
+            <p className="mt-1.5 text-sm text-slate-500">
+              Cette action est définitive.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isDeleting}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-50 text-slate-500 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Fermer"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="px-6 py-5">
+          {item && (
+            <div className="mb-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-semibold text-slate-700">
+                <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-500 border border-slate-200">
+                  {item.id}
+                </span>
+                <span className="truncate">{item.client}</span>
+                <span className="hidden h-1 w-1 rounded-full bg-slate-300 sm:inline-block" />
+                <span className="truncate text-slate-500">{item.machine}</span>
+              </div>
+            </div>
+          )}
+
+          <div
+            className={`rounded-2xl border px-4 py-4 ${hasLinkedMission ? 'border-amber-200 bg-amber-50/80' : 'border-slate-200 bg-slate-50'}`}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${hasLinkedMission ? 'bg-amber-100 text-amber-700' : 'bg-red-50 text-red-600'}`}
+              >
+                {hasLinkedMission ? <AlertTriangle size={18} /> : <Trash2 size={18} />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-700 whitespace-pre-line">
+                  {hasLinkedMission
+                    ? 'Cette intervention est affectée à une mission. La mission liée sera également supprimée.'
+                    : 'Êtes-vous sûr de vouloir supprimer cette intervention ?'}
+                </p>
+                {hasLinkedMission && (
+                  <p className="mt-2 text-xs font-medium text-amber-700/90">
+                    {linkedMissionCount > 1
+                      ? `${linkedMissionCount} missions liées seront supprimées.`
+                      : 'La mission liée sera supprimée en même temps.'}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {error && (
+            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              {error}
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isDeleting}
+            className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Annuler
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isDeleting}
+            className={`inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-white transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-75 ${hasLinkedMission ? 'bg-amber-600 hover:bg-amber-700' : 'bg-red-600 hover:bg-red-700'}`}
+          >
+            {isDeleting ? <RefreshCw size={16} className="animate-spin" /> : <Trash2 size={16} />}
+            {isDeleting ? 'Suppression...' : 'Supprimer'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SuccessModal({ open, message, onClose }) {
+  if (!open) return null
+
+  return (
+    <div
+      className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-950/45 backdrop-blur-sm px-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Suppression réussie"
+    >
+      <div className="w-full max-w-md overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-2xl">
+        <div className="flex items-start gap-4 px-6 py-6">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50 text-emerald-600">
+            <CheckCircle2 size={22} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500">Succès</p>
+            <p className="mt-1 text-base font-semibold text-slate-800 whitespace-pre-line">
+              {message}
+            </p>
+          </div>
+        </div>
+        <div className="border-t border-emerald-100 bg-emerald-50/50 px-6 py-4 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white transition-colors hover:bg-emerald-700"
+          >
+            Fermer
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function InterventionList() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -159,6 +308,13 @@ export default function InterventionList() {
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState({ open: false, message: '' })
   const toastTimerRef = useRef(null)
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    item: null,
+    isDeleting: false,
+    error: '',
+  })
+  const [deleteSuccess, setDeleteSuccess] = useState({ open: false, message: '' })
   const [highlightId, setHighlightId] = useState('')
   const highlightTimerRef = useRef(null)
   const highlightRowRef = useRef(null)
@@ -170,6 +326,23 @@ export default function InterventionList() {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 6
+
+  useEffect(() => {
+    const refreshOnFocus = () => fetchInterventions()
+    const refreshOnVisible = () => {
+      if (document.visibilityState === 'visible') {
+        fetchInterventions()
+      }
+    }
+
+    window.addEventListener('focus', refreshOnFocus)
+    document.addEventListener('visibilitychange', refreshOnVisible)
+
+    return () => {
+      window.removeEventListener('focus', refreshOnFocus)
+      document.removeEventListener('visibilitychange', refreshOnVisible)
+    }
+  }, [])
 
   const fetchInterventions = async () => {
     setLoading(true)
@@ -191,6 +364,7 @@ export default function InterventionList() {
 
       // Build a map of interventionId -> grouped employee names
       const agentsByIntervention = new Map()
+      const linkedMissionCounts = new Map()
       if (Array.isArray(missionsData)) {
         const namesByGroup = new Map()
 
@@ -199,6 +373,13 @@ export default function InterventionList() {
           const groupId = mission?.assignmentGroupId
           const employeeName = String(mission?.employee || '').trim()
           const interventionId = mission?.interventionId
+
+          if (interventionId) {
+            linkedMissionCounts.set(
+              interventionId,
+              (linkedMissionCounts.get(interventionId) || 0) + 1,
+            )
+          }
 
           if (!employeeName) continue
 
@@ -255,6 +436,8 @@ export default function InterventionList() {
               date: i.date || i.interventionDate || '',
               assignee: assigneeDisplay,
               priority: i.priority || 'Moyenne',
+              linkedMissionCount: linkedMissionCounts.get(interventionId) || 0,
+              hasLinkedMission: (linkedMissionCounts.get(interventionId) || 0) > 0,
             }
           })
         : []
@@ -347,21 +530,64 @@ export default function InterventionList() {
     }
     else if (action === 'assign') navigate('/missions/assign', { state: { prefillInterventionId: id } })
     else if (action === 'delete') {
-      const confirmed = window.confirm(`Supprimer le dossier ${id} ?`)
-      if (!confirmed) return
-      ;(async () => {
-        try {
-          const response = await apiFetch(`/interventions/${id}`, {
-            method: 'DELETE',
-            auth: true,
-          })
-          if (response.ok) {
-            fetchInterventions()
-          }
-        } catch (error) {
-          console.error('Error deleting intervention:', error)
-        }
-      })()
+      setDeleteDialog({
+        open: true,
+        item: item || null,
+        isDeleting: false,
+        error: '',
+      })
+    }
+  }
+
+  const handleDeleteCancel = () => {
+    if (deleteDialog.isDeleting) return
+    setDeleteDialog({ open: false, item: null, isDeleting: false, error: '' })
+  }
+
+  const handleDeleteConfirm = async () => {
+    const target = deleteDialog.item
+    if (!target || deleteDialog.isDeleting) return
+
+    setDeleteDialog((prev) => ({ ...prev, isDeleting: true, error: '' }))
+
+    try {
+      const response = await apiFetch(`/interventions/${target.id}`, {
+        method: 'DELETE',
+        auth: true,
+      })
+
+      let payload = null
+      try {
+        payload = await response.json()
+      } catch {
+        payload = null
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          payload?.message || payload?.error || 'Impossible de supprimer cette intervention.',
+        )
+      }
+
+      const missionsDeletedCount = Number(
+        payload?.missionsDeletedCount ?? (payload?.missionDeleted ? 1 : 0),
+      ) || 0
+      const successMessage =
+        missionsDeletedCount > 1
+          ? `L’intervention et les ${missionsDeletedCount} missions liées ont été supprimées avec succès.`
+          : missionsDeletedCount === 1
+            ? 'L’intervention et la mission liée ont été supprimées avec succès.'
+            : 'L’intervention a été supprimée avec succès.'
+
+      await fetchInterventions()
+      setDeleteDialog({ open: false, item: null, isDeleting: false, error: '' })
+      setDeleteSuccess({ open: true, message: successMessage })
+    } catch (error) {
+      setDeleteDialog((prev) => ({
+        ...prev,
+        isDeleting: false,
+        error: error instanceof Error ? error.message : 'Erreur lors de la suppression.',
+      }))
     }
   }
 
@@ -415,6 +641,19 @@ export default function InterventionList() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
+      <DeleteConfirmationModal
+        open={deleteDialog.open}
+        item={deleteDialog.item}
+        isDeleting={deleteDialog.isDeleting}
+        error={deleteDialog.error}
+        onCancel={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+      />
+      <SuccessModal
+        open={deleteSuccess.open}
+        message={deleteSuccess.message}
+        onClose={() => setDeleteSuccess({ open: false, message: '' })}
+      />
       {toast.open && (
         <div className="fixed top-4 left-4 right-4 sm:top-6 sm:left-auto sm:right-6 z-[120] animate-in fade-in duration-200">
           <div
@@ -704,13 +943,20 @@ export default function InterventionList() {
                               disabled={Boolean(item.assignee) || item.status === 'ASSIGNED'}
                               onClick={(e) => { e.stopPropagation(); handleNavigate('assign', item) }}
                               className={`flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-sm border active:scale-95 ${
-                                Boolean(item.assignee) || item.status === 'ASSIGNED'
+                                Boolean(String(item.assignee || '').trim()) || Boolean(String(item.assignedTo || '').trim()) || Boolean(String(item.technicianName || '').trim()) || Boolean(item.hasLinkedMission)
                                   ? 'text-slate-300 bg-slate-100 border-slate-200 cursor-not-allowed pointer-events-none'
                                   : 'text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white border-[#004a77]/10'
                               }`}
                             >
                               <UserCheck2 size={12} strokeWidth={3} />
                               Affecter
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); handleNavigate('delete', item) }}
+                              className="flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-red-600 bg-red-50 hover:bg-red-600 hover:text-white rounded-xl transition-all shadow-sm border border-red-100 active:scale-95"
+                            >
+                              <Trash2 size={12} strokeWidth={3} />
+                              Supprimer
                             </button>
                           </div>
                         </td>

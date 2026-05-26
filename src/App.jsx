@@ -18,6 +18,8 @@ import OperationsDashboard from './pages/dashboard/OperationsDashboard'
 import DevisList from './pages/devis/DevisList'
 import DevisDetails from './pages/devis/DevisDetails'
 import CreateDevis from './pages/devis/CreateDevis'
+import DevisSuiviDashboard from './pages/devis-suivi/DevisSuiviDashboard'
+import DevisSuiviRelance from './pages/devis-suivi/DevisSuiviRelance'
 import MachineList from './pages/machines/MachineList'
 import MachineForm from './pages/machines/MachineForm'
 import MachineDetails from './pages/machines/MachineDetails'
@@ -380,6 +382,50 @@ export default function App() {
             >
               <CreateDevis />
             </AppLayout>
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+      <Route
+        path="/devis-suivi"
+        element={
+          isLoggedIn ? (
+            (normalizedRole === 'administrateur' || normalizedRole === 'commerciale' || normalizedRole === 'commercial') ? (
+              <AppLayout
+                isSidebarOpen={isSidebarOpen}
+                onToggleSidebar={handleToggleSidebar}
+                onCloseSidebar={handleCloseSidebar}
+                currentUser={currentUser}
+                onLogout={handleLogout}
+              >
+                <DevisSuiviDashboard />
+              </AppLayout>
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+      <Route
+        path="/devis-suivi/relance"
+        element={
+          isLoggedIn ? (
+            (normalizedRole === 'administrateur' || normalizedRole === 'commerciale' || normalizedRole === 'commercial') ? (
+              <AppLayout
+                isSidebarOpen={isSidebarOpen}
+                onToggleSidebar={handleToggleSidebar}
+                onCloseSidebar={handleCloseSidebar}
+                currentUser={currentUser}
+                onLogout={handleLogout}
+              >
+                <DevisSuiviRelance />
+              </AppLayout>
+            ) : (
+              <Navigate to="/dashboard" replace />
+            )
           ) : (
             <Navigate to="/" replace />
           )

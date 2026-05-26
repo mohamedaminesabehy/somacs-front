@@ -43,6 +43,30 @@ function KpiCard({ kpi }) {
   )
 }
 
+function buildDeleteMissionSummary(mission) {
+  const interventionId = String(mission?.interventionId || '').trim()
+  const employeeName = String(mission?.employeeDisplay || mission?.employee || '').trim()
+
+  if (!interventionId) {
+    return {
+      isLinked: false,
+      title: 'Supprimer cette mission ?',
+      message: 'Cette action est irréversible. La mission sera supprimée définitivement.',
+      details: [],
+    }
+  }
+
+  return {
+    isLinked: true,
+    title: 'Attention',
+    message: `Cette mission est liée à l’intervention numéro ${interventionId}. En supprimant cette mission, l’intervention sera désaffectée et redeviendra non affectée.`,
+    details: [
+      `Technicien${employeeName ? `: ${employeeName}` : ''} ne sera plus assigné.`,
+      'L’intervention liée sera remise à l’état non affecté.',
+    ],
+  }
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function ListMission() {
   const navigate = useNavigate()
@@ -459,18 +483,24 @@ export default function ListMission() {
   return (
     <div className="min-h-full bg-slate-50">
       {deleteDialog.open && (
+        (() => {
+          const summary = buildDeleteMissionSummary(deleteDialog.mission)
+          return (
         <div
           className="fixed inset-0 z-[130] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
           role="dialog"
           aria-modal="true"
           aria-label="Confirmer la suppression"
         >
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
             <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Suppression</p>
-                <h2 className="text-base sm:text-lg font-black text-slate-900 mt-1">
-                  Supprimer cette mission ?
+                <p className={`text-[10px] font-black uppercase tracking-widest ${summary.isLinked ? 'text-amber-500' : 'text-slate-400'}`}>
+                  {summary.isLinked ? 'Attention' : 'Suppression'}
+                </p>
+                <h2 className="text-base sm:text-lg font-black text-slate-900 mt-1 flex items-center gap-2">
+                  {summary.isLinked && <AlertCircle size={16} className="text-amber-500 shrink-0" />}
+                  {summary.title}
                 </h2>
                 {deleteDialog.mission?.title && (
                   <p className="text-xs sm:text-sm text-slate-600 mt-1.5 break-words">
@@ -492,9 +522,21 @@ export default function ListMission() {
             </div>
 
             <div className="px-5 py-4">
-              <p className="text-sm text-slate-600">
-                Cette action est irréversible. La mission sera supprimée définitivement.
-              </p>
+                <div className={`rounded-2xl border px-4 py-4 ${summary.isLinked ? 'border-amber-200 bg-amber-50/80' : 'border-slate-200 bg-slate-50'}`}>
+                  <p className="text-sm text-slate-700 font-semibold leading-relaxed whitespace-pre-line">
+                    {summary.message}
+                  </p>
+                  {summary.details.length > 0 && (
+                    <ul className="mt-3 space-y-1 text-sm text-slate-600">
+                      {summary.details.map((detail) => (
+                        <li key={detail} className="flex items-start gap-2">
+                          <span className={`mt-1 h-1.5 w-1.5 rounded-full ${summary.isLinked ? 'bg-amber-500' : 'bg-slate-400'}`} />
+                          <span>{detail}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
             </div>
 
             <div className="px-5 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">
@@ -554,14 +596,18 @@ export default function ListMission() {
                 className={`px-4 py-2.5 rounded-xl text-sm font-black transition-all active:scale-95 ${
                   deleteDialog.isDeleting
                     ? 'bg-red-400 text-white cursor-not-allowed'
-                    : 'bg-red-600 hover:bg-red-700 text-white'
+                    : summary.isLinked
+                      ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                      : 'bg-red-600 hover:bg-red-700 text-white'
                 }`}
               >
-                Supprimer
+                {deleteDialog.isDeleting ? 'Suppression...' : 'Confirmer suppression'}
               </button>
             </div>
           </div>
         </div>
+          )
+        })()
       )}
       {toast.open && (
         <div className="fixed top-5 right-5 sm:top-6 sm:right-6 z-[120] animate-in fade-in duration-200">
