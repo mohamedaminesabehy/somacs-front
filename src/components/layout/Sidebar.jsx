@@ -17,6 +17,7 @@ import {
   ClipboardList,
   Settings,
   Truck,
+  Building2,
 } from 'lucide-react'
 import logo from '../../assets/logo.jpg'
 
@@ -112,6 +113,11 @@ function SidebarContent({ onClose, currentUser, onLogout }) {
             <span className="font-medium">Machines</span>
           </NavLink>
 
+          <NavLink to="/clients" className={menuLinkClass} onClick={onClose}>
+            <Building2 size={20} className="group-hover:scale-110 transition-transform" />
+            <span className="font-medium">Clients 360</span>
+          </NavLink>
+
           <NavLink to="/vehicles" className={menuLinkClass} onClick={onClose}>
             <Truck size={20} className="group-hover:scale-110 transition-transform" />
             <span className="font-medium">Véhicules</span>
@@ -166,6 +172,10 @@ function SidebarContent({ onClose, currentUser, onLogout }) {
               <NavLink to="/devis" className={menuLinkClass} onClick={onClose}>
                 <FileText size={20} className="group-hover:scale-110 transition-transform" />
                 <span className="font-medium">Devis</span>
+              </NavLink>
+              <NavLink to="/clients" className={menuLinkClass} onClick={onClose}>
+                <Building2 size={20} className="group-hover:scale-110 transition-transform" />
+                <span className="font-medium">Clients 360</span>
               </NavLink>
               <SubMenu icon={ClipboardList} label="Suivi commercial" matchPaths={["/devis-suivi"]}>
                 <SubLink to="/devis-suivi" end icon={PieChart} label="Dashboard suivi" onClick={onClose} />

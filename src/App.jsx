@@ -27,6 +27,8 @@ import VehicleList from './pages/VehicleList'
 import VehicleDetails from './pages/VehicleDetails'
 import CreateVehicle from './pages/CreateVehicle'
 import EditVehicle from './pages/EditVehicle'
+import ClientsList from './pages/clients/ClientsList'
+import ClientDetails360 from './pages/clients/ClientDetails360'
 import { NotificationsProvider } from './notifications/NotificationsProvider'
 import { getAuthToken, isAuthTokenUsable, logoutSession } from './api/apiClient'
 
@@ -605,6 +607,42 @@ export default function App() {
               onLogout={handleLogout}
             >
               <EmployeeHistory />
+            </AppLayout>
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+      <Route
+        path="/clients"
+        element={
+          isLoggedIn ? (
+            <AppLayout
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={handleToggleSidebar}
+              onCloseSidebar={handleCloseSidebar}
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            >
+              <ClientsList />
+            </AppLayout>
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
+      />
+      <Route
+        path="/clients/:id/360"
+        element={
+          isLoggedIn ? (
+            <AppLayout
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={handleToggleSidebar}
+              onCloseSidebar={handleCloseSidebar}
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            >
+              <ClientDetails360 />
             </AppLayout>
           ) : (
             <Navigate to="/" replace />
