@@ -1,16 +1,15 @@
-﻿import { useEffect, useState } from 'react'
+﻿import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   AlertTriangle, ArrowRight, BadgeCheck, CalendarDays, Loader2,
-  RefreshCw, Search, XCircle, Clock, Zap, Bell, CheckCircle2,
-  Phone, MessageSquare, User,
+  RefreshCw, Search, Clock, Zap, Bell, CheckCircle2,
+  MessageSquare, User,
 } from 'lucide-react'
 import {
   fetchDevisSuiviRelancesToday,
   fetchDevisSuiviRelancesOverdue,
   updateDevisSuiviStatus,
 } from '../../api/devisSuiviApi'
-import { STATUS_META, PRIORITY_META } from '../../constants/devisSuiviConstants'
 import { StatusBadge, PriorityBadge } from '../../components/devis/DevisSuiviBadges'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -163,31 +162,34 @@ export default function DevisSuiviRelance() {
   const [tab, setTab] = useState('today')
   const [toast, setToast] = useState(null)
 
-  const showToast = (type, message) => {
+  const showToast = useCallback((type, message) => {
     setToast({ type, message })
     window.setTimeout(() => setToast(null), 3200)
-  }
+  }, [])
+
+  const load = useCallback(async (signal) => {
+    try {
+      setLoading(true); setError('')
+      const [today, overdue] = await Promise.all([
+        fetchDevisSuiviRelancesToday(signal),
+        fetchDevisSuiviRelancesOverdue(signal),
+      ])
+      if (signal?.aborted) return
+      setRows(Array.isArray(today) ? today : [])
+      setOverdueRows(Array.isArray(overdue) ? overdue : [])
+    } catch (e) {
+      if (e?.name === 'AbortError') return
+      setError(e?.message || 'Impossible de charger les relances.')
+    } finally {
+      if (!signal?.aborted) setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    let mounted = true
-    async function load() {
-      try {
-        setLoading(true); setError('')
-        const [today, overdue] = await Promise.all([
-          fetchDevisSuiviRelancesToday(),
-          fetchDevisSuiviRelancesOverdue(),
-        ])
-        if (!mounted) return
-        setRows(Array.isArray(today) ? today : [])
-        setOverdueRows(Array.isArray(overdue) ? overdue : [])
-      } catch (e) {
-        if (!mounted) return
-        setError(e?.message || 'Impossible de charger les relances.')
-      } finally { if (mounted) setLoading(false) }
-    }
-    load()
-    return () => { mounted = false }
-  }, [])
+    const controller = new AbortController()
+    load(controller.signal)
+    return () => controller.abort()
+  }, [load])
 
   const activeRows = tab === 'today' ? rows : overdueRows
 
@@ -211,7 +213,6 @@ export default function DevisSuiviRelance() {
   }
 
   const urgentCount = [...rows, ...overdueRows].filter(r => r.reminderPriority === 'URGENT').length
-  const totalProcessed = 0 // could be tracked if needed
 
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_left,_rgba(0,82,204,0.07),_transparent_40%),linear-gradient(180deg,#f8fbff_0%,#eef4fb_100%)] px-4 py-6 sm:px-6 lg:px-8">
@@ -233,7 +234,7 @@ export default function DevisSuiviRelance() {
               <h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Relances à traiter</h1>
               <p className="text-sm text-slate-500">Clients à rappeler aujourd'hui · Relances en retard</p>
             </div>
-            <button type="button" onClick={() => window.location.reload()}
+            <button type="button" onClick={() => load()}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:-translate-y-0.5 hover:shadow-sm self-start xl:self-auto">
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Actualiser
             </button>

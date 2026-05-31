@@ -18,9 +18,15 @@ function buildQuery(params = {}) {
   return searchParams.toString()
 }
 
-export async function fetchDevisSuiviList(params = {}) {
+export async function fetchDevisTotals(month, year) {
+  const query = buildQuery({ month, year })
+  const response = await apiFetch(`/devis-suivi/totals?${query}`, { auth: true })
+  return readJsonResponse(response, 'Impossible de charger les totaux devis.')
+}
+
+export async function fetchDevisSuiviList(params = {}, signal) {
   const query = buildQuery(params)
-  const response = await apiFetch(`/devis-suivi${query ? `?${query}` : ''}`, { auth: true })
+  const response = await apiFetch(`/devis-suivi${query ? `?${query}` : ''}`, { auth: true, signal })
   return readJsonResponse(response, 'Impossible de charger la liste de suivi.')
 }
 
@@ -75,18 +81,18 @@ export async function updateDevisSuiviReminder(payload) {
   return readJsonResponse(response, 'Impossible de mettre à jour le rappel.')
 }
 
-export async function fetchDevisSuiviRelancesToday() {
-  const response = await apiFetch('/devis-suivi/relance/today', { auth: true })
+export async function fetchDevisSuiviRelancesToday(signal) {
+  const response = await apiFetch('/devis-suivi/relance/today', { auth: true, signal })
   return readJsonResponse(response, 'Impossible de charger les relances du jour.')
 }
 
-export async function fetchDevisSuiviRelancesOverdue() {
-  const response = await apiFetch('/devis-suivi/relance/overdue', { auth: true })
+export async function fetchDevisSuiviRelancesOverdue(signal) {
+  const response = await apiFetch('/devis-suivi/relance/overdue', { auth: true, signal })
   return readJsonResponse(response, 'Impossible de charger les relances en retard.')
 }
 
-export async function fetchDevisSuiviStats() {
-  const response = await apiFetch('/devis-suivi/stats', { auth: true })
+export async function fetchDevisSuiviStats(signal) {
+  const response = await apiFetch('/devis-suivi/stats', { auth: true, signal })
   return readJsonResponse(response, 'Impossible de charger les statistiques.')
 }
 
@@ -116,10 +122,10 @@ export async function fetchDevisSuiviById(id) {
 }
 
 
-export async function fetchDevisSuiviStatuses(numeros = []) {
+export async function fetchDevisSuiviStatuses(numeros = [], signal) {
   if (!numeros.length) return {}
   const query = numeros.join(',')
-  const response = await apiFetch(`/devis-suivi/statuses?numeros=${encodeURIComponent(query)}`, { auth: true })
+  const response = await apiFetch(`/devis-suivi/statuses?numeros=${encodeURIComponent(query)}`, { auth: true, signal })
   return readJsonResponse(response, 'Impossible de charger les statuts.')
 }
 

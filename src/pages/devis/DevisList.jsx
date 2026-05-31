@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../api/apiClient'
 import { fetchDevisSuiviStatuses } from '../../api/devisSuiviApi'
@@ -24,7 +24,7 @@ function formatCurrency(amount) {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'TND' }).format(amount || 0)
 }
 
-// ─── ERP doc state badge (Annulé / Validé / En attente) ──────────────────────
+// ─── ERP doc state badge (Annulé / Validé / Sans statut) ─────────────────────
 // Distinct from the CRM suivi status — shown only when no CRM status exists.
 
 function DocStateBadge({ item }) {
@@ -41,15 +41,15 @@ function DocStateBadge({ item }) {
       </span>
     )
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-amber-700">
-      <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />En attente
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+      <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />Sans statut
     </span>
   )
 }
 
 // ─── Combined status cell ─────────────────────────────────────────────────────
 // Shows CRM suivi status (CREATED, HOT_LEAD…) when available,
-// falls back to ERP doc state (Validé / Annulé / En attente).
+// falls back to ERP doc state (Validé / Annulé / Sans statut).
 
 function StatusCell({ item, suiviStatuses }) {
   const crmStatus = suiviStatuses[item.NUMERO]
@@ -91,87 +91,117 @@ const DevisList = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [sortOrder, setSortOrder] = useState('desc')
-  const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 0 })
-  const [prefetchedData, setPrefetchedData] = useState({})
+  const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 0, validated: 0, cancelled: 0 })
   // Map of { [numeroDevis]: crmStatus } for the current page
   const [suiviStatuses, setSuiviStatuses] = useState({})
   const navigate = useNavigate()
+
+  // Refs pour gérer les requêtes concurrentes / annulations propres
+  const fetchAbortRef = useRef(null)
+  const suiviAbortRef = useRef(null)
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+      // Annule toutes les requêtes en vol au démontage
+      try { fetchAbortRef.current?.abort() } catch {}
+      try { suiviAbortRef.current?.abort() } catch {}
+    }
+  }, [])
 
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm)
       setPagination(prev => ({ ...prev, page: 1 }))
-      setPrefetchedData({})
     }, 500)
     return () => clearTimeout(timer)
   }, [searchTerm])
 
-  useEffect(() => {
-    if (prefetchedData[pagination.page]) {
-      const cached = prefetchedData[pagination.page]
-      setDevis(cached.data)
-      setPagination(prev => ({ ...prev, total: cached.total, totalPages: cached.totalPages }))
-      setLoading(false)
-      loadSuiviStatuses(cached.data)
-      prefetchNextPage(pagination.page + 1)
-    } else {
-      fetchDevis(pagination.page)
-    }
-  }, [pagination.page, debouncedSearch])
-
   // After loading a page of devis, fetch their CRM statuses in one batch call
   const loadSuiviStatuses = useCallback(async (rows) => {
-    if (!rows?.length) { setSuiviStatuses({}); return }
+    // Annule un précédent batch encore en vol
+    try { suiviAbortRef.current?.abort() } catch {}
+    if (!rows?.length) {
+      if (isMountedRef.current) setSuiviStatuses({})
+      return
+    }
     const numeros = rows.map(r => r.NUMERO).filter(Boolean)
+    const controller = new AbortController()
+    suiviAbortRef.current = controller
     try {
-      const map = await fetchDevisSuiviStatuses(numeros)
+      const map = await fetchDevisSuiviStatuses(numeros, controller.signal)
+      if (!isMountedRef.current || controller.signal.aborted) return
       setSuiviStatuses(map || {})
-    } catch {
-      // Non-blocking — if suivi statuses fail, ERP state badge is shown as fallback
-      setSuiviStatuses({})
+    } catch (err) {
+      if (err?.name === 'AbortError') return
+      // Non-blocking — fallback ERP badge
+      if (isMountedRef.current) setSuiviStatuses({})
     }
   }, [])
 
-  const fetchDevis = async (page) => {
+  const fetchDevis = useCallback(async (page) => {
+    // Annule la requête précédente pour éviter les races
+    try { fetchAbortRef.current?.abort() } catch {}
+    const controller = new AbortController()
+    fetchAbortRef.current = controller
+
+    if (isMountedRef.current) { setLoading(true); setError(null) }
     try {
-      setLoading(true); setError(null)
       const query = new URLSearchParams({ page: String(page), limit: String(pagination.limit) })
       if (debouncedSearch) query.append('search', debouncedSearch)
-      const response = await apiFetch(`/devis?${query.toString()}`, { auth: true })
+      const response = await apiFetch(`/devis?${query.toString()}`, {
+        auth: true,
+        signal: controller.signal,
+        timeoutMs: 25_000,
+      })
+      if (!isMountedRef.current || controller.signal.aborted) return
+
       if (response.ok) {
         const result = await response.json()
-        if (result.error) { setError(result.error); setDevis([]) }
-        else {
-          setDevis(result.data)
-          setPagination(prev => ({ ...prev, total: result.total, totalPages: result.totalPages }))
+        if (!isMountedRef.current) return
+        if (result.error) {
+          setError(result.error); setDevis([])
+        } else {
+          setDevis(Array.isArray(result.data) ? result.data : [])
+          setPagination(prev => ({
+            ...prev,
+            total: Number(result.total || 0),
+            totalPages: Number(result.totalPages || 0),
+            validated: Number(result.validated ?? 0),
+            cancelled: Number(result.cancelled ?? 0),
+          }))
           loadSuiviStatuses(result.data)
-          prefetchNextPage(page + 1)
         }
       } else {
         const errData = await response.json().catch(() => ({}))
+        if (!isMountedRef.current) return
         setError(response.status === 401
           ? (errData.message || 'Session expirée. Veuillez vous reconnecter.')
           : (errData.message || `Erreur serveur: ${response.status}`))
+        setDevis([])
       }
-    } catch {
-      setError('Impossible de joindre le serveur. Vérifiez votre connexion.')
-    } finally { setLoading(false) }
-  }
+    } catch (err) {
+      if (err?.name === 'AbortError' || err?.name === 'TimeoutError') return
+      if (!isMountedRef.current) return
+      const msg = /timeout/i.test(err?.message || '')
+        ? 'Le serveur met trop de temps à répondre. Réessayez ou affinez votre recherche.'
+        : 'Impossible de joindre le serveur. Vérifiez votre connexion.'
+      setError(msg)
+      setDevis([])
+    } finally {
+      // GARANTIT que le loader ne reste JAMAIS bloqué
+      if (isMountedRef.current && !controller.signal.aborted) {
+        setLoading(false)
+      }
+    }
+  }, [debouncedSearch, pagination.limit, loadSuiviStatuses])
 
-  const prefetchNextPage = async (nextPage) => {
-    if (nextPage > pagination.totalPages && pagination.totalPages !== 0) return
-    if (prefetchedData[nextPage]) return
-    try {
-      const query = new URLSearchParams({ page: String(nextPage), limit: String(pagination.limit) })
-      if (debouncedSearch) query.append('search', debouncedSearch)
-      const response = await apiFetch(`/devis?${query.toString()}`, { auth: true })
-      if (response.ok) {
-        const result = await response.json()
-        setPrefetchedData(prev => ({ ...prev, [nextPage]: result }))
-      }
-    } catch { /* silent */ }
-  }
+  useEffect(() => {
+    fetchDevis(pagination.page)
+  }, [pagination.page, debouncedSearch, fetchDevis])
 
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= pagination.totalPages) {
@@ -191,8 +221,8 @@ const DevisList = () => {
   const stats = {
     total: pagination.total,
     shown: devis.length,
-    validated: devis.filter(i => i.ETATDOC === 'C' || i.ETATDOC === 3).length,
-    cancelled: devis.filter(i => i.IsAnnuler).length,
+    validated: pagination.validated ?? devis.filter(i => i.ETATDOC === 'C' || i.ETATDOC === 3).length,
+    cancelled: pagination.cancelled ?? devis.filter(i => i.IsAnnuler).length,
   }
 
   const pageNumbers = (() => {

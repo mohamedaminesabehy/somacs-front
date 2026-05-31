@@ -485,23 +485,113 @@ export default function MachineDetails({ currentUser }) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.25 }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+              className="space-y-6"
             >
-              <DetailField label="Code" value={machine.code} mono />
-              <DetailField label="Designation" value={machine.designation} />
-              <DetailField label="Categorie" value={machine.category} />
-              <DetailField label="Marque" value={machine.brand} />
-              <DetailField label="Modele" value={machine.model} />
-              <DetailField label="Numero de serie" value={machine.serialNumber} mono />
-              <DetailField label="Annee" value={machine.year} />
-              <DetailField label="Montant unitaire" value={machine.unitAmount != null ? `${machine.unitAmount} DA` : null} />
-              <DetailField label="Bon de commande" value={machine.purchaseOrderNumber} mono />
-              <DetailField label="Date reception" value={formatDate(machine.receptionDate)} />
-              <DetailField label="Fin garantie" value={formatDate(machine.warrantyEndDate)} />
-              <DetailField label="Garantie active" value={warrantyActive === null ? 'Non defini' : warrantyActive ? 'Oui' : 'Non'} />
-              <div className="lg:col-span-3 rounded-xl border border-slate-200 bg-white px-4 py-3.5">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Notes</p>
-                <p className="mt-1.5 text-sm font-medium text-slate-700 whitespace-pre-wrap">{machine.notes || 'Aucune observation.'}</p>
+              {/* Identification Machine */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                    <Cpu size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900">Identification Machine</h3>
+                    <p className="text-[11px] text-slate-500">Code interne, caractéristiques et statut</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <DetailField label="Code interne" value={machine.code} mono />
+                  <DetailField label="Désignation" value={machine.designation} />
+                  <DetailField label="Marque" value={machine.brand} />
+                  <DetailField label="Modèle" value={machine.model} />
+                  <DetailField label="N° de série" value={machine.serialNumber} mono />
+                  <DetailField label="Année" value={machine.year} />
+                  <DetailField label="Catégorie" value={machine.category} />
+                  <DetailField label="Statut" value={machine.status} />
+                </div>
+              </div>
+
+              {/* Origine & Fournisseur */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
+                    <Truck size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900">Origine & Fournisseur</h3>
+                    <p className="text-[11px] text-slate-500">Provenance, réception et garantie</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <DetailField label="Fournisseur" value={machine.supplier} />
+                  <DetailField label="Réf. fournisseur" value={machine.referenceFournisseur} mono />
+                  <DetailField label="Date de réception" value={formatDate(machine.receptionDate)} />
+                  <DetailField label="Facture / BL" value={machine.purchaseOrderNumber} mono />
+                  <DetailField label="Fin de garantie" value={formatDate(machine.warrantyEndDate)} />
+                  <DetailField label="Durée garantie" value={machine.dureeGarantie} />
+                  <DetailField label="État réception" value={machine.etatReception} />
+                  <DetailField label="Garantie active" value={warrantyActive === null ? 'Non défini' : warrantyActive ? 'Oui' : 'Non'} />
+                </div>
+                {machine.observationsReception && (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Observations réception</p>
+                    <p className="mt-1.5 text-sm font-medium text-slate-700 whitespace-pre-wrap">{machine.observationsReception}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Contrôle avant livraison */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                    <ShieldCheck size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900">Contrôle Avant Livraison</h3>
+                    <p className="text-[11px] text-slate-500">Vérification technique et validation</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <DetailField label="Emplacement" value={machine.emplacementInterne} />
+                  <DetailField label="État général" value={machine.etatGeneral} />
+                  <DetailField label="Test fonctionnement" value={machine.testFonctionnement} />
+                  <DetailField label="Accessoires présents" value={machine.accessoiresPresents} />
+                  <DetailField label="Documents présents" value={machine.documentsPresents} />
+                  <DetailField label="Problème constaté" value={machine.problemeConstate} />
+                  <DetailField label="Action recommandée" value={machine.actionRecommandee} />
+                  <DetailField label="Validé par" value={machine.valideParControle} />
+                  <DetailField label="Date contrôle" value={formatDate(machine.dateControle)} />
+                </div>
+                {machine.problemeConstate === 'Oui' && machine.descriptionProbleme && (
+                  <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700">Description du problème</p>
+                    <p className="mt-1.5 text-sm font-medium text-amber-900 whitespace-pre-wrap">{machine.descriptionProbleme}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Traçabilité */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
+                    <Layers3 size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900">Traçabilité</h3>
+                    <p className="text-[11px] text-slate-500">Historique de création et modification</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <DetailField label="Créé par" value={machine.createdBy} />
+                  <DetailField label="Créé le" value={formatDate(machine.createdAt)} />
+                  <DetailField label="Modifié par" value={machine.updatedBy} />
+                  <DetailField label="Modifié le" value={formatDate(machine.updatedAt)} />
+                </div>
+                {machine.notes && (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Notes</p>
+                    <p className="mt-1.5 text-sm font-medium text-slate-700 whitespace-pre-wrap">{machine.notes}</p>
+                  </div>
+                )}
               </div>
             </Motion.section>
           )}

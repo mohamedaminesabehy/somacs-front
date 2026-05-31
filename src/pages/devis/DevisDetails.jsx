@@ -1,5 +1,6 @@
-﻿import React, { useState, useEffect, useCallback } from 'react'
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { apiFetch } from '../../api/apiClient'
 import {
   ChevronLeft,
   FileText,
@@ -360,23 +361,41 @@ export default function DevisDetails() {
   const [activeTab, setActiveTab] = useState('informations')
   const [sharedStatuses, setSharedStatuses] = useState(null) // null = not yet loaded
 
+  const abortRef = useRef(null)
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+      try { abortRef.current?.abort() } catch {}
+    }
+  }, [])
+
   const fetchDevisDetails = useCallback(async () => {
+    if (!numero) return
+    // Annule un précédent fetch en vol pour éviter les races (Strict Mode, double-clic…)
+    try { abortRef.current?.abort() } catch {}
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    if (isMountedRef.current) { setLoading(true); setError(null) }
+
     try {
-      setLoading(true)
-      setError(null)
-      const token = localStorage.getItem('auth_token')
-      
-      const response = await fetch(`http://localhost:3000/devis/${encodeURIComponent(numero)}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const response = await apiFetch(`/devis/${encodeURIComponent(numero)}`, {
+        auth: true,
+        signal: controller.signal,
+        timeoutMs: 25_000,
       })
+      if (!isMountedRef.current || controller.signal.aborted) return
 
       if (response.ok) {
         const result = await response.json()
+        if (!isMountedRef.current) return
         const normalized = normalizeDevisPayload(result)
         setData(normalized)
-        // Initialiser sharedStatuses depuis localStorage dès le chargement
+
+        // Initialiser sharedStatuses depuis localStorage
         const numero_ = normalized?.header?.NUMERO || ''
         const typDoc_ = normalized?.header?.TYPDOC || ''
         if (numero_ && typDoc_) {
@@ -389,25 +408,40 @@ export default function DevisDetails() {
             }
           } catch {}
         }
+      } else if (response.status === 401) {
+        if (!isMountedRef.current) return
+        setError('Session expirée. Veuillez vous reconnecter.')
+      } else if (response.status === 408) {
+        if (!isMountedRef.current) return
+        setError('Le serveur de base de données est trop lent. Réessayez dans un instant.')
       } else {
         const errorPayload = await response.json().catch(() => null)
+        if (!isMountedRef.current) return
         const serverMessage =
           typeof errorPayload?.message === 'string'
             ? errorPayload.message
             : 'Le devis demandé est introuvable ou inaccessible.'
-        throw new Error(serverMessage)
+        setError(serverMessage)
       }
     } catch (err) {
+      if (err?.name === 'AbortError' || err?.name === 'TimeoutError') return
+      if (!isMountedRef.current) return
       console.error('Error fetching devis details:', err)
-      setError(err?.message || 'Impossible de joindre le serveur. Vérifiez votre connexion.')
+      const msg = /timeout/i.test(err?.message || '')
+        ? 'Le serveur met trop de temps à répondre.'
+        : (err?.message || 'Impossible de joindre le serveur. Vérifiez votre connexion.')
+      setError(msg)
     } finally {
-      setLoading(false)
+      // GARANTIT que le loader ne reste JAMAIS bloqué
+      if (isMountedRef.current && !controller.signal.aborted) {
+        setLoading(false)
+      }
     }
   }, [numero])
 
   useEffect(() => {
     fetchDevisDetails()
-  }, [numero, fetchDevisDetails])
+  }, [fetchDevisDetails])
 
   if (loading) {
     return (

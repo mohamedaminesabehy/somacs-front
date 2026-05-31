@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   AlertTriangle, ArrowRight, BadgeCheck, CalendarDays, Filter,
   Loader2, RefreshCw, Search, ShoppingCart, UserCog, XCircle,
-  ThumbsDown, TrendingUp, Flame, Zap, BarChart3,
+  ThumbsDown, Flame, Zap, BarChart3,
   Activity, Target, Clock, AlertCircle, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import {
@@ -65,41 +65,6 @@ function KpiCard({ label, value, sub, color = 'slate', icon: Icon, pct }) {
 
 // ─── Funnel Chart ─────────────────────────────────────────────────────────────
 
-function FunnelChart({ funnel }) {
-  if (!funnel?.length) return <div className="py-8 text-center text-xs text-slate-400">Aucune donnée de funnel</div>
-  const max = Math.max(...funnel.map(f => f.count), 1)
-  return (
-    <div className="space-y-3">
-      {funnel.map((step, idx) => {
-        const m = STATUS_META[step.status] || STATUS_META.CREATED
-        const pct = Math.round((step.count / max) * 100)
-        const conv = idx > 0 && funnel[idx - 1].count > 0 ? Math.round((step.count / funnel[idx - 1].count) * 100) : null
-        return (
-          <div key={step.status}>
-            <div className="mb-1.5 flex items-center justify-between gap-2">
-              <span className={"inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.2em] " + m.tone}>
-                <span className={"h-1.5 w-1.5 rounded-full " + m.dot} />{m.label}
-              </span>
-              <div className="flex items-center gap-3">
-                {conv !== null && (
-                  <span className={"text-[10px] font-bold px-2 py-0.5 rounded-full " + (conv >= 70 ? 'bg-emerald-50 text-emerald-600' : conv >= 40 ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600')}>
-                    {conv}% conv.
-                  </span>
-                )}
-                <span className="text-sm font-black text-slate-900 tabular-nums w-8 text-right">{step.count}</span>
-              </div>
-            </div>
-            <div className="h-6 w-full overflow-hidden rounded-xl bg-slate-100">
-              <div className={"h-full rounded-xl transition-all duration-700 bg-gradient-to-r " + m.gradient}
-                style={{ width: Math.max(pct, 3) + '%' }} />
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
 // ─── Lost Reasons Chart ───────────────────────────────────────────────────────
 
 function LostReasonsChart({ data }) {
@@ -126,31 +91,80 @@ function LostReasonsChart({ data }) {
   )
 }
 
-// ─── Evolution Chart ──────────────────────────────────────────────────────────
+// ─── Status Donut Chart ───────────────────────────────────────────────────────
 
-function EvolutionChart({ data }) {
-  if (!data?.length) return <div className="py-8 text-center text-xs text-slate-400">Aucune donnée mensuelle</div>
-  const max = Math.max(...data.map(d => d.total), 1)
+function StatusDonutChart({ distribution }) {
+  if (!distribution?.length) return <div className="py-8 text-center text-xs text-slate-400">Aucun devis avec statut attribué</div>
+
+  const sorted = [...distribution].sort((a, b) => b.count - a.count)
+  const total = sorted.reduce((acc, d) => acc + d.count, 0)
+
+  // SVG donut
+  const size = 160
+  const strokeWidth = 28
+  const radius = (size - strokeWidth) / 2
+  const circumference = 2 * Math.PI * radius
+
+  // Color palette derived from STATUS_META dot colors
+  const STATUS_COLORS = {
+    CREATED: '#94a3b8', SENT: '#60a5fa', CONTACTED: '#a78bfa',
+    WAITING: '#fbbf24', NEGOTIATION: '#f97316', HOT_LEAD: '#ef4444',
+    ACCEPTED: '#34d399', PURCHASED: '#10b981', REFUSED: '#f43f5e',
+    EXPIRED: '#6b7280',
+  }
+
+  let offset = 0
+
   return (
-    <div className="flex items-end gap-1.5 h-32">
-      {data.map((d, i) => {
-        const th = Math.max(Math.round((d.total / max) * 100), 4)
-        const ph = d.total > 0 ? Math.round((d.purchased / d.total) * th) : 0
-        const [, mo] = (d.month || '').split('-')
-        const ml = mo ? new Date(2024, Number(mo) - 1).toLocaleString('fr-FR', { month: 'short' }) : d.month
-        return (
-          <div key={i} className="group relative flex flex-1 flex-col items-center gap-1">
-            <div className="absolute -top-9 left-1/2 -translate-x-1/2 hidden rounded-xl bg-slate-900 px-2.5 py-1.5 text-[10px] font-bold text-white group-hover:block whitespace-nowrap z-10 shadow-lg">
-              {d.month}: {d.total} devis · {d.purchased} achetés
-            </div>
-            <div className="relative w-full flex flex-col justify-end rounded-t-lg overflow-hidden" style={{ height: th + '%' }}>
-              <div className="absolute inset-0 bg-blue-100 rounded-t-lg" />
-              <div className="absolute bottom-0 w-full bg-[#0052CC] rounded-t-lg transition-all duration-700" style={{ height: ph + '%' }} />
-            </div>
-            <span className="text-[9px] font-bold text-slate-400 capitalize">{ml}</span>
-          </div>
-        )
-      })}
+    <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start sm:gap-8">
+      {/* Donut */}
+      <div className="relative shrink-0" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="-rotate-90">
+          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#f1f5f9" strokeWidth={strokeWidth} />
+          {total > 0 && sorted.map((item, i) => {
+            const pct = item.count / total
+            const dash = pct * circumference
+            const gap = circumference - dash
+            const currentOffset = offset
+            offset += dash
+            const color = STATUS_COLORS[item.status] || '#94a3b8'
+            return (
+              <circle key={item.status} cx={size / 2} cy={size / 2} r={radius} fill="none"
+                stroke={color} strokeWidth={strokeWidth}
+                strokeDasharray={`${dash} ${gap}`}
+                strokeDashoffset={-currentOffset}
+                className="transition-all duration-700" />
+            )
+          })}
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-2xl font-black text-slate-900 tabular-nums">{total}</span>
+          <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400">suivis</span>
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="flex-1 min-w-0">
+        <div className="mb-3 text-[10px] font-bold text-slate-400">Répartition par statut</div>
+        <div className="space-y-2">
+          {sorted.map(item => {
+            const m = STATUS_META[item.status] || STATUS_META.CREATED
+            const pct = total > 0 ? Math.round((item.count / total) * 100) : 0
+            const color = STATUS_COLORS[item.status] || '#94a3b8'
+            return (
+              <div key={item.status} className="flex items-center gap-2.5">
+                <span className="h-3 w-3 shrink-0 rounded" style={{ backgroundColor: color }} />
+                <span className={"text-xs font-bold text-slate-700 w-24 truncate"}>{m.label}</span>
+                <div className="flex-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-full rounded-full transition-all duration-700" style={{ width: Math.max(pct, 2) + '%', backgroundColor: color }} />
+                </div>
+                <span className="text-xs font-black text-slate-900 tabular-nums w-6 text-right">{item.count}</span>
+                <span className="text-[10px] font-medium text-slate-400 w-8 text-right">{pct}%</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
@@ -241,23 +255,44 @@ export default function DevisSuiviDashboard() {
     window.setTimeout(() => setToast(null), 3500)
   }, [])
 
+  // Refs pour annuler les requêtes en cours et éviter les états zombies
+  const dataAbortRef = useRef(null)
+  const statsAbortRef = useRef(null)
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+      try { dataAbortRef.current?.abort() } catch {}
+      try { statsAbortRef.current?.abort() } catch {}
+    }
+  }, [])
+
   useEffect(() => {
     const t = window.setTimeout(() => { setDebouncedSearch(search.trim()); setPage(1) }, 350)
     return () => window.clearTimeout(t)
   }, [search])
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (externalSignal) => {
+    // Annule la requête précédente pour éviter les races et empilements
+    try { dataAbortRef.current?.abort() } catch {}
+    const controller = new AbortController()
+    dataAbortRef.current = controller
+    if (externalSignal) {
+      if (externalSignal.aborted) controller.abort()
+      else externalSignal.addEventListener('abort', () => controller.abort(), { once: true })
+    }
+
     try {
-      setLoading(true); setError('')
-      const [list, ns] = await Promise.all([
-        fetchDevisSuiviList({
-          page, limit: pageInfo.limit, search: debouncedSearch,
-          status: statusFilter === 'ALL' ? '' : statusFilter,
-          commercialCode: commercialFilter === 'ALL' ? '' : commercialFilter,
-          dateFrom: dateFilter || '', dateTo: dateFilter || '',
-        }),
-        fetchDevisSuiviStats(),
-      ])
+      if (isMountedRef.current) { setLoading(true); setError('') }
+      const list = await fetchDevisSuiviList({
+        page, limit: pageInfo.limit, search: debouncedSearch,
+        status: statusFilter === 'ALL' ? '' : statusFilter,
+        commercialCode: commercialFilter === 'ALL' ? '' : commercialFilter,
+        dateFrom: dateFilter || '', dateTo: dateFilter || '',
+      }, controller.signal)
+      if (controller.signal.aborted || !isMountedRef.current) return
       setRows(Array.isArray(list?.data) ? list.data : [])
       setPageInfo(prev => ({
         ...prev,
@@ -265,6 +300,31 @@ export default function DevisSuiviDashboard() {
         totalPages: Number(list?.totalPages || 1),
         limit: Number(list?.limit || prev.limit),
       }))
+    } catch (err) {
+      if (err?.name === 'AbortError' || err?.name === 'TimeoutError') return
+      if (!isMountedRef.current) return
+      const msg = /timeout/i.test(err?.message || '')
+        ? 'Le serveur met trop de temps à répondre. Réessayez ou affinez vos filtres.'
+        : (err?.message || 'Impossible de charger le suivi commercial.')
+      setError(msg)
+      setRows([])
+    } finally {
+      // GARANTIT que le loader ne reste JAMAIS bloqué
+      if (isMountedRef.current && !controller.signal.aborted) setLoading(false)
+    }
+  }, [page, debouncedSearch, statusFilter, commercialFilter, dateFilter, pageInfo.limit])
+
+  const loadStats = useCallback(async (externalSignal) => {
+    try { statsAbortRef.current?.abort() } catch {}
+    const controller = new AbortController()
+    statsAbortRef.current = controller
+    if (externalSignal) {
+      if (externalSignal.aborted) controller.abort()
+      else externalSignal.addEventListener('abort', () => controller.abort(), { once: true })
+    }
+    try {
+      const ns = await fetchDevisSuiviStats(controller.signal)
+      if (controller.signal.aborted || !isMountedRef.current) return
       setStats({
         purchased: Number(ns?.purchased || 0), refused: Number(ns?.refused || 0),
         pending: Number(ns?.pending || 0), conversionRate: Number(ns?.conversionRate || 0),
@@ -279,11 +339,18 @@ export default function DevisSuiviDashboard() {
         statusDistribution: Array.isArray(ns?.statusDistribution) ? ns.statusDistribution : [],
       })
     } catch (err) {
-      setError(err?.message || 'Impossible de charger le suivi commercial.')
-    } finally { setLoading(false) }
-  }, [page, pageInfo.limit, debouncedSearch, statusFilter, commercialFilter, dateFilter])
+      if (err?.name === 'AbortError' || err?.name === 'TimeoutError') return
+      // stats failure is non-blocking — we just leave previous values in place
+    }
+  }, [])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  useEffect(() => {
+    loadStats()
+  }, [loadStats])
 
   const commercialOptions = useMemo(() => {
     const codes = rows.map(r => r.commercialCode || r.commercialLabel || '').filter(Boolean)
@@ -298,7 +365,7 @@ export default function DevisSuiviDashboard() {
       if (type === 'purchased') { await markDevisPurchased(row.id); showToast('success', 'Devis marqué comme acheté.') }
       else { await markDevisLost(row.id, '', refusalCode || undefined); showToast('success', 'Devis marqué comme perdu.') }
       setConfirmAction({ open: false, row: null, type: null }); setRefusalCode('')
-      await loadData()
+      await Promise.all([loadData(), loadStats()])
     } catch (err) { showToast('error', err?.message || 'Impossible de mettre à jour.') }
     finally { setSaving(false) }
   }
@@ -306,7 +373,6 @@ export default function DevisSuiviDashboard() {
   const TABS = [
     { id: 'list', label: 'Pipeline', icon: Activity },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { id: 'funnel', label: 'Funnel', icon: TrendingUp },
   ]
 
   return (
@@ -327,10 +393,10 @@ export default function DevisSuiviDashboard() {
                 )}
               </div>
               <h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Dashboard Commercial</h1>
-              <p className="text-sm text-slate-500">Pipeline complet · Funnel de conversion · Analytics temps réel</p>
+              <p className="text-sm text-slate-500">Pipeline complet · Analytics temps réel</p>
             </div>
             <div className="flex flex-wrap gap-2.5">
-              <button type="button" onClick={loadData}
+              <button type="button" onClick={() => { loadData(); loadStats() }}
                 className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:-translate-y-0.5 hover:shadow-sm">
                 <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Actualiser
               </button>
@@ -349,7 +415,6 @@ export default function DevisSuiviDashboard() {
             <KpiCard label="Total suivis"  value={stats.total}                  sub="Devis en suivi"      color="slate"   icon={BarChart3}   />
             <KpiCard label="Achetés"       value={stats.purchased}              sub="Convertis"           color="emerald" icon={BadgeCheck}  pct={stats.total > 0 ? Math.round(stats.purchased / stats.total * 100) : 0} />
             <KpiCard label="Perdus"        value={stats.refused}                sub="À analyser"          color="rose"    icon={XCircle}     />
-            <KpiCard label="En attente"    value={stats.pending}                sub="Pipeline actif"      color="amber"   icon={Clock}       />
             <KpiCard label="Conversion"    value={stats.conversionRate + '%'}   sub="Achetés / total"     color="blue"    icon={Target}      pct={stats.conversionRate} />
             <KpiCard label="Hot Leads"     value={stats.hotLeads}               sub="Très intéressés"     color="orange"  icon={Flame}       />
             <KpiCard label="Relances"      value={stats.relancesToday}          sub="Aujourd'hui"         color="violet"  icon={Zap}         />
@@ -385,19 +450,15 @@ export default function DevisSuiviDashboard() {
         {/* ── Analytics Tab ── */}
         {activeTab === 'analytics' && (
           <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
-            {/* Evolution */}
+            {/* Status Donut - Devis avec statut */}
             <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-sm xl:col-span-2">
               <div className="mb-5 flex items-center justify-between">
                 <div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Évolution mensuelle</div>
-                  <h3 className="mt-0.5 text-base font-black text-slate-900">Devis par mois</h3>
-                </div>
-                <div className="flex items-center gap-4 text-xs font-semibold text-slate-500">
-                  <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-blue-100" />Total</span>
-                  <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-[#0052CC]" />Achetés</span>
+                  <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Suivi commercial</div>
+                  <h3 className="mt-0.5 text-base font-black text-slate-900">Devis avec statut attribué</h3>
                 </div>
               </div>
-              <EvolutionChart data={stats.evolutionMensuelle} />
+              <StatusDonutChart distribution={stats.statusDistribution} />
             </div>
 
             {/* Lost Reasons */}
@@ -460,42 +521,6 @@ export default function DevisSuiviDashboard() {
               )}
             </div>
 
-            {/* Status Distribution */}
-            <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-sm">
-              <div className="mb-5">
-                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Répartition</div>
-                <h3 className="mt-0.5 text-base font-black text-slate-900">Par statut</h3>
-              </div>
-              <div className="space-y-2.5">
-                {[...stats.statusDistribution].sort((a, b) => b.count - a.count).map(item => {
-                  const m = STATUS_META[item.status] || STATUS_META.CREATED
-                  const pct = stats.total > 0 ? Math.round((item.count / stats.total) * 100) : 0
-                  return (
-                    <div key={item.status} className="flex items-center gap-3">
-                      <span className={"inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.2em] shrink-0 " + m.tone}>
-                        <span className={"h-1.5 w-1.5 rounded-full " + m.dot} />{m.label}
-                      </span>
-                      <div className="flex-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                        <div className={"h-full rounded-full transition-all duration-700 " + m.dot} style={{ width: pct + '%' }} />
-                      </div>
-                      <span className="text-xs font-black text-slate-700 shrink-0 w-7 text-right tabular-nums">{item.count}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── Funnel Tab ── */}
-        {activeTab === 'funnel' && (
-          <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-sm">
-            <div className="mb-6">
-              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Conversion</div>
-              <h3 className="mt-0.5 text-xl font-black text-slate-900">Funnel commercial</h3>
-              <p className="mt-1 text-sm text-slate-500">Visualisez où vous perdez vos clients dans le pipeline.</p>
-            </div>
-            <div className="max-w-2xl"><FunnelChart funnel={stats.funnel} /></div>
           </div>
         )}
 

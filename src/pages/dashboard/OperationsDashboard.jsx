@@ -22,6 +22,7 @@ import {
   X,
 } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
+import { fetchDevisTotals } from '../../api/devisSuiviApi'
 
 /* -------------------------------------------------------------------------- */
 /*  Constants                                                                 */
@@ -360,6 +361,7 @@ export default function OperationsDashboard({ currentUser }) {
   const [interventions, setInterventions] = useState([])
   const [machines, setMachines] = useState([])
   const [devis, setDevis] = useState([])
+  const [devisTotals, setDevisTotals] = useState({ total: 0, valides: 0, enAttente: 0, nonValides: 0 })
 
   useEffect(() => {
     let cancelled = false
@@ -401,6 +403,15 @@ export default function OperationsDashboard({ currentUser }) {
     void loadAll()
     return () => { cancelled = true }
   }, [])
+
+  // Recharge les totaux devis à chaque changement de mois/année
+  useEffect(() => {
+    let cancelled = false
+    fetchDevisTotals(selectedMonth + 1, selectedYear)
+      .then(data => { if (!cancelled) setDevisTotals(data) })
+      .catch(() => { /* non bloquant */ })
+    return () => { cancelled = true }
+  }, [selectedMonth, selectedYear])
 
   const yearOptions = useMemo(() => {
     const y = today.getFullYear()
@@ -565,26 +576,20 @@ export default function OperationsDashboard({ currentUser }) {
   }, [selectedMonth, selectedYear])
 
   const devisPie = useMemo(() => {
-    const hasReal = filteredDevis.length > 0
-    const isMock = !hasReal && Boolean(import.meta?.env?.DEV)
-    const counts = hasReal
-      ? (() => {
-          const validated = filteredDevis.filter((d) => !d?.IsAnnuler && (d?.ETATDOC === 'C' || d?.ETATDOC === 3)).length
-          const notValidated = filteredDevis.filter((d) => Boolean(d?.IsAnnuler)).length
-          const pending = Math.max(filteredDevis.length - validated - notValidated, 0)
-          return { validated, pending, notValidated }
-        })()
-      : isMock ? mockDevisCounts : { validated: 0, pending: 0, notValidated: 0 }
+    const isMock = devisTotals.total === 0 && Boolean(import.meta?.env?.DEV)
+    const counts = isMock
+      ? mockDevisCounts
+      : { validated: devisTotals.valides, pending: devisTotals.enAttente, notValidated: devisTotals.nonValides }
 
     return {
       isMock,
       segments: [
-        { key: 'validated',    label: 'Validés',      value: counts.validated,    color: '#10B981', pill: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-        { key: 'pending',      label: 'En attente',   value: counts.pending,      color: '#F59E0B', pill: 'bg-amber-50 text-amber-700 border-amber-200' },
-        { key: 'notValidated', label: 'Non validés',  value: counts.notValidated, color: '#EF4444', pill: 'bg-red-50 text-red-700 border-red-200' },
+        { key: 'validated',    label: 'Validés',     value: counts.validated,    color: '#10B981', pill: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+        { key: 'pending',      label: 'En attente',  value: counts.pending,      color: '#F59E0B', pill: 'bg-amber-50 text-amber-700 border-amber-200' },
+        { key: 'notValidated', label: 'Non validés', value: counts.notValidated, color: '#EF4444', pill: 'bg-red-50 text-red-700 border-red-200' },
       ],
     }
-  }, [filteredDevis, mockDevisCounts])
+  }, [devisTotals, mockDevisCounts])
 
   const recentActivity = useMemo(() => {
     const missionItems = filteredMissions.slice(0, 12).map((m) => ({
@@ -706,8 +711,8 @@ export default function OperationsDashboard({ currentUser }) {
           />
           <KpiCard
             title="Devis validés"
-            value={isLoading ? '—' : filteredDevis.filter((d) => d?.ETATDOC === 'C' || d?.ETATDOC === 3).length}
-            subtitle={isLoading ? '' : `${filteredDevis.filter((d) => Boolean(d?.IsAnnuler)).length} annulés · ${selectedLabel}`}
+            value={isLoading ? '—' : devisTotals.valides}
+            subtitle={isLoading ? '' : `${devisTotals.nonValides} refusés/expirés/bloqués · ${selectedLabel}`}
             icon={CheckCircle2}
             tone="slate"
           />

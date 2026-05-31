@@ -33,6 +33,25 @@ const BUSINESS_ACTIONS = [
   'UPDATE_INTERVENTION',
   'ASSIGN_USER_INTERVENTION',
   'USE_AI_ASSISTANT',
+  // Commercial / Devis-Suivi
+  'CHANGE_STATUS_DEVIS_SUIVI',
+  'MARK_DEVIS_PURCHASED',
+  'MARK_DEVIS_LOST',
+  'RELANCE_DEVIS',
+]
+
+const TECHNICIEN_ACTIONS = [
+  'UPDATE_MISSION',
+  'UPDATE_INTERVENTION',
+  'ASSIGN_USER_INTERVENTION',
+  'USE_AI_ASSISTANT',
+]
+
+const COMMERCIAL_ACTIONS = [
+  'CHANGE_STATUS_DEVIS_SUIVI',
+  'MARK_DEVIS_PURCHASED',
+  'MARK_DEVIS_LOST',
+  'RELANCE_DEVIS',
 ]
 
 const actionBadgeColors = {
@@ -46,6 +65,10 @@ const actionBadgeColors = {
   UPDATE_INTERVENTION: 'bg-indigo-100 text-indigo-700',
   ASSIGN_USER_INTERVENTION: 'bg-amber-100 text-amber-700',
   USE_AI_ASSISTANT: 'bg-teal-100 text-teal-700',
+  CHANGE_STATUS_DEVIS_SUIVI: 'bg-amber-100 text-amber-700',
+  MARK_DEVIS_PURCHASED: 'bg-emerald-100 text-emerald-700',
+  MARK_DEVIS_LOST: 'bg-rose-100 text-rose-700',
+  RELANCE_DEVIS: 'bg-purple-100 text-purple-700',
 }
 
 const actionLabels = {
@@ -59,6 +82,10 @@ const actionLabels = {
   UPDATE_INTERVENTION: 'Modification intervention',
   ASSIGN_USER_INTERVENTION: 'Affectation utilisateur',
   USE_AI_ASSISTANT: 'Assistant IA',
+  CHANGE_STATUS_DEVIS_SUIVI: 'Changement statut devis',
+  MARK_DEVIS_PURCHASED: 'Devis acheté',
+  MARK_DEVIS_LOST: 'Devis perdu',
+  RELANCE_DEVIS: 'Relance commerciale',
 }
 
 const moduleMeta = {
@@ -77,6 +104,10 @@ const moduleMeta = {
   Interventions: {
     icon: AlertCircle,
     pill: 'bg-violet-50 text-violet-700 border-violet-200',
+  },
+  'Suivi Devis': {
+    icon: BarChart3,
+    pill: 'bg-blue-50 text-blue-700 border-blue-200',
   },
 }
 
@@ -128,6 +159,7 @@ function moduleFromLog(log) {
   if (log.entity === 'MACHINE') return 'Parc Machine'
   if (log.entity === 'MISSION') return 'Missions'
   if (log.entity === 'INTERVENTION') return 'Interventions'
+  if (log.entity === 'DEVIS_SUIVI') return 'Suivi Devis'
   return log.entity || '-'
 }
 
@@ -267,11 +299,29 @@ export default function UserDetails() {
       interventionCreate: Number(map.CREATE_INTERVENTION || 0),
       interventionUpdate: Number(map.UPDATE_INTERVENTION || 0),
       interventionAssign: Number(map.ASSIGN_USER_INTERVENTION || 0),
+      // Commercial / Devis-Suivi
+      devisSuiviCreate: Number(map.CREATE_DEVIS_SUIVI || 0),
+      devisSuiviUpdate: Number(map.UPDATE_DEVIS_SUIVI || 0),
+      devisStatusChange: Number(map.CHANGE_STATUS_DEVIS_SUIVI || 0),
+      devisPurchased: Number(map.MARK_DEVIS_PURCHASED || 0),
+      devisLost: Number(map.MARK_DEVIS_LOST || 0),
+      devisRelance: Number(map.RELANCE_DEVIS || 0),
     }
   }, [auditStats])
 
-  const totalActions = useMemo(
-    () =>
+  const userRole = userDetails?.role || ''
+  const isTechnicien = userRole === 'Technicien'
+  const isCommercial = userRole === 'Commerciale'
+  const isAdminLike = !isTechnicien && !isCommercial
+
+  const totalActions = useMemo(() => {
+    if (isTechnicien) {
+      return counts.ai + counts.missionUpdate + counts.interventionUpdate + counts.interventionAssign
+    }
+    if (isCommercial) {
+      return counts.devisPurchased + counts.devisLost + counts.devisStatusChange + counts.devisRelance
+    }
+    return (
       counts.ai +
       counts.machineCreate +
       counts.machineUpdate +
@@ -281,14 +331,18 @@ export default function UserDetails() {
       counts.missionDelete +
       counts.interventionCreate +
       counts.interventionUpdate +
-      counts.interventionAssign,
-    [counts],
-  )
+      counts.interventionAssign
+    )
+  }, [counts, isTechnicien, isCommercial])
 
-  const logsForTable = useMemo(
-    () => (auditLogs.items || []).filter((item) => BUSINESS_ACTIONS.includes(item.action)),
-    [auditLogs.items],
-  )
+  const logsForTable = useMemo(() => {
+    const allowedActions = isTechnicien
+      ? TECHNICIEN_ACTIONS
+      : isCommercial
+        ? COMMERCIAL_ACTIONS
+        : BUSINESS_ACTIONS
+    return (auditLogs.items || []).filter((item) => allowedActions.includes(item.action))
+  }, [auditLogs.items, isTechnicien, isCommercial])
 
   const totalTablePages = useMemo(
     () => Math.max(1, Math.ceil(logsForTable.length / tableRowsPerPage)),
@@ -757,6 +811,8 @@ export default function UserDetails() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {/* ─── ADMIN / COORDINATEUR / RESPONSABLE TECHNICIEN ─── */}
+              {isAdminLike && (<>
               <div className="rounded-xl border border-teal-200 bg-teal-50 p-4 transition hover:shadow-sm">
                 <div className="mb-2 flex items-center justify-between">
                   <p className="text-sm font-black uppercase tracking-widest text-slate-600">Assistant IA</p>
@@ -764,10 +820,10 @@ export default function UserDetails() {
                 </div>
                 <p className="text-sm leading-relaxed text-slate-700">
                   {counts.ai === 0
-                    ? "- L'Assistant IA de diagnostic n'a pas ete utilise durant cette periode."
+                    ? "- L'Assistant IA de diagnostic n'a pas été utilisé durant cette période."
                     : counts.ai === 1
-                      ? "- Cet utilisateur a utilise l'Assistant IA de diagnostic 1 fois durant la periode selectionnee."
-                      : `- Cet utilisateur a utilise l'Assistant IA de diagnostic ${counts.ai} fois durant la periode selectionnee.`}
+                      ? "- Cet utilisateur a utilisé l'Assistant IA de diagnostic 1 fois durant la période sélectionnée."
+                      : `- Cet utilisateur a utilisé l'Assistant IA de diagnostic ${counts.ai} fois durant la période sélectionnée.`}
                 </p>
               </div>
 
@@ -779,9 +835,9 @@ export default function UserDetails() {
                   </span>
                 </div>
                 <div className="space-y-1 text-sm leading-relaxed text-slate-700">
-                  <p>- {counts.machineCreate === 0 ? "Aucune creation de machine n'a ete enregistree durant cette periode." : counts.machineCreate === 1 ? 'Une nouvelle machine a ete creee par cet utilisateur.' : `${counts.machineCreate} creations de machines ont ete enregistrees durant cette periode.`}</p>
-                  <p>- {counts.machineUpdate === 0 ? "Aucune modification de machine n'a ete enregistree durant cette periode." : counts.machineUpdate === 1 ? 'Une machine a ete modifiee par cet utilisateur.' : `${counts.machineUpdate} modifications de machines ont ete enregistrees durant cette periode.`}</p>
-                  <p>- {counts.machineDelete === 0 ? "Aucune suppression de machine n'a ete enregistree durant cette periode." : counts.machineDelete === 1 ? 'Une machine a ete supprimee par cet utilisateur.' : `${counts.machineDelete} suppressions de machines ont ete enregistrees durant cette periode.`}</p>
+                  <p>- {counts.machineCreate === 0 ? "Aucune création de machine n'a été enregistrée durant cette période." : counts.machineCreate === 1 ? 'Une nouvelle machine a été créée par cet utilisateur.' : `${counts.machineCreate} créations de machines ont été enregistrées durant cette période.`}</p>
+                  <p>- {counts.machineUpdate === 0 ? "Aucune modification de machine n'a été enregistrée durant cette période." : counts.machineUpdate === 1 ? 'Une machine a été modifiée par cet utilisateur.' : `${counts.machineUpdate} modifications de machines ont été enregistrées durant cette période.`}</p>
+                  <p>- {counts.machineDelete === 0 ? "Aucune suppression de machine n'a été enregistrée durant cette période." : counts.machineDelete === 1 ? 'Une machine a été supprimée par cet utilisateur.' : `${counts.machineDelete} suppressions de machines ont été enregistrées durant cette période.`}</p>
                 </div>
               </div>
 
@@ -793,9 +849,9 @@ export default function UserDetails() {
                   </span>
                 </div>
                 <div className="space-y-1 text-sm leading-relaxed text-slate-700">
-                  <p>- {counts.missionCreate === 0 ? "Aucune creation de mission n'a ete enregistree durant cette periode." : counts.missionCreate === 1 ? 'Une nouvelle mission a ete creee par cet utilisateur.' : `${counts.missionCreate} creations de missions ont ete enregistrees durant cette periode.`}</p>
-                  <p>- {counts.missionUpdate === 0 ? "Aucune modification de mission n'a ete enregistree durant cette periode." : counts.missionUpdate === 1 ? 'Une mission a ete modifiee par cet utilisateur.' : `${counts.missionUpdate} modifications de missions ont ete enregistrees durant cette periode.`}</p>
-                  <p>- {counts.missionDelete === 0 ? "Aucune suppression de mission n'a ete enregistree durant cette periode." : counts.missionDelete === 1 ? 'Une mission a ete supprimee par cet utilisateur.' : `${counts.missionDelete} suppressions de missions ont ete enregistrees durant cette periode.`}</p>
+                  <p>- {counts.missionCreate === 0 ? "Aucune création de mission n'a été enregistrée durant cette période." : counts.missionCreate === 1 ? 'Une nouvelle mission a été créée par cet utilisateur.' : `${counts.missionCreate} créations de missions ont été enregistrées durant cette période.`}</p>
+                  <p>- {counts.missionUpdate === 0 ? "Aucune modification de mission n'a été enregistrée durant cette période." : counts.missionUpdate === 1 ? 'Une mission a été modifiée par cet utilisateur.' : `${counts.missionUpdate} modifications de missions ont été enregistrées durant cette période.`}</p>
+                  <p>- {counts.missionDelete === 0 ? "Aucune suppression de mission n'a été enregistrée durant cette période." : counts.missionDelete === 1 ? 'Une mission a été supprimée par cet utilisateur.' : `${counts.missionDelete} suppressions de missions ont été enregistrées durant cette période.`}</p>
                 </div>
               </div>
 
@@ -807,11 +863,122 @@ export default function UserDetails() {
                   </span>
                 </div>
                 <div className="space-y-1 text-sm leading-relaxed text-slate-700">
-                  <p>- {counts.interventionCreate === 0 ? "Aucune creation d'intervention n'a ete enregistree durant cette periode." : counts.interventionCreate === 1 ? 'Une nouvelle intervention a ete creee par cet utilisateur.' : `${counts.interventionCreate} creations d'interventions ont ete enregistrees durant cette periode.`}</p>
-                  <p>- {counts.interventionUpdate === 0 ? "Aucune modification d'intervention n'a ete detectee pour cette periode." : counts.interventionUpdate === 1 ? 'Une intervention a ete modifiee par cet utilisateur.' : `${counts.interventionUpdate} modifications d'interventions ont ete detectees pour cette periode.`}</p>
-                  <p>- {counts.interventionAssign === 0 ? "Aucune affectation d'utilisateur n'a ete enregistree durant cette periode." : counts.interventionAssign === 1 ? 'Un utilisateur a ete affecte a une intervention durant cette periode.' : `${counts.interventionAssign} affectations d'utilisateurs ont ete enregistrees durant cette periode.`}</p>
+                  <p>- {counts.interventionCreate === 0 ? "Aucune création d'intervention n'a été enregistrée durant cette période." : counts.interventionCreate === 1 ? 'Une nouvelle intervention a été créée par cet utilisateur.' : `${counts.interventionCreate} créations d'interventions ont été enregistrées durant cette période.`}</p>
+                  <p>- {counts.interventionUpdate === 0 ? "Aucune modification d'intervention n'a été détectée pour cette période." : counts.interventionUpdate === 1 ? 'Une intervention a été modifiée par cet utilisateur.' : `${counts.interventionUpdate} modifications d'interventions ont été détectées pour cette période.`}</p>
+                  <p>- {counts.interventionAssign === 0 ? "Aucune affectation d'utilisateur n'a été enregistrée durant cette période." : counts.interventionAssign === 1 ? 'Un utilisateur a été affecté à une intervention durant cette période.' : `${counts.interventionAssign} affectations d'utilisateurs ont été enregistrées durant cette période.`}</p>
                 </div>
               </div>
+              </>)}
+
+              {/* ─── TECHNICIEN ─── */}
+              {isTechnicien && (<>
+              <div className="rounded-xl border border-teal-200 bg-teal-50 p-4 transition hover:shadow-sm">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-sm font-black uppercase tracking-widest text-slate-600">Assistant IA</p>
+                  <span className="rounded-md bg-teal-100 px-2 py-1 text-xs font-bold text-teal-700">{counts.ai}</span>
+                </div>
+                <p className="text-sm leading-relaxed text-slate-700">
+                  {counts.ai === 0
+                    ? "- L'Assistant IA de diagnostic n'a pas été utilisé durant cette période."
+                    : `- Nombre d'utilisations de l'Assistant IA diagnostic : ${counts.ai}`}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4 transition hover:shadow-sm">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-sm font-black uppercase tracking-widest text-slate-600">Missions</p>
+                  <span className="rounded-md bg-cyan-100 px-2 py-1 text-xs font-bold text-cyan-700">
+                    {counts.missionUpdate + counts.interventionAssign}
+                  </span>
+                </div>
+                <div className="space-y-1 text-sm leading-relaxed text-slate-700">
+                  {counts.missionUpdate === 0 && counts.interventionAssign === 0 ? (
+                    <p>- Aucun changement d'état de mission n'a été enregistré durant cette période.</p>
+                  ) : (<>
+                    {counts.interventionAssign > 0 && (
+                      <p>- Missions affectées au technicien : {counts.interventionAssign}</p>
+                    )}
+                    {counts.missionUpdate > 0 && (
+                      <p>- Missions dont le statut a été changé par le technicien : {counts.missionUpdate}</p>
+                    )}
+                    <p className="text-xs text-slate-500 italic mt-1">Détail des changements d'état possibles : À faire → En cours, En cours → Terminée, En cours → Bloquée</p>
+                  </>)}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 transition hover:shadow-sm lg:col-span-2">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-sm font-black uppercase tracking-widest text-slate-600">Interventions</p>
+                  <span className="rounded-md bg-violet-100 px-2 py-1 text-xs font-bold text-violet-700">
+                    {counts.interventionUpdate + counts.interventionAssign}
+                  </span>
+                </div>
+                <div className="space-y-1 text-sm leading-relaxed text-slate-700">
+                  {counts.interventionUpdate === 0 && counts.interventionAssign === 0 ? (
+                    <p>- Aucune clôture ou modification d'intervention n'a été détectée durant cette période.</p>
+                  ) : (<>
+                    {counts.interventionAssign > 0 && (
+                      <p>- Interventions affectées au technicien : {counts.interventionAssign}</p>
+                    )}
+                    {counts.interventionUpdate > 0 && (
+                      <p>- Interventions modifiées par le technicien : {counts.interventionUpdate}</p>
+                    )}
+                  </>)}
+                </div>
+              </div>
+              </>)}
+
+              {/* ─── COMMERCIAL ─── */}
+              {isCommercial && (<>
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 transition hover:shadow-sm">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-sm font-black uppercase tracking-widest text-slate-600">Devis</p>
+                  <span className="rounded-md bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700">
+                    {counts.devisPurchased + counts.devisLost}
+                  </span>
+                </div>
+                <div className="space-y-1 text-sm leading-relaxed text-slate-700">
+                  {(counts.devisPurchased + counts.devisLost) === 0 ? (
+                    <p>- Aucune activité commerciale n'a été enregistrée durant cette période.</p>
+                  ) : (<>
+                    <p>- Nombre de devis achetés : {counts.devisPurchased}</p>
+                    <p>- Nombre de devis refusés : {counts.devisLost}</p>
+                  </>)}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 transition hover:shadow-sm">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-sm font-black uppercase tracking-widest text-slate-600">Changements de statut</p>
+                  <span className="rounded-md bg-amber-100 px-2 py-1 text-xs font-bold text-amber-700">
+                    {counts.devisStatusChange}
+                  </span>
+                </div>
+                <div className="space-y-1 text-sm leading-relaxed text-slate-700">
+                  {counts.devisStatusChange === 0 ? (
+                    <p>- Aucun changement de statut devis n'a été enregistré durant cette période.</p>
+                  ) : (
+                    <p>- {counts.devisStatusChange} changement(s) de statut de devis effectué(s) durant cette période.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 transition hover:shadow-sm lg:col-span-2">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-sm font-black uppercase tracking-widest text-slate-600">Relances commerciales</p>
+                  <span className="rounded-md bg-purple-100 px-2 py-1 text-xs font-bold text-purple-700">
+                    {counts.devisRelance}
+                  </span>
+                </div>
+                <div className="space-y-1 text-sm leading-relaxed text-slate-700">
+                  {counts.devisRelance === 0 ? (
+                    <p>- Aucune relance commerciale n'a été planifiée durant cette période.</p>
+                  ) : (
+                    <p>- {counts.devisRelance} relance(s) commerciale(s) planifiée(s) durant cette période.</p>
+                  )}
+                </div>
+              </div>
+              </>)}
             </div>
 
             {noActivity && (

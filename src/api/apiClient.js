@@ -59,6 +59,8 @@ export async function apiFetch(path, options = {}) {
     headers = {},
     body,
     auth = true,
+    signal,
+    timeoutMs = 25_000, // timeout par défaut côté client
     ...rest
   } = options
 
@@ -82,19 +84,46 @@ export async function apiFetch(path, options = {}) {
     finalBody = JSON.stringify(body)
   }
 
-  const response = await fetch(API_BASE_URL + path, {
-    method,
-    headers: finalHeaders,
-    body: finalBody,
-    ...rest,
-  })
+  // Timeout client : si le backend met plus de N ms, on annule la requête
+  // pour ne JAMAIS laisser un loader bloqué côté UI.
+  const timeoutController = new AbortController()
+  const timeoutId = timeoutMs > 0
+    ? setTimeout(() => timeoutController.abort(new DOMException('Request timeout', 'TimeoutError')), timeoutMs)
+    : null
 
-  if (auth && response.status === 401) {
-    clearStoredAuth()
-    dispatchAuthInvalid('unauthorized-response')
+  // On compose le signal externe (si fourni) avec le signal de timeout.
+  let composedSignal = timeoutController.signal
+  let externalAbortHandler = null
+  if (signal) {
+    if (signal.aborted) {
+      timeoutController.abort(signal.reason)
+    } else {
+      externalAbortHandler = () => timeoutController.abort(signal.reason)
+      signal.addEventListener('abort', externalAbortHandler, { once: true })
+    }
   }
 
-  return response
+  try {
+    const response = await fetch(API_BASE_URL + path, {
+      method,
+      headers: finalHeaders,
+      body: finalBody,
+      signal: composedSignal,
+      ...rest,
+    })
+
+    if (auth && response.status === 401) {
+      clearStoredAuth()
+      dispatchAuthInvalid('unauthorized-response')
+    }
+
+    return response
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
+    if (signal && externalAbortHandler) {
+      signal.removeEventListener('abort', externalAbortHandler)
+    }
+  }
 }
 
 export async function logoutSession() {
