@@ -28,6 +28,7 @@ import {
   ChevronRight,
   Check,
   Wrench,
+  Camera,
   Eye,
   XCircle
 } from 'lucide-react'
@@ -266,6 +267,24 @@ const statusConfig = {
   IN_PROGRESS: { label: 'En cours',       color: 'bg-orange-50 text-orange-700 border border-orange-200', dot: 'bg-orange-500'  },
   TESTING:     { label: 'En test',        color: 'bg-purple-50 text-purple-700 border border-purple-200', dot: 'bg-purple-500'  },
   CLOSED:      { label: 'Clôturé',        color: 'bg-green-50 text-green-700 border border-green-200',    dot: 'bg-green-500'   },
+}
+
+const SIGNATURE_TYPES = {
+  technician: 'TECHNICIAN_SIGNATURE',
+  client: 'CLIENT_SIGNATURE_STAMP',
+}
+
+function formatSignatureDate(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 function formatClientAddress(client) {
@@ -693,9 +712,12 @@ export default function InterventionDetails() {
   const [showMobilePreview, setShowMobilePreview] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false)
+  const [signatures, setSignatures] = useState([])
+  const [uploadingSignatureType, setUploadingSignatureType] = useState(null)
   const [assignedMissionEmployees, setAssignedMissionEmployees] = useState(() => assignedTechnicianName)
   const [interventionData, setInterventionData] = useState(() => mapEntryToInterventionData(dbEntry, assignedMissionEmployees || assignedTechnicianName))
   const baseDprRef = useRef(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
+  const signatureInputRefs = useRef({})
 
   const selectedClient = useMemo(
     () => clients.find((c) => String(c.id) === String(interventionData.clientId)),
@@ -736,6 +758,23 @@ export default function InterventionDetails() {
         const data = await response.json()
         if (!cancelled && data) {
           setDbEntry(data)
+        }
+      } catch {}
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [id])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const response = await apiFetch(`/interventions/${id}/signatures`, { cache: 'no-store' })
+        if (!response.ok) return
+        const data = await response.json().catch(() => [])
+        if (!cancelled) {
+          setSignatures(Array.isArray(data) ? data : [])
         }
       } catch {}
     })()
@@ -1509,6 +1548,96 @@ export default function InterventionDetails() {
     }
   }
 
+  const getSignatureByType = useCallback((type) => (
+    signatures.find((signature) => signature?.type === type && signature?.isActive !== false)
+  ), [signatures])
+
+  const canManageSignatures = isEditing && !isReadOnlyView && status !== 'CLOSED'
+
+  const buildSignaturePayloadMeta = (type) => {
+    if (type === SIGNATURE_TYPES.technician) {
+      return {
+        signerName: interventionData.technicianName || assignedMissionEmployees || 'Technicien',
+        signerRole: 'Technicien',
+      }
+    }
+    return {
+      signerName: interventionData.requestorName || interventionData.clientName || 'Client',
+      signerRole: 'Client',
+    }
+  }
+
+  const handleSignatureFileChange = async (type, event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!file.type?.startsWith('image/')) {
+      alert('Veuillez selectionner une image de signature.')
+      return
+    }
+
+    const meta = buildSignaturePayloadMeta(type)
+    const formData = new FormData()
+    formData.append('type', type)
+    formData.append('signerName', meta.signerName)
+    formData.append('signerRole', meta.signerRole)
+    formData.append('signedAt', new Date().toISOString())
+    formData.append('image', file)
+
+    setUploadingSignatureType(type)
+    try {
+      const response = await apiFetch(`/interventions/${id}/signatures`, {
+        method: 'POST',
+        body: formData,
+        timeoutMs: 60_000,
+      })
+      if (!response.ok) {
+        alert("Erreur lors de l'enregistrement de la signature.")
+        return
+      }
+      const result = await response.json().catch(() => null)
+      const nextSignature = result?.signature || result
+      if (nextSignature?.id) {
+        setSignatures((prev) => [
+          nextSignature,
+          ...prev.filter((signature) => signature?.id !== nextSignature.id && signature?.type !== type),
+        ])
+      } else {
+        const reload = await apiFetch(`/interventions/${id}/signatures`, { cache: 'no-store' })
+        if (reload.ok) {
+          const data = await reload.json().catch(() => [])
+          setSignatures(Array.isArray(data) ? data : [])
+        }
+      }
+    } catch {
+      alert('Impossible de joindre le serveur pour la signature.')
+    } finally {
+      setUploadingSignatureType(null)
+    }
+  }
+
+  const handleDeleteSignature = async (signature) => {
+    if (!signature?.id || !canManageSignatures) return
+    const confirmed = window.confirm('Supprimer cette signature ?')
+    if (!confirmed) return
+
+    setUploadingSignatureType(signature.type)
+    try {
+      const response = await apiFetch(`/interventions/${id}/signatures/${signature.id}`, {
+        method: 'DELETE',
+      })
+      if (!response.ok) {
+        alert('Erreur lors de la suppression de la signature.')
+        return
+      }
+      setSignatures((prev) => prev.filter((item) => item?.id !== signature.id))
+    } catch {
+      alert('Impossible de joindre le serveur pour supprimer la signature.')
+    } finally {
+      setUploadingSignatureType(null)
+    }
+  }
+
   const handleSave = async (options = {}) => {
     setIsSaving(true)
     try {
@@ -1578,6 +1707,89 @@ export default function InterventionDetails() {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const SignatureCaptureCard = ({ title, placeholder, type }) => {
+    const signature = getSignatureByType(type)
+    const isBusy = uploadingSignatureType === type
+    const inputId = `signature-input-${type}`
+
+    return (
+      <div className="space-y-3 sm:space-y-4">
+        <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">{title}</p>
+        <input
+          id={inputId}
+          ref={(node) => {
+            if (node) signatureInputRefs.current[type] = node
+          }}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          disabled={!canManageSignatures || isBusy}
+          onChange={(event) => handleSignatureFileChange(type, event)}
+        />
+        <button
+          type="button"
+          disabled={!canManageSignatures || isBusy}
+          onClick={() => signatureInputRefs.current[type]?.click()}
+          className={`relative aspect-[2.5/1] sm:aspect-[2/1] w-full overflow-hidden rounded-2xl border-2 border-dashed transition-all ${
+            canManageSignatures
+              ? 'bg-slate-50 border-slate-200 hover:border-[#0052CC] cursor-pointer'
+              : 'bg-slate-50 border-slate-200 cursor-default'
+          }`}
+        >
+          {signature?.url ? (
+            <img
+              src={signature.url}
+              alt={title}
+              className="absolute inset-0 h-full w-full object-contain bg-white p-3"
+            />
+          ) : (
+            <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center">
+              <Camera size={20} className={canManageSignatures ? 'text-[#0052CC]' : 'text-slate-300'} />
+              <span className={`text-[9px] sm:text-[10px] font-black uppercase transition-colors ${
+                canManageSignatures ? 'text-slate-400' : 'text-slate-300'
+              }`}>
+                {isBusy ? 'Enregistrement...' : placeholder}
+              </span>
+            </span>
+          )}
+        </button>
+        {signature?.url && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black text-slate-700 truncate">{signature.signerName || 'Non renseigné'}</p>
+              <p className="text-[9px] font-semibold text-slate-400">
+                {formatSignatureDate(signature.signedAt) || 'Date non renseignée'}
+              </p>
+            </div>
+            {canManageSignatures && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => signatureInputRefs.current[type]?.click()}
+                  disabled={isBusy}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-[9px] font-black uppercase tracking-wider text-white hover:bg-slate-800 transition-colors disabled:opacity-60"
+                >
+                  <Camera size={13} />
+                  Remplacer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteSignature(signature)}
+                  disabled={isBusy}
+                  className="inline-flex items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-60"
+                  aria-label="Supprimer la signature"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )
   }
 
   const renderSectionContent = () => {
@@ -2125,18 +2337,16 @@ export default function InterventionDetails() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-              <div className="space-y-3 sm:space-y-4">
-                <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Signature du Technicien</p>
-                <div className="aspect-[2.5/1] sm:aspect-[2/1] bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl flex items-center justify-center group hover:border-[#0052CC] transition-all cursor-pointer">
-                  <span className="text-[9px] sm:text-[10px] font-black text-slate-300 uppercase group-hover:text-[#0052CC] transition-colors text-center px-4">Cliquer pour signer</span>
-                </div>
-              </div>
-              <div className="space-y-3 sm:space-y-4">
-                <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Signature et Cachet Client</p>
-                <div className="aspect-[2.5/1] sm:aspect-[2/1] bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl flex items-center justify-center group hover:border-[#0052CC] transition-all cursor-pointer">
-                  <span className="text-[9px] sm:text-[10px] font-black text-slate-300 uppercase group-hover:text-[#0052CC] transition-colors text-center px-4">Signature Client</span>
-                </div>
-              </div>
+              <SignatureCaptureCard
+                title="Signature du Technicien"
+                placeholder="Prendre une photo"
+                type={SIGNATURE_TYPES.technician}
+              />
+              <SignatureCaptureCard
+                title="Signature et Cachet Client"
+                placeholder="Signature client + cachet"
+                type={SIGNATURE_TYPES.client}
+              />
             </div>
           </div>
         )
