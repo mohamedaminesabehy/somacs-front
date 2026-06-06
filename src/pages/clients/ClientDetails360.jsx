@@ -28,11 +28,12 @@ import {
   Cpu,
   Hammer,
   X,
-  ExternalLink,
   Package,
   StickyNote,
   TrendingUp,
   FileText,
+  Pencil,
+  Save,
 } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 
@@ -51,17 +52,169 @@ function getInitials(name) {
     .map((p) => p[0]?.toUpperCase() || '').join('') || '?'
 }
 
+const FALLBACK = 'Non renseigné'
+const PHONE_PREFIX = '+216'
+
+function present(value) {
+  return value !== null && value !== undefined && String(value).trim() !== ''
+}
+
+function valueOrFallback(value) {
+  return present(value) ? value : FALLBACK
+}
+
+function isValidEmail(value) {
+  if (!present(value)) return true
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).trim())
+}
+
+function getPhoneDigits(value) {
+  const raw = String(value || '').trim()
+  const withoutPrefix = raw.startsWith(PHONE_PREFIX) ? raw.slice(PHONE_PREFIX.length) : raw
+  return withoutPrefix.replace(/\D/g, '').slice(0, 8)
+}
+
+function normalizePhone(value) {
+  return `${PHONE_PREFIX}${getPhoneDigits(value)}`
+}
+
+function isValidPhone(value) {
+  return new RegExp(`^\\${PHONE_PREFIX}\\d{8}$`).test(String(value || '').trim())
+}
+
+function getInterventionMachine(intervention) {
+  const machine = intervention?.machineEntity || intervention?.machine || intervention?.equipment || null
+  if (machine) return machine
+
+  if (
+    present(intervention?.machineId) ||
+    present(intervention?.machineType) ||
+    present(intervention?.machineBrand) ||
+    present(intervention?.machineModel) ||
+    present(intervention?.serialNumber)
+  ) {
+    return {
+      id: intervention.machineId,
+      designation: intervention.machineType,
+      brand: intervention.machineBrand,
+      model: intervention.machineModel,
+      serialNumber: intervention.serialNumber,
+    }
+  }
+
+  return null
+}
+
+function getMachineLabel(machine) {
+  return (
+    machine?.designation ||
+    machine?.name ||
+    machine?.machineType ||
+    machine?.type ||
+    machine?.label ||
+    ''
+  )
+}
+
+function getMachineReference(machine) {
+  return machine?.code || machine?.reference || machine?.referenceFournisseur || ''
+}
+
+function machineKey(machine) {
+  if (!machine) return null
+  if (present(machine.id)) return `id:${machine.id}`
+  if (present(machine.serialNumber)) return `serial:${String(machine.serialNumber).toLowerCase()}`
+
+  const ref = getMachineReference(machine)
+  if (present(ref)) return `ref:${String(ref).toLowerCase()}`
+
+  const signature = [getMachineLabel(machine), machine.brand, machine.model]
+    .filter(present)
+    .map((v) => String(v).trim().toLowerCase())
+    .join('|')
+
+  return signature ? `sig:${signature}` : null
+}
+
+function enrichMachinesForClient(directMachines, interventions) {
+  const byKey = new Map()
+
+  const addMachine = (machine, extra = {}) => {
+    const key = machineKey(machine)
+    if (!key) return
+
+    const existing = byKey.get(key) || {}
+    byKey.set(key, {
+      ...machine,
+      ...existing,
+      ...Object.fromEntries(
+        Object.entries(machine || {}).filter(([, value]) => present(value)),
+      ),
+      ...extra,
+      id: existing.id ?? machine?.id ?? extra.id,
+      interventionCount: extra.interventionCount ?? existing.interventionCount ?? 0,
+      lastInterventionDate: extra.lastInterventionDate ?? existing.lastInterventionDate ?? null,
+    })
+  }
+
+  directMachines.forEach((machine) => addMachine(machine))
+
+  const stats = new Map()
+  interventions.forEach((intervention) => {
+    const machine = getInterventionMachine(intervention)
+    const key = machineKey(machine)
+    if (!key) return
+
+    const current = stats.get(key) || { count: 0, lastDate: null, machine }
+    const date = intervention.interventionDate || intervention.createdAt || null
+    const currentTime = current.lastDate ? new Date(current.lastDate).getTime() : 0
+    const nextTime = date ? new Date(date).getTime() : 0
+
+    stats.set(key, {
+      count: current.count + 1,
+      lastDate: nextTime > currentTime ? date : current.lastDate,
+      machine: { ...current.machine, ...machine },
+    })
+  })
+
+  stats.forEach((stat, key) => {
+    addMachine(stat.machine, {
+      interventionCount: stat.count,
+      lastInterventionDate: stat.lastDate,
+    })
+
+    const machine = byKey.get(key)
+    if (machine) {
+      byKey.set(key, {
+        ...machine,
+        interventionCount: stat.count,
+        lastInterventionDate: stat.lastDate,
+      })
+    }
+  })
+
+  return Array.from(byKey.values())
+}
+
 const STATUS_PRESETS = {
-  COMPLETED:   { label: 'TERMINÉE',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', icon: CheckCircle2 },
-  TERMINEE:    { label: 'TERMINÉE',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', icon: CheckCircle2 },
-  IN_PROGRESS: { label: 'EN COURS',    cls: 'bg-blue-50 text-blue-700 border-blue-200',          dot: 'bg-blue-500',    icon: PlayCircle },
-  EN_COURS:    { label: 'EN COURS',    cls: 'bg-blue-50 text-blue-700 border-blue-200',          dot: 'bg-blue-500',    icon: PlayCircle },
-  ASSIGNED:    { label: 'ASSIGNED',    cls: 'bg-violet-50 text-violet-700 border-violet-200',    dot: 'bg-violet-500',  icon: ClipboardList },
-  ASSIGNEE:    { label: 'ASSIGNÉE',    cls: 'bg-violet-50 text-violet-700 border-violet-200',    dot: 'bg-violet-500',  icon: ClipboardList },
-  PENDING:     { label: 'EN ATTENTE',  cls: 'bg-amber-50 text-amber-700 border-amber-200',       dot: 'bg-amber-500',   icon: Clock },
-  EN_ATTENTE:  { label: 'EN ATTENTE',  cls: 'bg-amber-50 text-amber-700 border-amber-200',       dot: 'bg-amber-500',   icon: Clock },
-  CANCELLED:   { label: 'ANNULÉE',     cls: 'bg-red-50 text-red-700 border-red-200',             dot: 'bg-red-500',     icon: XCircle },
-  ANNULEE:     { label: 'ANNULÉE',     cls: 'bg-red-50 text-red-700 border-red-200',             dot: 'bg-red-500',     icon: XCircle },
+  COMPLETED:   { label: 'Terminée',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', icon: CheckCircle2 },
+  TERMINEE:    { label: 'Terminée',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', icon: CheckCircle2 },
+  DONE:        { label: 'Terminée',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', icon: CheckCircle2 },
+  CLOSED:      { label: 'Clôturée',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', icon: CheckCircle2 },
+  CLOTURE:     { label: 'Clôturée',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', icon: CheckCircle2 },
+  CLOTUREE:    { label: 'Clôturée',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', icon: CheckCircle2 },
+  CLÔTURÉE:    { label: 'Clôturée',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', icon: CheckCircle2 },
+  OPEN:        { label: 'Ouverte',     cls: 'bg-sky-50 text-sky-700 border-sky-200',             dot: 'bg-sky-500',     icon: ClipboardList },
+  OUVERTE:     { label: 'Ouverte',     cls: 'bg-sky-50 text-sky-700 border-sky-200',             dot: 'bg-sky-500',     icon: ClipboardList },
+  IN_PROGRESS: { label: 'En cours',    cls: 'bg-blue-50 text-blue-700 border-blue-200',          dot: 'bg-blue-500',    icon: PlayCircle },
+  EN_COURS:    { label: 'En cours',    cls: 'bg-blue-50 text-blue-700 border-blue-200',          dot: 'bg-blue-500',    icon: PlayCircle },
+  ASSIGNED:    { label: 'Affectée',    cls: 'bg-violet-50 text-violet-700 border-violet-200',    dot: 'bg-violet-500',  icon: ClipboardList },
+  AFFECTEE:    { label: 'Affectée',    cls: 'bg-violet-50 text-violet-700 border-violet-200',    dot: 'bg-violet-500',  icon: ClipboardList },
+  ASSIGNEE:    { label: 'Affectée',    cls: 'bg-violet-50 text-violet-700 border-violet-200',    dot: 'bg-violet-500',  icon: ClipboardList },
+  PENDING:     { label: 'En attente',  cls: 'bg-amber-50 text-amber-700 border-amber-200',       dot: 'bg-amber-500',   icon: Clock },
+  EN_ATTENTE:  { label: 'En attente',  cls: 'bg-amber-50 text-amber-700 border-amber-200',       dot: 'bg-amber-500',   icon: Clock },
+  CANCELLED:   { label: 'Annulée',     cls: 'bg-red-50 text-red-700 border-red-200',             dot: 'bg-red-500',     icon: XCircle },
+  ANNULEE:     { label: 'Annulée',     cls: 'bg-red-50 text-red-700 border-red-200',             dot: 'bg-red-500',     icon: XCircle },
 }
 function getStatusPreset(status) {
   const k = String(status || '').toUpperCase().replace(/[\s-]/g, '_')
@@ -127,25 +280,94 @@ function InfoCard({ icon: Icon, label, value, mono = false, accent = 'slate' }) 
   )
 }
 
+function ClientEditField({ icon: Icon, label, name, value, onChange, required = false, type = 'text', multiline = false }) {
+  const inputClass = 'mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none transition-colors focus:border-[#0052CC] focus:ring-2 focus:ring-blue-100'
+
+  return (
+    <label className={multiline ? 'sm:col-span-2 min-w-0' : 'min-w-0'}>
+      <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.12em] flex items-center gap-1.5">
+        {Icon && <Icon size={10} />}
+        {label}
+        {required && <span className="text-red-500">*</span>}
+      </span>
+      {multiline ? (
+        <textarea
+          name={name}
+          value={value}
+          onChange={onChange}
+          rows={3}
+          className={`${inputClass} resize-none leading-snug`}
+        />
+      ) : (
+        <input
+          name={name}
+          type={type}
+          value={value}
+          onChange={onChange}
+          className={inputClass}
+        />
+      )}
+    </label>
+  )
+}
+
+function ClientPhoneEditField({ value, onChange }) {
+  const digits = getPhoneDigits(value)
+
+  const handleDigitsChange = (event) => {
+    const nextDigits = event.target.value.replace(/\D/g, '').slice(0, 8)
+    onChange({
+      target: {
+        name: 'phone',
+        value: `${PHONE_PREFIX}${nextDigits}`,
+      },
+    })
+  }
+
+  return (
+    <label className="min-w-0">
+      <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.12em] flex items-center gap-1.5">
+        <Phone size={10} />
+        Téléphone
+      </span>
+      <div className="mt-1 flex rounded-lg border border-slate-200 bg-white shadow-sm transition-colors focus-within:border-[#0052CC] focus-within:ring-2 focus-within:ring-blue-100">
+        <span className="inline-flex items-center rounded-l-lg border-r border-slate-200 bg-slate-50 px-3 text-sm font-black text-slate-700 select-none">
+          {PHONE_PREFIX}
+        </span>
+        <input
+          name="phoneDigits"
+          type="text"
+          value={digits}
+          onChange={handleDigitsChange}
+          inputMode="numeric"
+          pattern="[0-9]{8}"
+          maxLength={8}
+          autoComplete="tel-national"
+          className="w-full rounded-r-lg border-0 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none"
+        />
+      </div>
+    </label>
+  )
+}
+
 
 // ─── Cards ─────────────────────────────────────────────────────────────────
 
-function MachineCard({ machine, onView }) {
+function MachineCard({ machine }) {
+  const reference = getMachineReference(machine)
+
   return (
-    <div
-      onClick={onView}
-      className="group bg-white border border-slate-100 rounded-2xl p-5 hover:border-blue-200 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
-    >
+    <div className="group bg-white border border-slate-100 rounded-2xl p-5 hover:border-blue-200 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
       <div className="flex items-start gap-3">
         <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 text-white flex items-center justify-center shadow-sm shrink-0">
           <Cpu size={18} />
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-bold text-[#0052CC] uppercase tracking-wider font-mono">
-            {machine.code || `#${machine.id}`}
+            {reference || (present(machine.id) ? `#${machine.id}` : FALLBACK)}
           </p>
           <p className="text-sm font-black text-slate-800 truncate group-hover:text-[#0052CC] transition-colors">
-            {machine.designation || '—'}
+            {valueOrFallback(getMachineLabel(machine))}
           </p>
         </div>
         <MachineStatusPill status={machine.status} />
@@ -155,31 +377,35 @@ function MachineCard({ machine, onView }) {
         <div>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Marque</p>
           <p className="text-slate-700 font-semibold truncate mt-0.5">
-            {machine.brand || <span className="text-slate-300 italic font-normal">—</span>}
+            {present(machine.brand) ? machine.brand : <span className="text-slate-300 italic font-normal">{FALLBACK}</span>}
           </p>
         </div>
         <div>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Modèle</p>
           <p className="text-slate-700 font-semibold truncate mt-0.5">
-            {machine.model || <span className="text-slate-300 italic font-normal">—</span>}
+            {present(machine.model) ? machine.model : <span className="text-slate-300 italic font-normal">{FALLBACK}</span>}
           </p>
         </div>
         <div className="col-span-2">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Numéro de série</p>
           <p className="text-slate-700 font-mono text-[12px] truncate mt-0.5">
-            {machine.serialNumber || <span className="text-slate-300 italic font-sans font-normal">—</span>}
+            {present(machine.serialNumber) ? machine.serialNumber : <span className="text-slate-300 italic font-sans font-normal">{FALLBACK}</span>}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Interventions</p>
+          <p className="text-slate-700 font-semibold truncate mt-0.5">
+            {Number(machine.interventionCount) || 0}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Dernière</p>
+          <p className="text-slate-700 font-semibold truncate mt-0.5">
+            {machine.lastInterventionDate ? fmtDate(machine.lastInterventionDate) : <span className="text-slate-300 italic font-normal">{FALLBACK}</span>}
           </p>
         </div>
       </div>
 
-      <div className="mt-4 pt-3 border-t border-slate-50 flex justify-end">
-        <button
-          onClick={(e) => { e.stopPropagation(); onView() }}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-[#0052CC] hover:bg-blue-50 rounded-lg transition-colors"
-        >
-          <Eye size={12} /> Voir détail
-        </button>
-      </div>
     </div>
   )
 }
@@ -187,6 +413,7 @@ function MachineCard({ machine, onView }) {
 function InterventionCard({ intervention, onView }) {
   const preset = getStatusPreset(intervention.status)
   const Icon = preset.icon
+  const machine = getInterventionMachine(intervention)
 
   const fields = [
     { label: 'Panne / symptôme',        value: intervention.problemDescription },
@@ -229,6 +456,32 @@ function InterventionCard({ intervention, onView }) {
             <span className="text-sm font-bold text-slate-800">{intervention.interventionType}</span>
           </div>
         )}
+
+        <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3">
+          <p className="text-[10px] font-bold text-blue-600 uppercase tracking-[0.12em] flex items-center gap-1.5">
+            <Cpu size={10} /> Équipement lié
+          </p>
+          <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nom équipement</p>
+              <p className="text-sm font-semibold text-slate-800 truncate mt-0.5">
+                {valueOrFallback(getMachineLabel(machine))}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Marque</p>
+              <p className="text-sm font-semibold text-slate-800 truncate mt-0.5">
+                {valueOrFallback(machine?.brand)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Modèle</p>
+              <p className="text-sm font-semibold text-slate-800 truncate mt-0.5">
+                {valueOrFallback(machine?.model)}
+              </p>
+            </div>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {fields.map((f) => {
@@ -283,6 +536,11 @@ export default function ClientDetails360() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selectedIntervention, setSelectedIntervention] = useState(null)
+  const [isEditingClient, setIsEditingClient] = useState(false)
+  const [clientDraft, setClientDraft] = useState(null)
+  const [clientEditError, setClientEditError] = useState('')
+  const [savingClient, setSavingClient] = useState(false)
+  const [toast, setToast] = useState('')
 
   const load = () => {
     let alive = true
@@ -299,8 +557,107 @@ export default function ClientDetails360() {
   useEffect(() => load(), [id])
 
   const client = data?.client
-  const machines = useMemo(() => data?.machines || [], [data])
+  const directMachines = useMemo(() => data?.machines || [], [data])
   const interventions = useMemo(() => data?.interventions || [], [data])
+  const machines = useMemo(
+    () => enrichMachinesForClient(directMachines, interventions),
+    [directMachines, interventions],
+  )
+
+  useEffect(() => {
+    if (!toast) return undefined
+    const timeout = window.setTimeout(() => setToast(''), 3000)
+    return () => window.clearTimeout(timeout)
+  }, [toast])
+
+  const getClientDraft = (source) => ({
+    name: source?.name || '',
+    taxId: source?.taxId || '',
+    phone: normalizePhone(source?.phone || ''),
+    email: source?.email || '',
+    web: source?.web || '',
+    city: source?.city || '',
+    address: source?.address || '',
+  })
+
+  const startClientEdit = () => {
+    setClientDraft(getClientDraft(client))
+    setClientEditError('')
+    setIsEditingClient(true)
+  }
+
+  const cancelClientEdit = () => {
+    setClientDraft(getClientDraft(client))
+    setClientEditError('')
+    setIsEditingClient(false)
+  }
+
+  const handleClientDraftChange = (event) => {
+    const { name, value } = event.target
+    setClientDraft((prev) => ({
+      ...(prev || getClientDraft(client)),
+      [name]: name === 'phone' ? normalizePhone(value) : value,
+    }))
+    setClientEditError('')
+  }
+
+  const saveClient = async () => {
+    const draft = clientDraft || getClientDraft(client)
+    const payload = Object.fromEntries(
+      Object.entries(draft).map(([key, value]) => [key, String(value ?? '').trim()]),
+    )
+
+    if (!payload.name) {
+      setClientEditError('Le nom du client est obligatoire.')
+      return
+    }
+
+    if (!isValidEmail(payload.email)) {
+      setClientEditError('Veuillez saisir une adresse email valide')
+      return
+    }
+
+    if (!isValidPhone(payload.phone)) {
+      setClientEditError('Le numéro doit contenir exactement 8 chiffres après +216')
+      return
+    }
+
+    setSavingClient(true)
+    setClientEditError('')
+
+    try {
+      const response = await apiFetch(`/clients/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        let message = `Erreur HTTP ${response.status}`
+        try {
+          const errorBody = await response.json()
+          message = errorBody?.message || message
+        } catch {}
+        throw new Error(message)
+      }
+
+      const updatedClient = await response.json()
+      setData((prev) => ({
+        ...prev,
+        client: {
+          ...(prev?.client || client),
+          ...updatedClient,
+        },
+      }))
+      setClientDraft(getClientDraft(updatedClient))
+      setIsEditingClient(false)
+      setToast('Modification réussie')
+    } catch (err) {
+      setClientEditError(err?.message || 'Impossible de modifier ce client.')
+    } finally {
+      setSavingClient(false)
+    }
+  }
 
   // ─── Loading ───
   if (loading) {
@@ -339,6 +696,12 @@ export default function ClientDetails360() {
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 space-y-6">
+      {toast && (
+        <div className="fixed top-4 right-4 z-[10000] rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 shadow-lg">
+          {toast}
+        </div>
+      )}
+
       {/* Top bar */}
       <div className="flex items-center justify-between gap-3">
         <button
@@ -442,19 +805,71 @@ export default function ClientDetails360() {
             <h2 className="text-base font-black text-slate-900">Informations client</h2>
             <p className="text-xs text-slate-500 mt-0.5">Coordonnées et identifiants administratifs</p>
           </div>
+          {isEditingClient ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={cancelClientEdit}
+                disabled={savingClient}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+              >
+                <X size={12} /> Annuler
+              </button>
+              <button
+                type="button"
+                onClick={saveClient}
+                disabled={savingClient}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0052CC] text-white rounded-lg text-xs font-bold hover:bg-[#0047b3] disabled:opacity-60 shadow-sm"
+              >
+                {savingClient ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                Enregistrer
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={startClientEdit}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-400 text-black rounded-lg text-xs font-semibold shadow-sm transition-all hover:bg-yellow-500 hover:shadow-md active:scale-[0.98]"
+            >
+              <Pencil size={12} /> Modifier
+            </button>
+          )}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <InfoCard icon={Building2}  label="Nom"               value={client.name}  accent="blue" />
-          <InfoCard icon={Hash}       label="Code client"       value={client.code}  mono accent="blue" />
-          <InfoCard icon={FileDigit}  label="Matricule fiscal"  value={client.taxId} mono accent="violet" />
-          <InfoCard icon={Phone}      label="Téléphone"         value={client.phone || client.phone2 || client.phone3} accent="emerald" />
-          <InfoCard icon={Mail}       label="Email"             value={client.email} accent="emerald" />
-          <InfoCard icon={Globe}      label="Site web"          value={client.web} accent="slate" />
-          <InfoCard icon={MapPin}     label="Ville"             value={client.city} accent="amber" />
-          <div className="sm:col-span-2">
-            <InfoCard icon={MapPin}   label="Adresse"           value={client.address} accent="amber" />
+
+        {clientEditError && (
+          <div className="mb-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 flex items-center gap-2">
+            <AlertCircle size={14} />
+            {clientEditError}
           </div>
-        </div>
+        )}
+
+        {isEditingClient ? (
+          <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <ClientEditField icon={Building2} label="Nom" name="name" value={clientDraft?.name || ''} onChange={handleClientDraftChange} required />
+              <InfoCard icon={Hash} label="Code client" value={client.code} mono accent="blue" />
+              <ClientEditField icon={FileDigit} label="Matricule fiscal" name="taxId" value={clientDraft?.taxId || ''} onChange={handleClientDraftChange} />
+              <ClientPhoneEditField value={clientDraft?.phone || PHONE_PREFIX} onChange={handleClientDraftChange} />
+              <ClientEditField icon={Mail} label="Email" name="email" value={clientDraft?.email || ''} onChange={handleClientDraftChange} type="email" />
+              <ClientEditField icon={Globe} label="Site web" name="web" value={clientDraft?.web || ''} onChange={handleClientDraftChange} />
+              <ClientEditField icon={MapPin} label="Ville" name="city" value={clientDraft?.city || ''} onChange={handleClientDraftChange} />
+              <ClientEditField icon={MapPin} label="Adresse" name="address" value={clientDraft?.address || ''} onChange={handleClientDraftChange} multiline />
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <InfoCard icon={Building2}  label="Nom"               value={client.name}  accent="blue" />
+            <InfoCard icon={Hash}       label="Code client"       value={client.code}  mono accent="blue" />
+            <InfoCard icon={FileDigit}  label="Matricule fiscal"  value={client.taxId} mono accent="violet" />
+            <InfoCard icon={Phone}      label="Téléphone"         value={client.phone || client.phone2 || client.phone3} accent="emerald" />
+            <InfoCard icon={Mail}       label="Email"             value={client.email} accent="emerald" />
+            <InfoCard icon={Globe}      label="Site web"          value={client.web} accent="slate" />
+            <InfoCard icon={MapPin}     label="Ville"             value={client.city} accent="amber" />
+            <div className="sm:col-span-2">
+              <InfoCard icon={MapPin}   label="Adresse"           value={client.address} accent="amber" />
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Équipements du client */}
@@ -482,7 +897,7 @@ export default function ClientDetails360() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {machines.map((m) => (
-              <MachineCard key={m.id} machine={m} onView={() => navigate(`/machines/${m.id}`)} />
+              <MachineCard key={machineKey(m) || m.id} machine={m} />
             ))}
           </div>
         )}
@@ -528,10 +943,6 @@ export default function ClientDetails360() {
         intervention={selectedIntervention}
         clientName={client.name}
         onClose={() => setSelectedIntervention(null)}
-        onOpenPage={(it) => {
-          setSelectedIntervention(null)
-          navigate(`/interventions/${it.id}`)
-        }}
       />
     </div>
   )
@@ -566,7 +977,7 @@ function ModalField({ icon: Icon, label, value, mono = false, isUser = false }) 
   const empty = value === null || value === undefined || value === ''
   return (
     <div className="min-w-0">
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.12em] flex items-center gap-1.5">
+      <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.12em] flex items-center gap-1.5">
         {Icon && <Icon size={10} />}
         {label}
       </p>
@@ -588,7 +999,7 @@ function ModalField({ icon: Icon, label, value, mono = false, isUser = false }) 
   )
 }
 
-function InterventionDetailsModal({ intervention, clientName, onClose, onOpenPage }) {
+function InterventionDetailsModal({ intervention, clientName, onClose }) {
   // Lock scroll + ESC
   useEffect(() => {
     if (!intervention) return undefined
@@ -606,7 +1017,7 @@ function InterventionDetailsModal({ intervention, clientName, onClose, onOpenPag
 
   const preset = getStatusPreset(intervention.status)
   const StatusIcon = preset.icon
-  const machine = intervention.machineEntity
+  const machine = getInterventionMachine(intervention)
 
   // Pièces utilisées
   let parts = intervention.parts
@@ -622,7 +1033,8 @@ function InterventionDetailsModal({ intervention, clientName, onClose, onOpenPag
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/50 backdrop-blur-sm animate-in fade-in"
+      className="fixed top-0 left-0 right-0 bottom-0 z-[9999] mt-0 flex h-screen min-h-screen w-screen items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-sm animate-in fade-in"
+      style={{ position: 'fixed', inset: 0, width: '100vw', height: '100vh', marginTop: 0 }}
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -630,10 +1042,11 @@ function InterventionDetailsModal({ intervention, clientName, onClose, onOpenPag
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-3xl max-h-[92vh] bg-slate-50 rounded-3xl shadow-2xl flex flex-col overflow-hidden"
+        className="relative mt-0 w-full max-w-3xl max-h-[92vh] bg-slate-50 rounded-3xl shadow-2xl flex flex-col overflow-hidden"
+        style={{ marginTop: 0 }}
       >
         {/* Header dégradé */}
-        <div className="relative bg-gradient-to-br from-[#0052CC] via-blue-600 to-indigo-700 text-white px-5 sm:px-7 py-5">
+        <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-white px-5 sm:px-7 py-5 border-b border-slate-700/60">
           <button
             onClick={onClose}
             className="absolute top-4 right-4 w-9 h-9 rounded-xl bg-white/15 hover:bg-white/25 backdrop-blur-sm flex items-center justify-center transition-colors"
@@ -677,10 +1090,13 @@ function InterventionDetailsModal({ intervention, clientName, onClose, onOpenPag
                 label="Machine liée"
                 value={
                   machine
-                    ? `${machine.designation || ''}${machine.code ? ` (${machine.code})` : ''}`.trim() || null
+                    ? `${getMachineLabel(machine) || ''}${getMachineReference(machine) ? ` (${getMachineReference(machine)})` : ''}`.trim() || null
                     : null
                 }
               />
+              <ModalField icon={Tag}       label="Marque machine"     value={machine?.brand} />
+              <ModalField icon={Settings}  label="Modèle machine"     value={machine?.model} />
+              <ModalField icon={Hash}      label="Numéro de série"    value={machine?.serialNumber} mono />
               <ModalField icon={UserIcon}  label="Technicien assigné" value={intervention.technicianName || intervention.assignedTo} isUser />
               <ModalField icon={Calendar}  label="Date intervention"  value={fmtDate(intervention.interventionDate)} />
               <ModalField icon={FileText}  label="Numéro de fiche"    value={intervention.ficheNumber} mono />
@@ -785,22 +1201,13 @@ function InterventionDetailsModal({ intervention, clientName, onClose, onOpenPag
         </div>
 
         {/* Footer actions */}
-        <div className="px-4 sm:px-6 py-3 border-t border-slate-200 bg-white flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2">
+        <div className="px-4 sm:px-6 py-3 border-t border-slate-200 bg-white flex items-center justify-end">
           <button
             onClick={onClose}
             className="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
           >
             Fermer
           </button>
-          {onOpenPage && (
-            <button
-              onClick={() => onOpenPage(intervention)}
-              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-[#0052CC] text-white text-sm font-bold rounded-lg hover:bg-[#0047b3] transition-colors shadow-sm"
-            >
-              <ExternalLink size={14} />
-              Ouvrir la page intervention
-            </button>
-          )}
         </div>
       </div>
     </div>
