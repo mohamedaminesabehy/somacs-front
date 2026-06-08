@@ -110,7 +110,7 @@ function mapRawToInterventionData(raw) {
   }
 }
 
-function FicheContent({ interventionData, parts, laborPrice, logo }) {
+function FicheContent({ interventionData, parts, laborPrice, logo, technicianSignatureUrl, clientSignatureUrl }) {
   return (
     <>
       <div className="flex justify-between items-center pb-3 mb-3" style={{ borderBottom: '1px solid #000' }}>
@@ -343,8 +343,17 @@ function FicheContent({ interventionData, parts, laborPrice, logo }) {
           <div className="bg-slate-50 border-b border-slate-900 p-1 text-center">
             <p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Signature du technicien</p>
           </div>
-          <div className="h-[50px] flex items-center justify-center">
-            <p style={{ fontSize: '7px', color: '#e2e8f0', fontStyle: 'italic' }}>{interventionData.technicianName || ''}</p>
+          <div className="h-[50px] flex items-center justify-center p-1">
+            {technicianSignatureUrl ? (
+              <img
+                src={technicianSignatureUrl}
+                alt="Signature du technicien"
+                className="max-h-full max-w-full object-contain"
+                style={{ mixBlendMode: 'multiply' }}
+              />
+            ) : (
+              <p style={{ fontSize: '7px', color: '#e2e8f0', fontStyle: 'italic' }}>{interventionData.technicianName || ''}</p>
+            )}
           </div>
         </div>
         <div className="w-[30px]"></div>
@@ -352,7 +361,16 @@ function FicheContent({ interventionData, parts, laborPrice, logo }) {
           <div className="bg-slate-50 border-b border-slate-900 p-1 text-center">
             <p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Signature et cachet client</p>
           </div>
-          <div className="h-[50px]"></div>
+          <div className="h-[50px] flex items-center justify-center p-1">
+            {clientSignatureUrl && (
+              <img
+                src={clientSignatureUrl}
+                alt="Signature et cachet client"
+                className="max-h-full max-w-full object-contain"
+                style={{ mixBlendMode: 'multiply' }}
+              />
+            )}
+          </div>
         </div>
       </div>
 
@@ -373,6 +391,8 @@ function InterventionPreview({ intervention }) {
   const FICHE_WIDTH = 560
   const wrapperRef = useRef(null)
   const [scale, setScale] = useState(1)
+  const [technicianSignatureUrl, setTechnicianSignatureUrl] = useState('')
+  const [clientSignatureUrl, setClientSignatureUrl] = useState('')
 
   const computeScale = useCallback(() => {
     if (wrapperRef.current) {
@@ -387,12 +407,48 @@ function InterventionPreview({ intervention }) {
     return () => window.removeEventListener('resize', computeScale)
   }, [computeScale])
 
+  // Load the signatures linked to this intervention so the official sheet
+  // preview shows them exactly like a real signed document.
+  useEffect(() => {
+    const interventionId = intervention?.id || data.id
+    if (!interventionId) {
+      setTechnicianSignatureUrl('')
+      setClientSignatureUrl('')
+      return undefined
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const response = await apiFetch(`/interventions/${interventionId}/signatures`, { cache: 'no-store' })
+        if (!response.ok) return
+        const list = await response.json().catch(() => [])
+        if (cancelled || !Array.isArray(list)) return
+        const findActive = (...types) =>
+          list.find((sig) => sig?.isActive !== false && types.includes(sig?.type))
+        const tech = findActive('TECHNICIAN_SIGNATURE')
+        const client = findActive('CLIENT_SIGNATURE_STAMP', 'CLIENT_SIGNATURE', 'CLIENT_STAMP')
+        setTechnicianSignatureUrl(tech?.url || '')
+        setClientSignatureUrl(client?.url || '')
+      } catch {}
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [intervention?.id, data.id])
+
   return (
     <div ref={wrapperRef} className="flex-1 overflow-y-auto bg-slate-100 no-scrollbar p-3">
       <div style={{ width: `${FICHE_WIDTH * scale}px`, height: `${Math.round(FICHE_WIDTH * scale * 1.414)}px`, margin: '0 auto' }}>
         <div style={{ width: `${FICHE_WIDTH}px`, transformOrigin: 'top left', transform: `scale(${scale})` }}>
           <div className="bg-white shadow-2xl rounded-none px-7 pt-5 pb-8 relative transition-all duration-700 overflow-hidden border border-slate-300 text-slate-900 leading-none" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-            <FicheContent interventionData={interventionData} parts={parts} laborPrice={laborPrice} logo={logo} />
+            <FicheContent
+              interventionData={interventionData}
+              parts={parts}
+              laborPrice={laborPrice}
+              logo={logo}
+              technicianSignatureUrl={technicianSignatureUrl}
+              clientSignatureUrl={clientSignatureUrl}
+            />
           </div>
         </div>
       </div>

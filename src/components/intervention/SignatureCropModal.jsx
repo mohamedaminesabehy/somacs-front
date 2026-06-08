@@ -1,201 +1,208 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, Crop, RotateCcw, X } from 'lucide-react'
-import {
-  detectSignatureRegion,
-  loadImageFromFile,
-  processSignatureImage,
-} from '../../utils/signatureImage'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Check, Crop, RotateCcw, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { loadImageFromFile, processSignatureImage } from '../../utils/signatureImage'
 
-// Lightweight, dependency-free crop modal.
-// The user drags a rectangle over the captured photo to keep only the useful
-// signature area. The selection is rendered in display pixels and converted
-// back to source pixels on validation, then processed (white removed, trimmed,
-// optimised) into a transparent PNG.
+// Zoom / pan / crop modal — dependency-free.
+//
+// Model (avatar-cropper style): the whole gray viewport IS the crop frame.
+// The image is rendered behind it with a transform (scale + translate). The
+// user zooms (buttons / slider) and pans (drag, mouse or touch) to place the
+// signature inside the frame, then validates. On validation we map the
+// viewport rectangle back to the *source* image pixels and process it into a
+// clean transparent PNG. Because the math uses the real display scale and
+// offset, the crop stays accurate at any zoom / pan.
 
-const HANDLE = 14
+const MIN_ZOOM = 1
+const MAX_ZOOM = 5
 
 export default function SignatureCropModal({ file, title, onCancel, onValidate }) {
-  const containerRef = useRef(null)
-  const imgRef = useRef(null)
+  const viewportRef = useRef(null)
   const [image, setImage] = useState(null)
   const [error, setError] = useState('')
   const [processing, setProcessing] = useState(false)
-  // Selection in *display* coordinates (relative to the rendered image).
-  const [layout, setLayout] = useState(null) // { dispW, dispH, scale }
-  const [sel, setSel] = useState(null) // { x, y, w, h } in display px
+  const [viewport, setViewport] = useState({ w: 0, h: 0 })
+  const [baseScale, setBaseScale] = useState(1) // contain-fit scale (source→display)
+  const [zoom, setZoom] = useState(1)
+  const [offset, setOffset] = useState({ x: 0, y: 0 }) // top-left of image in viewport px
   const dragRef = useRef(null)
 
+  // ── Load the captured image (persistent data URL, no early revoke) ──
   useEffect(() => {
     let cancelled = false
     setError('')
+    setImage(null)
     loadImageFromFile(file)
       .then((img) => {
         if (!cancelled) setImage(img)
       })
-      .catch(() => {
-        if (!cancelled) setError("Impossible de charger l'image.")
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err?.message || "Impossible d'afficher l'image, veuillez réessayer")
+        }
       })
     return () => {
       cancelled = true
     }
   }, [file])
 
-  const computeLayout = useCallback(() => {
-    if (!image || !containerRef.current) return
-    const maxW = containerRef.current.clientWidth
-    const maxH = containerRef.current.clientHeight
-    const natW = image.naturalWidth || image.width
-    const natH = image.naturalHeight || image.height
-    const scale = Math.min(maxW / natW, maxH / natH, 1)
-    const dispW = Math.round(natW * scale)
-    const dispH = Math.round(natH * scale)
-    setLayout({ dispW, dispH, scale, natW, natH })
+  const natW = image ? image.naturalWidth || image.width : 0
+  const natH = image ? image.naturalHeight || image.height : 0
+  const displayScale = baseScale * zoom
 
-    // Initial selection: auto-detected ink region, else centred 80%.
-    const region = detectSignatureRegion(image)
-    if (region) {
-      setSel({
-        x: region.x * scale,
-        y: region.y * scale,
-        w: region.width * scale,
-        h: region.height * scale,
-      })
-    } else {
-      setSel({
-        x: dispW * 0.1,
-        y: dispH * 0.1,
-        w: dispW * 0.8,
-        h: dispH * 0.8,
-      })
-    }
-  }, [image])
-
-  useEffect(() => {
-    computeLayout()
-    window.addEventListener('resize', computeLayout)
-    return () => window.removeEventListener('resize', computeLayout)
-  }, [computeLayout])
-
-  const clampSel = useCallback(
-    (next) => {
-      if (!layout) return next
-      const minSize = 24
-      let { x, y, w, h } = next
-      w = Math.max(minSize, Math.min(w, layout.dispW))
-      h = Math.max(minSize, Math.min(h, layout.dispH))
-      x = Math.max(0, Math.min(x, layout.dispW - w))
-      y = Math.max(0, Math.min(y, layout.dispH - h))
-      return { x, y, w, h }
+  // Keep the image covering the viewport when possible; clamp panning.
+  const clampOffset = useCallback(
+    (next, scale = displayScale, vp = viewport) => {
+      const imgW = natW * scale
+      const imgH = natH * scale
+      let { x, y } = next
+      if (imgW <= vp.w) {
+        x = (vp.w - imgW) / 2 // centre horizontally if smaller than frame
+      } else {
+        x = Math.min(0, Math.max(vp.w - imgW, x))
+      }
+      if (imgH <= vp.h) {
+        y = (vp.h - imgH) / 2
+      } else {
+        y = Math.min(0, Math.max(vp.h - imgH, y))
+      }
+      return { x, y }
     },
-    [layout],
+    [displayScale, viewport, natW, natH],
   )
 
-  const pointFromEvent = (event) => {
-    const rect = imgRef.current.getBoundingClientRect()
-    const cx = event.touches ? event.touches[0].clientX : event.clientX
-    const cy = event.touches ? event.touches[0].clientY : event.clientY
-    return { x: cx - rect.left, y: cy - rect.top }
-  }
+  const fitImage = useCallback(() => {
+    if (!image || !viewportRef.current) return
+    const w = viewportRef.current.clientWidth
+    const h = viewportRef.current.clientHeight
+    const vp = { w, h }
+    setViewport(vp)
+    const fit = Math.min(w / natW, h / natH) || 1
+    setBaseScale(fit)
+    setZoom(1)
+    const imgW = natW * fit
+    const imgH = natH * fit
+    setOffset({ x: (w - imgW) / 2, y: (h - imgH) / 2 })
+  }, [image, natW, natH])
 
-  const onPointerDown = (mode) => (event) => {
-    event.preventDefault()
-    event.stopPropagation()
-    const p = pointFromEvent(event)
-    dragRef.current = { mode, start: p, origin: sel }
-  }
+  useEffect(() => {
+    fitImage()
+    window.addEventListener('resize', fitImage)
+    return () => window.removeEventListener('resize', fitImage)
+  }, [fitImage])
 
-  const onPointerMove = useCallback(
-    (event) => {
-      if (!dragRef.current || !sel) return
-      const p = pointFromEvent(event)
-      const { mode, start, origin } = dragRef.current
-      const dx = p.x - start.x
-      const dy = p.y - start.y
-      let next = { ...origin }
-
-      if (mode === 'move') {
-        next.x = origin.x + dx
-        next.y = origin.y + dy
-      } else {
-        if (mode.includes('e')) next.w = origin.w + dx
-        if (mode.includes('s')) next.h = origin.h + dy
-        if (mode.includes('w')) {
-          next.x = origin.x + dx
-          next.w = origin.w - dx
-        }
-        if (mode.includes('n')) {
-          next.y = origin.y + dy
-          next.h = origin.h - dy
-        }
+  // ── Zoom keeping the viewport centre stable ──
+  const applyZoom = useCallback(
+    (nextZoom) => {
+      const z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextZoom))
+      const oldScale = baseScale * zoom
+      const newScale = baseScale * z
+      const cx = viewport.w / 2
+      const cy = viewport.h / 2
+      // Source point under the viewport centre stays under the centre.
+      const srcX = (cx - offset.x) / oldScale
+      const srcY = (cy - offset.y) / oldScale
+      const nextOffset = {
+        x: cx - srcX * newScale,
+        y: cy - srcY * newScale,
       }
-      setSel(clampSel(next))
+      setZoom(z)
+      setOffset(clampOffset(nextOffset, newScale, viewport))
     },
-    [sel, clampSel],
+    [baseScale, zoom, offset, viewport, clampOffset],
+  )
+
+  // ── Pan (mouse + touch) ──
+  const pointFromEvent = (event) => {
+    const e = event.touches ? event.touches[0] : event
+    return { x: e.clientX, y: e.clientY }
+  }
+
+  const onDragStart = (event) => {
+    if (!image) return
+    const p = pointFromEvent(event)
+    dragRef.current = { start: p, origin: { ...offset } }
+  }
+
+  const onDragMove = useCallback(
+    (event) => {
+      if (!dragRef.current) return
+      if (event.cancelable) event.preventDefault()
+      const p = pointFromEvent(event)
+      const dx = p.x - dragRef.current.start.x
+      const dy = p.y - dragRef.current.start.y
+      const next = {
+        x: dragRef.current.origin.x + dx,
+        y: dragRef.current.origin.y + dy,
+      }
+      setOffset(clampOffset(next))
+    },
+    [clampOffset],
   )
 
   useEffect(() => {
     const stop = () => {
       dragRef.current = null
     }
-    window.addEventListener('mousemove', onPointerMove)
-    window.addEventListener('touchmove', onPointerMove, { passive: false })
+    window.addEventListener('mousemove', onDragMove)
+    window.addEventListener('touchmove', onDragMove, { passive: false })
     window.addEventListener('mouseup', stop)
     window.addEventListener('touchend', stop)
     return () => {
-      window.removeEventListener('mousemove', onPointerMove)
-      window.removeEventListener('touchmove', onPointerMove)
+      window.removeEventListener('mousemove', onDragMove)
+      window.removeEventListener('touchmove', onDragMove)
       window.removeEventListener('mouseup', stop)
       window.removeEventListener('touchend', stop)
     }
-  }, [onPointerMove])
-
-  const resetSelection = () => computeLayout()
+  }, [onDragMove])
 
   const handleValidate = async () => {
-    if (!image || !layout || !sel) return
+    if (!image || !viewport.w) return
     setProcessing(true)
     try {
+      // Map the viewport (the crop frame) back to source-image pixels.
+      const scale = baseScale * zoom
+      const srcX = -offset.x / scale
+      const srcY = -offset.y / scale
+      const srcW = viewport.w / scale
+      const srcH = viewport.h / scale
+
+      // Clamp to image bounds so we never sample outside the bitmap.
+      const x = Math.max(0, srcX)
+      const y = Math.max(0, srcY)
+      const width = Math.min(natW - x, srcW - (x - srcX))
+      const height = Math.min(natH - y, srcH - (y - srcY))
+
       const region = {
-        x: sel.x / layout.scale,
-        y: sel.y / layout.scale,
-        width: sel.w / layout.scale,
-        height: sel.h / layout.scale,
+        x,
+        y,
+        width: Math.max(1, width),
+        height: Math.max(1, height),
       }
       const result = await processSignatureImage(image, region)
+      if (!result?.blob) {
+        throw new Error('Traitement échoué')
+      }
       onValidate(result)
-    } catch {
-      setError('Le traitement de la signature a échoué.')
+    } catch (err) {
+      setError(err?.message || 'Le traitement de la signature a échoué.')
       setProcessing(false)
     }
   }
 
-  const handles = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
-  const handleStyle = (pos) => {
-    if (!sel) return {}
-    const map = {
-      nw: { left: sel.x, top: sel.y },
-      n: { left: sel.x + sel.w / 2, top: sel.y },
-      ne: { left: sel.x + sel.w, top: sel.y },
-      e: { left: sel.x + sel.w, top: sel.y + sel.h / 2 },
-      se: { left: sel.x + sel.w, top: sel.y + sel.h },
-      s: { left: sel.x + sel.w / 2, top: sel.y + sel.h },
-      sw: { left: sel.x, top: sel.y + sel.h },
-      w: { left: sel.x, top: sel.y + sel.h / 2 },
-    }
-    const cursorMap = {
-      nw: 'nwse-resize', se: 'nwse-resize',
-      ne: 'nesw-resize', sw: 'nesw-resize',
-      n: 'ns-resize', s: 'ns-resize',
-      e: 'ew-resize', w: 'ew-resize',
-    }
-    return {
-      left: map[pos].left - HANDLE / 2,
-      top: map[pos].top - HANDLE / 2,
-      width: HANDLE,
-      height: HANDLE,
-      cursor: cursorMap[pos],
-    }
-  }
+  const imgStyle = image
+    ? {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        width: `${natW * displayScale}px`,
+        height: `${natH * displayScale}px`,
+        transform: `translate(${offset.x}px, ${offset.y}px)`,
+        transformOrigin: 'top left',
+        userSelect: 'none',
+        pointerEvents: 'none',
+        maxWidth: 'none',
+      }
+    : {}
 
   return (
     <div className="fixed inset-0 z-[120] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 animate-in fade-in duration-200">
@@ -222,66 +229,72 @@ export default function SignatureCropModal({ file, title, onCancel, onValidate }
 
         <div className="p-4 bg-slate-100 flex-1 overflow-hidden">
           <p className="text-[10px] sm:text-xs text-slate-500 font-semibold text-center mb-3">
-            Sélectionnez uniquement la zone de la signature. Le fond blanc sera supprimé automatiquement.
+            Zoomez et déplacez l'image pour cadrer la signature dans le cadre. Le fond blanc sera supprimé automatiquement.
           </p>
           <div
-            ref={containerRef}
-            className="relative mx-auto flex items-center justify-center bg-[repeating-conic-gradient(#e2e8f0_0%_25%,#f8fafc_0%_50%)] bg-[length:18px_18px] rounded-xl overflow-hidden"
-            style={{ width: '100%', height: '52vh' }}
+            ref={viewportRef}
+            className="relative mx-auto overflow-hidden rounded-xl bg-[repeating-conic-gradient(#e2e8f0_0%_25%,#f8fafc_0%_50%)] bg-[length:18px_18px] touch-none"
+            style={{ width: '100%', height: '50vh', cursor: image ? 'grab' : 'default' }}
+            onMouseDown={onDragStart}
+            onTouchStart={onDragStart}
           >
             {error ? (
-              <p className="text-xs font-bold text-red-500 px-4 text-center">{error}</p>
-            ) : !layout ? (
-              <p className="text-xs font-semibold text-slate-400">Chargement…</p>
-            ) : (
-              <div
-                className="relative"
-                style={{ width: layout.dispW, height: layout.dispH }}
-              >
-                <img
-                  ref={imgRef}
-                  src={image?.src}
-                  alt={title}
-                  draggable={false}
-                  className="absolute inset-0 w-full h-full select-none"
-                />
-                {sel && (
-                  <>
-                    {/* Dim overlay outside selection */}
-                    <div
-                      className="absolute inset-0 pointer-events-none"
-                      style={{
-                        background: 'rgba(15,23,42,0.5)',
-                        clipPath: `polygon(0 0, 100% 0, 100% 100%, 0 100%, 0 0, ${sel.x}px ${sel.y}px, ${sel.x}px ${sel.y + sel.h}px, ${sel.x + sel.w}px ${sel.y + sel.h}px, ${sel.x + sel.w}px ${sel.y}px, ${sel.x}px ${sel.y}px)`,
-                      }}
-                    />
-                    <div
-                      className="absolute border-2 border-[#0052CC] cursor-move"
-                      style={{ left: sel.x, top: sel.y, width: sel.w, height: sel.h }}
-                      onMouseDown={onPointerDown('move')}
-                      onTouchStart={onPointerDown('move')}
-                    />
-                    {handles.map((pos) => (
-                      <div
-                        key={pos}
-                        className="absolute bg-white border-2 border-[#0052CC] rounded-sm"
-                        style={handleStyle(pos)}
-                        onMouseDown={onPointerDown(pos)}
-                        onTouchStart={onPointerDown(pos)}
-                      />
-                    ))}
-                  </>
-                )}
+              <div className="absolute inset-0 flex items-center justify-center px-6">
+                <p className="text-xs font-bold text-red-500 text-center">{error}</p>
               </div>
+            ) : !image ? (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <p className="text-xs font-semibold text-slate-400">Chargement…</p>
+              </div>
+            ) : (
+              <>
+                <img src={image._dataUrl} alt={title} draggable={false} style={imgStyle} />
+                {/* Crop frame border */}
+                <div className="absolute inset-0 pointer-events-none border-2 border-[#0052CC] rounded-xl" />
+              </>
             )}
           </div>
+
+          {/* Zoom controls */}
+          {image && !error && (
+            <div className="flex items-center gap-3 mt-4">
+              <button
+                type="button"
+                onClick={() => applyZoom(zoom - 0.25)}
+                disabled={zoom <= MIN_ZOOM}
+                className="w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                aria-label="Zoom arrière"
+              >
+                <ZoomOut size={16} />
+              </button>
+              <input
+                type="range"
+                min={MIN_ZOOM}
+                max={MAX_ZOOM}
+                step="0.01"
+                value={zoom}
+                onChange={(e) => applyZoom(Number(e.target.value))}
+                className="flex-1 accent-[#0052CC]"
+                aria-label="Niveau de zoom"
+              />
+              <button
+                type="button"
+                onClick={() => applyZoom(zoom + 0.25)}
+                disabled={zoom >= MAX_ZOOM}
+                className="w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                aria-label="Zoom avant"
+              >
+                <ZoomIn size={16} />
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="p-4 bg-white border-t border-slate-100 shrink-0 flex items-center gap-3">
           <button
             type="button"
-            onClick={resetSelection}
-            disabled={processing || !layout}
+            onClick={fitImage}
+            disabled={processing || !image}
             className="inline-flex items-center gap-1.5 px-3 py-3 rounded-xl border border-slate-200 text-slate-600 text-[10px] font-black uppercase tracking-wider hover:bg-slate-50 transition-colors disabled:opacity-50"
           >
             <RotateCcw size={14} />
@@ -298,7 +311,7 @@ export default function SignatureCropModal({ file, title, onCancel, onValidate }
           <button
             type="button"
             onClick={handleValidate}
-            disabled={processing || !layout || !!error}
+            disabled={processing || !image || !!error}
             className="flex-1 inline-flex items-center justify-center gap-1.5 py-3 rounded-xl bg-[#0052CC] text-white text-[10px] font-black uppercase tracking-wider hover:bg-blue-700 transition-colors disabled:opacity-60"
           >
             <Check size={14} />

@@ -8,20 +8,48 @@
 const MAX_OUTPUT_WIDTH = 900
 const MAX_OUTPUT_HEIGHT = 450
 
-/** Load a File/Blob into an HTMLImageElement (respecting EXIF-less bitmap). */
+/**
+ * Load a File/Blob into a decoded HTMLImageElement using a **persistent**
+ * data URL (FileReader). We intentionally avoid URL.createObjectURL here
+ * because the resulting object URL would need to stay alive for as long as
+ * the <img> that displays it in the crop modal — revoking it too early is
+ * exactly what produced the "broken image" icon. A data URL has no lifecycle
+ * to manage and works identically on desktop, Android and iOS.
+ *
+ * Supports JPG/JPEG/PNG/WEBP/GIF natively. HEIC/HEIF is attempted as well;
+ * if the browser cannot decode it the promise rejects so the caller can show
+ * a clear error instead of uploading a broken file.
+ */
 export function loadImageFromFile(file) {
   return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file)
-    const img = new Image()
-    img.onload = () => {
-      URL.revokeObjectURL(url)
-      resolve(img)
+    if (!file) {
+      reject(new Error('Aucun fichier fourni'))
+      return
     }
-    img.onerror = (err) => {
-      URL.revokeObjectURL(url)
-      reject(err)
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('Lecture du fichier impossible'))
+    reader.onload = () => {
+      const dataUrl = reader.result
+      if (typeof dataUrl !== 'string') {
+        reject(new Error('Format de fichier non supporté'))
+        return
+      }
+      const img = new Image()
+      img.decoding = 'async'
+      img.onload = () => {
+        if (!img.naturalWidth || !img.naturalHeight) {
+          reject(new Error("Image illisible ou format non supporté"))
+          return
+        }
+        // Keep the data URL accessible for the <img> preview in the modal.
+        img._dataUrl = dataUrl
+        resolve(img)
+      }
+      img.onerror = () =>
+        reject(new Error("Impossible d'afficher l'image (format non supporté ?)"))
+      img.src = dataUrl
     }
-    img.src = url
+    reader.readAsDataURL(file)
   })
 }
 
