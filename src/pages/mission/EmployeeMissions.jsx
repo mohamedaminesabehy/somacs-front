@@ -818,14 +818,15 @@ export default function EmployeeMissions() {
         {/* KPI inline dans le header */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 lg:pb-0 scrollbar-hide w-full lg:w-auto">
           {[
-            { label: 'Total',     value: total,     bg: 'bg-blue-50',   text: 'text-blue-600'  },
-            { label: 'En cours',  value: enCours,   bg: 'bg-amber-50',  text: 'text-amber-600' },
-            { label: 'Terminées', value: terminees, bg: 'bg-green-50',  text: 'text-green-600' },
-            { label: 'Bloquées',  value: bloquees,  bg: 'bg-red-50',    text: 'text-red-600'   },
-          ].map(({ label, value, bg, text }) => (
-            <div key={label} className={`flex items-center gap-2 px-3 py-2 ${bg} rounded-xl shrink-0`}>
-              <span className={`text-lg font-black ${text}`}>{value}</span>
-              <span className="text-[11px] font-bold text-slate-500">{label}</span>
+            { label: 'Total',     value: total,     bg: 'bg-blue-50',   text: 'text-blue-600',  ring: 'border-blue-100',  dot: 'bg-blue-500'  },
+            { label: 'En cours',  value: enCours,   bg: 'bg-amber-50',  text: 'text-amber-600', ring: 'border-amber-100', dot: 'bg-amber-500' },
+            { label: 'Terminées', value: terminees, bg: 'bg-green-50',  text: 'text-green-600', ring: 'border-green-100', dot: 'bg-green-500' },
+            { label: 'Bloquées',  value: bloquees,  bg: 'bg-red-50',    text: 'text-red-600',   ring: 'border-red-100',   dot: 'bg-red-500'   },
+          ].map(({ label, value, bg, text, ring, dot }) => (
+            <div key={label} className={`flex items-center gap-2.5 px-3.5 py-2 ${bg} border ${ring} rounded-xl shrink-0`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+              <span className={`text-lg font-black ${text} leading-none`}>{value}</span>
+              <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">{label}</span>
             </div>
           ))}
         </div>

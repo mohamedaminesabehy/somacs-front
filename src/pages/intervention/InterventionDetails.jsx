@@ -33,6 +33,7 @@ import {
   XCircle
 } from 'lucide-react'
 import logo from '../../assets/logo.jpg'
+import SignatureCropModal from '../../components/intervention/SignatureCropModal'
 
 // ── Per-intervention mock data (keyed by intervention ID) ──
 // Each entry has: status, completedUpToSection (1-4), and the fields filled.
@@ -351,7 +352,7 @@ const sections = [
 ]
 
 // ── Shared fiche content (identical layout for both desktop preview and mobile modal) ──
-function FicheContent({ interventionData, parts, laborPrice, logo }) {
+function FicheContent({ interventionData, parts, laborPrice, logo, technicianSignatureUrl, clientSignatureUrl }) {
   return (
     <>
       <div className="flex justify-between items-center pb-3 mb-3" style={{ borderBottom: '1px solid #000' }}>
@@ -584,8 +585,17 @@ function FicheContent({ interventionData, parts, laborPrice, logo }) {
           <div className="bg-slate-50 border-b border-slate-900 p-1 text-center">
             <p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Signature du technicien</p>
           </div>
-          <div className="h-[50px] flex items-center justify-center">
-            <p style={{ fontSize: '7px', color: '#e2e8f0', fontStyle: 'italic' }}>{interventionData.technicianName || ''}</p>
+          <div className="h-[50px] flex items-center justify-center p-1">
+            {technicianSignatureUrl ? (
+              <img
+                src={technicianSignatureUrl}
+                alt="Signature du technicien"
+                className="max-h-full max-w-full object-contain"
+                style={{ mixBlendMode: 'multiply' }}
+              />
+            ) : (
+              <p style={{ fontSize: '7px', color: '#e2e8f0', fontStyle: 'italic' }}>{interventionData.technicianName || ''}</p>
+            )}
           </div>
         </div>
         <div className="w-[30px]"></div>
@@ -593,7 +603,16 @@ function FicheContent({ interventionData, parts, laborPrice, logo }) {
           <div className="bg-slate-50 border-b border-slate-900 p-1 text-center">
             <p style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }}>Signature et cachet client</p>
           </div>
-          <div className="h-[50px]"></div>
+          <div className="h-[50px] flex items-center justify-center p-1">
+            {clientSignatureUrl && (
+              <img
+                src={clientSignatureUrl}
+                alt="Signature et cachet client"
+                className="max-h-full max-w-full object-contain"
+                style={{ mixBlendMode: 'multiply' }}
+              />
+            )}
+          </div>
         </div>
       </div>
 
@@ -606,7 +625,7 @@ function FicheContent({ interventionData, parts, laborPrice, logo }) {
 }
 
 // ── Mobile preview modal: renders the exact same fiche, scaled to fit screen width ──
-function MobilePreviewModal({ onClose, interventionData, parts, laborPrice, logo }) {
+function MobilePreviewModal({ onClose, interventionData, parts, laborPrice, logo, technicianSignatureUrl, clientSignatureUrl }) {
   const FICHE_WIDTH = 560 // intrinsic width of the fiche card (matches desktop px-7 padding)
   const wrapperRef = useRef(null)
   const [scale, setScale] = useState(1)
@@ -669,6 +688,8 @@ function MobilePreviewModal({ onClose, interventionData, parts, laborPrice, logo
                   parts={parts}
                   laborPrice={laborPrice}
                   logo={logo}
+                  technicianSignatureUrl={technicianSignatureUrl}
+                  clientSignatureUrl={clientSignatureUrl}
                 />
               </div>
             </div>
@@ -714,6 +735,7 @@ export default function InterventionDetails() {
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false)
   const [signatures, setSignatures] = useState([])
   const [uploadingSignatureType, setUploadingSignatureType] = useState(null)
+  const [cropState, setCropState] = useState(null) // { file, type, title }
   const [assignedMissionEmployees, setAssignedMissionEmployees] = useState(() => assignedTechnicianName)
   const [interventionData, setInterventionData] = useState(() => mapEntryToInterventionData(dbEntry, assignedMissionEmployees || assignedTechnicianName))
   const baseDprRef = useRef(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
@@ -1552,6 +1574,15 @@ export default function InterventionDetails() {
     signatures.find((signature) => signature?.type === type && signature?.isActive !== false)
   ), [signatures])
 
+  const technicianSignatureUrl = useMemo(
+    () => getSignatureByType(SIGNATURE_TYPES.technician)?.url || '',
+    [getSignatureByType],
+  )
+  const clientSignatureUrl = useMemo(
+    () => getSignatureByType(SIGNATURE_TYPES.client)?.url || '',
+    [getSignatureByType],
+  )
+
   const canManageSignatures = isEditing && !isReadOnlyView && status !== 'CLOSED'
 
   const buildSignaturePayloadMeta = (type) => {
@@ -1567,7 +1598,7 @@ export default function InterventionDetails() {
     }
   }
 
-  const handleSignatureFileChange = async (type, event) => {
+  const handleSignatureFileChange = (type, event) => {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
@@ -1575,6 +1606,19 @@ export default function InterventionDetails() {
       alert('Veuillez selectionner une image de signature.')
       return
     }
+    const title =
+      type === SIGNATURE_TYPES.technician
+        ? 'Signature du Technicien'
+        : 'Signature et Cachet Client'
+    // Open the crop step before uploading.
+    setCropState({ file, type, title })
+  }
+
+  const handleCropValidate = async (result) => {
+    const crop = cropState
+    setCropState(null)
+    if (!crop || !result?.blob) return
+    const { type } = crop
 
     const meta = buildSignaturePayloadMeta(type)
     const formData = new FormData()
@@ -1582,7 +1626,7 @@ export default function InterventionDetails() {
     formData.append('signerName', meta.signerName)
     formData.append('signerRole', meta.signerRole)
     formData.append('signedAt', new Date().toISOString())
-    formData.append('image', file)
+    formData.append('image', result.blob, `${type}.png`)
 
     setUploadingSignatureType(type)
     try {
@@ -1595,8 +1639,8 @@ export default function InterventionDetails() {
         alert("Erreur lors de l'enregistrement de la signature.")
         return
       }
-      const result = await response.json().catch(() => null)
-      const nextSignature = result?.signature || result
+      const apiResult = await response.json().catch(() => null)
+      const nextSignature = apiResult?.signature || apiResult
       if (nextSignature?.id) {
         setSignatures((prev) => [
           nextSignature,
@@ -1699,8 +1743,16 @@ export default function InterventionDetails() {
         navigate(options.returnTo)
         return
       }
-      if (isFinalSave && missionId) {
-        navigate(`/missions/${missionId}`)
+      if (isFinalSave) {
+        const linkedMissionId = missionId || saved?.missionId || saved?.mission?.id
+        if (linkedMissionId) {
+          navigate(`/missions/${linkedMissionId}`, {
+            state: {
+              interventionClosedSuccess: true,
+              interventionId: id,
+            },
+          })
+        }
       }
     } catch (error) {
       alert('Impossible de joindre le serveur.')
@@ -2683,6 +2735,8 @@ export default function InterventionDetails() {
                 parts={parts}
                 laborPrice={laborPrice}
                 logo={logo}
+                technicianSignatureUrl={technicianSignatureUrl}
+                clientSignatureUrl={clientSignatureUrl}
               />
             </div>
           </div>
@@ -2698,6 +2752,18 @@ export default function InterventionDetails() {
           parts={parts}
           laborPrice={laborPrice}
           logo={logo}
+          technicianSignatureUrl={technicianSignatureUrl}
+          clientSignatureUrl={clientSignatureUrl}
+        />
+      )}
+
+      {/* --- SIGNATURE CROP MODAL --- */}
+      {cropState && (
+        <SignatureCropModal
+          file={cropState.file}
+          title={cropState.title}
+          onCancel={() => setCropState(null)}
+          onValidate={handleCropValidate}
         />
       )}
     </div>

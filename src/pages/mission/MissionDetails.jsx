@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   ArrowLeft, CheckCircle2, XCircle, Clock, Calendar, MapPin,
   Building2, Wrench, ClipboardList, AlertTriangle, Link2,
@@ -91,6 +91,7 @@ function syncVehicleMileageState(setDepart, setRetour, missionLike) {
 export default function MissionDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const [mission, setMission] = useState(null)
   const [intervention, setIntervention] = useState(null)
@@ -115,9 +116,32 @@ export default function MissionDetails() {
   const [vehicleKilometrageDepart, setVehicleKilometrageDepart] = useState('')
   const [vehicleKilometrageRetour, setVehicleKilometrageRetour] = useState('')
   const [vehicleMileageError, setVehicleMileageError] = useState('')
+  const [showInterventionClosedSuccess, setShowInterventionClosedSuccess] = useState(false)
   // Track whether the user is actively editing the mileage fields so the
   // background polling never overwrites what they are typing.
   const mileageEditingRef = useRef(false)
+
+  useEffect(() => {
+    if (!location.state?.interventionClosedSuccess) return undefined
+
+    setShowInterventionClosedSuccess(true)
+    navigate(
+      { pathname: location.pathname, search: location.search },
+      {
+        replace: true,
+        state: {
+          ...location.state,
+          interventionClosedSuccess: false,
+        },
+      },
+    )
+
+    const timer = window.setTimeout(() => {
+      setShowInterventionClosedSuccess(false)
+    }, 4500)
+
+    return () => window.clearTimeout(timer)
+  }, [location.pathname, location.search, location.state, navigate])
 
   const attachments = useMemo(() => {
     const list = Array.isArray(mission?.attachments) ? mission.attachments : []
@@ -279,7 +303,42 @@ export default function MissionDetails() {
     )
   }
   if (!mission) {
-    return null
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
+        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200">
+          <div className="max-w-[1600px] mx-auto px-3 sm:px-4 h-14 sm:h-16 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-slate-100 animate-pulse" />
+            <div className="h-4 w-40 bg-slate-100 rounded animate-pulse" />
+          </div>
+        </header>
+        <main className="flex-1 max-w-[1600px] mx-auto w-full p-4 sm:p-6 lg:p-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-pulse">
+            <div className="lg:col-span-8 space-y-6">
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-slate-100" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-24 bg-slate-100 rounded" />
+                    <div className="h-5 w-2/3 bg-slate-100 rounded" />
+                  </div>
+                </div>
+                <div className="h-20 bg-slate-50 rounded-xl" />
+                <div className="h-16 bg-slate-50 rounded-xl" />
+              </div>
+              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[0, 1, 2, 3].map((i) => <div key={i} className="h-24 bg-slate-50 rounded-xl" />)}
+                </div>
+              </div>
+            </div>
+            <div className="lg:col-span-4 space-y-6">
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 h-48" />
+              <div className="bg-white rounded-2xl border border-slate-200 p-6 h-64" />
+            </div>
+          </div>
+        </main>
+      </div>
+    )
   }
 
   const priority   = PRIORITY_CONFIG[mission.priority] || PRIORITY_CONFIG['Moyenne']
@@ -287,15 +346,6 @@ export default function MissionDetails() {
   const StatusIcon = statusCfg.icon
 
   const handleStatusChange = (newStatus) => {
-    // Si on termine la mission avec un véhicule, valider le kilométrage retour
-    if (newStatus === 'Terminée' && mission.vehicleId) {
-      const retourNum = vehicleKilometrageRetour !== '' ? Number(vehicleKilometrageRetour) : null
-      if (typeof retourNum !== 'number' || isNaN(retourNum)) {
-        setMissionActionError('Le kilométrage retour est requis pour terminer cette mission.')
-        return
-      }
-    }
-
     if (statusAnimTimerRef.current) {
       window.clearTimeout(statusAnimTimerRef.current)
       statusAnimTimerRef.current = null
@@ -304,20 +354,22 @@ export default function MissionDetails() {
     setMission((prev) => (prev ? { ...prev, status: newStatus } : prev))
     ;(async () => {
       try {
-        // Si Terminée avec véhicule, enregistrer le kilométrage en premier
+        // Le kilométrage reste facultatif : on l'enregistre seulement s'il est renseigné.
         if (newStatus === 'Terminée' && mission.vehicleId) {
           const departText = String(vehicleKilometrageDepart ?? '').trim()
           const retourText = String(vehicleKilometrageRetour ?? '').trim()
-          const depart = departText === '' ? null : Number(departText)
-          const retour = retourText === '' ? null : Number(retourText)
-          const kmRes = await apiFetch(`/missions/${mission.id}/vehicle-kilometrage`, {
-            method: 'PATCH',
-            body: { vehicleKilometrageDepart: depart, vehicleKilometrageRetour: retour },
-            auth: true,
-          })
-          if (!kmRes.ok) {
-            const kmErr = await kmRes.json().catch(() => ({}))
-            throw new Error(kmErr.message || 'Impossible de mettre à jour le kilométrage.')
+          if (departText !== '' || retourText !== '') {
+            const depart = departText === '' ? null : Number(departText)
+            const retour = retourText === '' ? null : Number(retourText)
+            const kmRes = await apiFetch(`/missions/${mission.id}/vehicle-kilometrage`, {
+              method: 'PATCH',
+              body: { vehicleKilometrageDepart: depart, vehicleKilometrageRetour: retour },
+              auth: true,
+            })
+            if (!kmRes.ok) {
+              const kmErr = await kmRes.json().catch(() => ({}))
+              setVehicleMileageError(kmErr.message || 'Kilométrage non enregistré, statut mis à jour.')
+            }
           }
         }
 
@@ -428,6 +480,44 @@ export default function MissionDetails() {
           <div className="bg-slate-900 text-white border border-slate-700 px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3">
             <CheckCircle2 size={20} className="text-green-400" />
             <span className="text-sm font-bold tracking-wide">{typeof showSaveToast === 'string' ? showSaveToast : 'Statut mis à jour'}</span>
+          </div>
+        </div>
+      )}
+
+      {showInterventionClosedSuccess && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={() => setShowInterventionClosedSuccess(false)} />
+          <div className="relative z-10 w-full max-w-md rounded-2xl border border-green-200 bg-white shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-5 sm:p-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-green-50 border border-green-200 text-green-600 flex items-center justify-center shrink-0">
+                  <CheckCircle2 size={24} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-green-600 mb-1">Succès</p>
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 leading-snug">
+                    L’intervention a été clôturée avec succès.
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowInterventionClosedSuccess(false)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition-colors shrink-0"
+                  aria-label="Fermer"
+                >
+                  <X size={17} />
+                </button>
+              </div>
+              <div className="mt-5 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowInterventionClosedSuccess(false)}
+                  className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-[#0052CC] hover:bg-[#0042a3] text-white text-xs font-black uppercase tracking-wider transition-colors shadow-lg shadow-blue-100"
+                >
+                  OK
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -670,21 +760,12 @@ export default function MissionDetails() {
                     const isActive = status === s
                     const shouldAnimate = isActive && statusJustChangedTo === s
                     
-                    // Check if Terminée button should be disabled
-                    const isTermineeDisabled = s === 'Terminée' && mission.vehicleId && 
-                      (typeof vehicleKilometrageRetour !== 'number' && 
-                       (vehicleKilometrageRetour === '' || vehicleKilometrageRetour === null || isNaN(Number(vehicleKilometrageRetour))))
-                    
                     return (
                       <button
                         key={s}
                         onClick={() => handleStatusChange(s)}
-                        disabled={isTermineeDisabled}
-                        title={isTermineeDisabled ? 'Renseignez le kilométrage retour pour terminer' : ''}
                         className={`flex flex-col items-center justify-center gap-3 p-4 rounded-xl border-2 transition-all ${
-                          isTermineeDisabled
-                            ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed opacity-50'
-                            : isActive
+                          isActive
                             ? `${cfg.border} ${cfg.bg} ${cfg.color} scale-[1.02] shadow-sm ${shouldAnimate ? 'ring-2 ring-offset-2 ring-[#0052CC] animate-in zoom-in-95 duration-200' : ''}`
                             : 'border-slate-50 bg-slate-50 text-slate-400 hover:border-slate-200 hover:bg-white hover:text-slate-600'
                         }`}

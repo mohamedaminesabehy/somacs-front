@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { AlertCircle, Calendar, CheckCircle2, Edit3, Eye, FileText, History, Printer, X } from 'lucide-react'
+import { AlertCircle, Building2, Calendar, CheckCircle2, Edit3, Eye, FileText, Hash, History, Printer, Search, User, Wrench, X } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 import logo from '../../assets/logo.jpg'
 
@@ -591,6 +591,9 @@ export default function EmployeeHistory() {
     win.print()
   }
 
+  const hasActiveFilters = Boolean(searchTerm || fromDate || toDate)
+  const resetFilters = () => { setSearchTerm(''); setFromDate(''); setToDate('') }
+
   const renderSkeletonRow = () => (
     <tr className="animate-pulse">
       <td className="px-6 py-4"><div className="h-4 w-32 bg-slate-200 rounded" /></td>
@@ -602,70 +605,196 @@ export default function EmployeeHistory() {
     </tr>
   )
 
+  const renderSkeletonCard = (key) => (
+    <div key={key} className="animate-pulse rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="h-4 w-24 bg-slate-200 rounded" />
+        <div className="h-6 w-20 bg-slate-200 rounded-full" />
+      </div>
+      <div className="h-3 w-40 bg-slate-200 rounded" />
+      <div className="h-3 w-32 bg-slate-200 rounded" />
+      <div className="flex gap-2 pt-1">
+        <div className="h-9 flex-1 bg-slate-200 rounded-xl" />
+        <div className="h-9 flex-1 bg-slate-200 rounded-xl" />
+      </div>
+    </div>
+  )
+
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 space-y-6">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-8 space-y-5 sm:space-y-6">
 
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-5">
-            <div className="w-14 h-14 bg-gradient-to-br from-[#0052CC] to-blue-700 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
-              <History size={26} className="text-white" />
+        {/* ── En-tête ── */}
+        <div className="flex flex-col gap-5 sm:flex-row sm:justify-between sm:items-center bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-4 sm:gap-5 min-w-0">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-[#0052CC] to-blue-700 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 shrink-0">
+              <History size={24} className="text-white" />
             </div>
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-black text-slate-900 tracking-tight">Historique des interventions</h1>
-                <span className="px-2.5 py-1 bg-[#0052CC]/10 text-[#0052CC] text-xs font-bold rounded-lg uppercase tracking-wider">
-                  {employeeName || '—'}
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">Historique des interventions</h1>
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#0052CC]/10 text-[#0052CC] text-[11px] font-black rounded-lg uppercase tracking-wider">
+                  <User size={11} /> {employeeName || '—'}
                 </span>
+                {resolvedRole && (
+                  <span className="px-2.5 py-1 bg-slate-100 text-slate-600 text-[11px] font-bold rounded-lg">{resolvedRole}</span>
+                )}
+                <span className="text-xs text-slate-400 font-semibold hidden sm:inline">Interventions clôturées et validées</span>
               </div>
-              <p className="text-sm text-slate-500 font-medium mt-1">
-                {resolvedRole ? `${resolvedRole} • ` : ''}Interventions clôturées et validées.
-              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-4 w-full sm:w-auto">
-              <div className="flex-1 text-center sm:text-left">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total</p>
-                <p className="text-lg font-black text-slate-900">{filtered.length}</p>
+          {/* Stat total */}
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-3 bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-2xl px-4 py-3 flex-1 sm:flex-none">
+              <div className="w-10 h-10 rounded-xl bg-white border border-green-200 flex items-center justify-center text-green-600 shrink-0">
+                <CheckCircle2 size={20} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-green-600/80 uppercase tracking-wider leading-none">Clôturées</p>
+                <p className="text-xl font-black text-slate-900 leading-tight">{filtered.length}</p>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row gap-4">
-          <div className="relative flex-1 min-w-0">
+        {/* ── Filtres ── */}
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row gap-3">
+          <div className="relative flex-1 min-w-0 group">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" />
             <input
               type="text"
               placeholder="Rechercher (réf, fiche, client, machine, site)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/30 focus:border-[#0052CC] transition-all placeholder:text-slate-400"
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] hover:border-slate-300 transition-all placeholder:text-slate-400"
             />
           </div>
 
           <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3">
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 flex-1 sm:flex-none justify-center">
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 flex-1 sm:flex-none justify-center hover:border-slate-300 transition-colors">
               <Calendar size={16} className="text-slate-400 shrink-0" />
               <input
                 type="date"
                 value={fromDate}
                 onChange={(e) => setFromDate(e.target.value)}
-                className="bg-transparent border-none text-sm text-slate-700 focus:outline-none w-[110px] sm:w-[120px]"
+                aria-label="Date de début"
+                className="bg-transparent border-none text-sm text-slate-700 font-medium focus:outline-none w-[110px] sm:w-[120px]"
               />
-              <span className="text-slate-300">-</span>
+              <span className="text-slate-300 font-bold">→</span>
               <input
                 type="date"
                 value={toDate}
                 onChange={(e) => setToDate(e.target.value)}
-                className="bg-transparent border-none text-sm text-slate-700 focus:outline-none w-[110px] sm:w-[120px]"
+                aria-label="Date de fin"
+                className="bg-transparent border-none text-sm text-slate-700 font-medium focus:outline-none w-[110px] sm:w-[120px]"
               />
             </div>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-600 text-xs font-black hover:bg-red-100 transition-colors active:scale-95"
+              >
+                <X size={14} /> Réinitialiser
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        {/* ── Vue mobile : cartes ── */}
+        <div className="space-y-3 lg:hidden">
+          {isLoading ? (
+            <>{renderSkeletonCard('s1')}{renderSkeletonCard('s2')}{renderSkeletonCard('s3')}</>
+          ) : filtered.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center px-6 py-12">
+              <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center mb-3">
+                <AlertCircle size={24} className="text-slate-400" />
+              </div>
+              <p className="text-sm font-black text-slate-700">Aucune intervention clôturée</p>
+              <p className="text-xs text-slate-500 mt-1">{hasActiveFilters ? 'Modifiez vos filtres ou réinitialisez la recherche.' : 'Les interventions validées apparaîtront ici.'}</p>
+              {hasActiveFilters && (
+                <button type="button" onClick={resetFilters} className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black active:scale-95 transition-transform">
+                  <X size={14} /> Réinitialiser
+                </button>
+              )}
+            </div>
+          ) : (
+            filtered.map((row) => (
+              <div
+                key={row.id}
+                ref={row.id === highlightId ? highlightRowRef : null}
+                className={`rounded-2xl border bg-white shadow-sm overflow-hidden transition-all ${
+                  row.id === highlightId ? 'border-amber-300 ring-2 ring-amber-200 animate-pulse' : 'border-slate-200'
+                }`}
+              >
+                <div className="h-1 w-full bg-green-500" />
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                        <Hash size={11} /> {row.ficheNumber || row.id}
+                      </div>
+                      <p className="text-base font-black text-slate-900 leading-tight truncate">{row.clientName || '—'}</p>
+                    </div>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-black border bg-green-50 text-green-700 border-green-200 shrink-0">
+                      <CheckCircle2 size={11} /> Clôturée
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5 mb-4">
+                    <div className="flex items-center gap-2 text-xs text-slate-600 font-semibold min-w-0">
+                      <Calendar size={13} className="text-slate-400 shrink-0" />
+                      <span className="truncate">{row.interventionDate || '—'}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-600 font-semibold min-w-0">
+                      <Building2 size={13} className="text-slate-400 shrink-0" />
+                      <span className="truncate">{row.siteName || '—'}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-600 font-semibold min-w-0">
+                      <Wrench size={13} className="text-slate-400 shrink-0" />
+                      <span className="truncate">{row.machine || '—'}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-600 font-semibold min-w-0">
+                      <User size={13} className="text-slate-400 shrink-0" />
+                      <span className="truncate">{row.assignedEmployeesDisplay || row.technicianName || '—'}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenDetails(row)}
+                      className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-900 hover:bg-slate-950 text-white rounded-xl text-xs font-black transition-colors active:scale-95"
+                    >
+                      <Eye size={14} /> Détails
+                    </button>
+                    {!modifiedIdsSet.has(row.id) && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          navigate(`/interventions/${row.id}`, {
+                            state: {
+                              assignedTechnicianName: row.assignedEmployeesDisplay || row.technicianName,
+                              missionId: row.missionId,
+                              returnTo: `${window.location.pathname}${window.location.search}`,
+                            },
+                          })
+                        }
+                        className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-black transition-colors active:scale-95"
+                      >
+                        <Edit3 size={14} /> Modifier
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* ── Vue desktop : tableau ── */}
+        <div className="hidden lg:flex bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex-col">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -689,11 +818,16 @@ export default function EmployeeHistory() {
                   <tr>
                     <td colSpan={6} className="px-6 py-12">
                       <div className="flex flex-col items-center justify-center text-center">
-                        <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center mb-3">
-                          <AlertCircle size={22} className="text-slate-400" />
+                        <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center mb-3">
+                          <AlertCircle size={24} className="text-slate-400" />
                         </div>
-                        <p className="text-sm font-bold text-slate-700">Aucune intervention clôturée</p>
-                        <p className="text-xs text-slate-500 mt-1">Modifiez vos filtres ou effectuez une autre recherche.</p>
+                        <p className="text-sm font-black text-slate-700">Aucune intervention clôturée</p>
+                        <p className="text-xs text-slate-500 mt-1">{hasActiveFilters ? 'Modifiez vos filtres ou effectuez une autre recherche.' : 'Les interventions validées apparaîtront ici.'}</p>
+                        {hasActiveFilters && (
+                          <button type="button" onClick={resetFilters} className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black hover:bg-slate-950 transition-colors">
+                            <X size={14} /> Réinitialiser les filtres
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -726,8 +860,8 @@ export default function EmployeeHistory() {
                         <p className="text-sm font-semibold text-slate-700">{row.machine || '—'}</p>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border ${statusBadgeByStatus[row.status] || 'bg-slate-50 text-slate-700 border-slate-200'}`}>
-                          Clôturée
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold border ${statusBadgeByStatus[row.status] || 'bg-slate-50 text-slate-700 border-slate-200'}`}>
+                          <CheckCircle2 size={12} /> Clôturée
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
