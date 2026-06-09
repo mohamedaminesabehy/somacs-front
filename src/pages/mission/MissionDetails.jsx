@@ -569,13 +569,21 @@ export default function MissionDetails() {
 
       {/* ── Main Content ── */}
       <main className="flex-1 max-w-[1600px] mx-auto w-full p-4 sm:p-6 lg:p-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/*
+          Responsive note:
+          - On mobile/tablet the column wrappers use `display: contents` so every
+            card becomes a direct flex item of this container and can be ordered
+            independently (Véhicule affecté is pushed last via `order-last`).
+          - At `lg:` the wrappers fall back to normal block columns, so the
+            desktop layout and ordering stay exactly the same.
+        */}
+        <div className="flex flex-col gap-6 lg:grid lg:grid-cols-12 lg:gap-6">
           
           {/* Left Column: Mission Content (8 cols) */}
-          <div className="lg:col-span-8 order-1 lg:order-1 space-y-6">
+          <div className="contents lg:block lg:col-span-8 lg:space-y-6">
             
             {/* Mission Card */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="bg-blue-50/40 lg:bg-white rounded-2xl border border-blue-100 lg:border-slate-200 shadow-sm overflow-hidden">
               <div className="p-4 sm:p-6">
                 <div className="flex items-start justify-between mb-4 sm:mb-6">
                   <div className="flex items-center gap-3 sm:gap-4">
@@ -642,7 +650,7 @@ export default function MissionDetails() {
 
             {/* Véhicule Affecté Card */}
             {mission.vehicle && (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="order-last lg:order-none bg-emerald-50/40 lg:bg-white rounded-2xl border border-emerald-100 lg:border-slate-200 shadow-sm overflow-hidden">
                 <div className="p-4 sm:p-6">
                   <SectionHeader icon={Truck} title="Véhicule affecté" />
                   
@@ -722,7 +730,7 @@ export default function MissionDetails() {
             )}
 
             <div
-              className={`bg-white rounded-2xl border-2 shadow-sm overflow-hidden transition-all ${
+              className={`bg-amber-50/30 lg:bg-white rounded-2xl border-2 shadow-sm overflow-hidden transition-all ${
                 showStatusAttention
                   ? 'border-amber-300 ring-2 ring-amber-300/60 shadow-lg shadow-amber-100 animate-pulse'
                   : (ACTIONS_SECTION_ACCENT[status] || 'border-slate-200')
@@ -781,7 +789,7 @@ export default function MissionDetails() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="bg-violet-50/40 lg:bg-white rounded-2xl border border-violet-100 lg:border-slate-200 shadow-sm overflow-hidden">
               <div className="p-4 sm:p-6">
                 <SectionHeader icon={FileText} title="Notes & Observations" />
                 <div className="relative mt-4">
@@ -812,11 +820,11 @@ export default function MissionDetails() {
           </div>
 
           {/* Right Column: Sidebar (4 cols) */}
-          <div className="lg:col-span-4 lg:row-span-3 space-y-6 order-2 lg:order-2">
+          <div className="contents lg:block lg:col-span-4 lg:row-span-3 lg:space-y-6">
             
             {/* Linked Intervention (Moved to first position) */}
             {intervention && (
-              <div className={`bg-white rounded-2xl border-2 shadow-sm overflow-hidden relative ${
+              <div className={`bg-indigo-50/40 lg:bg-white rounded-2xl border-2 shadow-sm overflow-hidden relative ${
                 intervention.status === 'CLOSED' ? 'border-red-200' : 'border-blue-600/10'
               }`}>
                 <div className={`absolute top-0 right-0 w-24 h-24 rounded-bl-full -mr-12 -mt-12 opacity-50 ${
@@ -925,7 +933,7 @@ export default function MissionDetails() {
             )}
 
             {/* Summary Details */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="bg-sky-50/40 lg:bg-white rounded-2xl border border-sky-100 lg:border-slate-200 shadow-sm overflow-hidden">
               <div className="p-4 sm:p-6 bg-[#F0F8FF]">
                 <SectionHeader icon={Info} title="Détails" />
                 <div className="mt-2">
@@ -951,7 +959,7 @@ export default function MissionDetails() {
             </div>
 
             {/* Location & Primary Document Card */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="bg-rose-50/40 lg:bg-white rounded-2xl border border-rose-100 lg:border-slate-200 shadow-sm overflow-hidden">
               <div className="p-4 sm:p-6">
                 <SectionHeader icon={MapPin} title="Lieu & Document">
                   <button className="text-[10px] font-black text-[#0052CC] flex items-center gap-1 hover:underline">

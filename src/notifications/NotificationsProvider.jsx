@@ -152,6 +152,57 @@ export function NotificationsProvider({ children }) {
       playNotificationSound()
     })
 
+    // ── Cross-device read/unread synchronization ──
+    socket.on('notificationRead', (payload) => {
+      const id = payload && typeof payload.id === 'number' ? payload.id : null
+      if (id == null) return
+      setNotifications((prev) => {
+        let changed = false
+        const next = prev.map((n) => {
+          if (n && n.id === id && !n.isRead) {
+            changed = true
+            return { ...n, isRead: true }
+          }
+          return n
+        })
+        if (changed) setUnreadCount((c) => Math.max(0, c - 1))
+        return next
+      })
+    })
+
+    socket.on('notificationsAllRead', () => {
+      setNotifications((prev) => prev.map((n) => (n ? { ...n, isRead: true } : n)))
+      setUnreadCount(0)
+    })
+
+    socket.on('notificationDeleted', (payload) => {
+      const id = payload && typeof payload.id === 'number' ? payload.id : null
+      if (id == null) return
+      setNotifications((prev) => {
+        const removed = prev.find((n) => n && n.id === id)
+        if (removed && !removed.isRead) setUnreadCount((c) => Math.max(0, c - 1))
+        return prev.filter((n) => n && n.id !== id)
+      })
+    })
+
+    socket.on('notificationsDeleted', (payload) => {
+      const ids = payload && Array.isArray(payload.ids) ? payload.ids : []
+      if (ids.length === 0) return
+      const idSet = new Set(ids)
+      setNotifications((prev) => {
+        const removedUnread = prev.filter((n) => n && idSet.has(n.id) && !n.isRead).length
+        if (removedUnread > 0) setUnreadCount((c) => Math.max(0, c - removedUnread))
+        return prev.filter((n) => n && !idSet.has(n.id))
+      })
+    })
+
+    socket.on('notificationArchived', (payload) => {
+      const id = payload && typeof payload.id === 'number' ? payload.id : null
+      if (id == null) return
+      // Archived notifications leave the active bell list; reconcile counts.
+      void refresh()
+    })
+
     let unsubscribeMessaging = () => {}
     void (async () => {
       unsubscribeMessaging = await onForegroundMessage(async (payload) => {
