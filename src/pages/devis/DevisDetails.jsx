@@ -320,7 +320,9 @@ function DevisFiche({ data }) {
       {/* Amount in Words */}
       <div className="text-[9px] mb-4 border-t border-slate-900 pt-2">
         <div className="italic mb-1">Arrêté le(a) présent(e) DEVIS EQ à la somme de :</div>
-        <div className="font-black uppercase">{header.AMOUNT_WORDS || 'DIX-HUIT MILLE SIX CENT SEPT DINARS ET HUIT CENT QUATRE-VINGT-SEPT MILLIMES'}</div>
+        <div className="font-black uppercase">
+          {header.AMOUNT_WORDS || header.amountWords || 'Montant en lettres non disponible'}
+        </div>
       </div>
 
       {/* Conditions & Signatures */}

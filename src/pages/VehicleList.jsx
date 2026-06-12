@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Plus, Search, Eye, Edit2, Trash2, Truck, CheckCircle2,
   Wrench, XCircle, RefreshCw, ChevronLeft, ChevronRight,
-  AlertCircle, X, Settings,
+  AlertCircle, X, Calendar,
 } from 'lucide-react'
 import { apiFetch } from '../api/apiClient'
 
@@ -225,18 +225,83 @@ export default function VehicleList() {
 
         {/* Content */}
         {loading ? (
-          <div className="flex items-center justify-center py-24">
+          <div className="flex items-center justify-center py-20 lg:py-24 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 bg-slate-50 lg:bg-transparent rounded-2xl lg:rounded-none">
             <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
-            <Truck size={48} className="text-slate-200 mx-auto mb-4" />
-            <p className="text-slate-500 font-semibold">Aucun véhicule trouvé</p>
-            <p className="text-slate-400 text-sm mt-1">Modifiez vos filtres ou ajoutez un nouveau véhicule.</p>
+          <div className="-mx-4 px-4 py-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:p-0 bg-slate-50 lg:bg-transparent rounded-2xl lg:rounded-none">
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm lg:shadow-none p-10 sm:p-16 text-center">
+              <Truck size={48} className="text-slate-200 mx-auto mb-4" />
+              <p className="text-slate-500 font-semibold">Aucun véhicule trouvé</p>
+              <p className="text-slate-400 text-sm mt-1">Modifiez vos filtres ou ajoutez un nouveau véhicule.</p>
+            </div>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
+          <div className="-mx-4 px-4 py-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:p-0 bg-slate-50 lg:bg-white lg:rounded-2xl lg:border lg:border-slate-200 lg:shadow-sm lg:overflow-hidden">
+            {/* Mobile / tablet cards */}
+            <div className="lg:hidden space-y-4 sm:space-y-5">
+              {paginated.map((v) => {
+                const usage = formatVehicleUsage(v)
+                return (
+                  <div
+                    key={v.id}
+                    onClick={() => navigate(`/vehicles/${v.id}`)}
+                    className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-4 sm:p-5 transition active:scale-[0.99] sm:hover:shadow-md cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-mono text-sm font-black text-slate-900">{v.matricule}</p>
+                        <p className="text-sm font-bold text-slate-700 mt-0.5 truncate">
+                          {v.marque}{v.modele ? ` — ${v.modele}` : ''}
+                        </p>
+                      </div>
+                      <StatusBadge status={v.statut} />
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {v.type && (
+                        <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">{v.type}</span>
+                      )}
+                      {v.annee && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg">
+                          <Calendar size={11} /> {v.annee}
+                        </span>
+                      )}
+                      {v.statut === 'Affecté' && !v.activeMission && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-orange-50 text-orange-600 border border-orange-200">
+                          <AlertCircle size={10} /> Sans mission active
+                        </span>
+                      )}
+                    </div>
+
+                    {usage ? (
+                      <div className="mt-3 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Utilisation actuelle</p>
+                        <p className="text-sm font-bold text-slate-900 truncate mt-0.5">{usage.primary}</p>
+                        {usage.secondary && <p className="text-[11px] text-slate-500 truncate mt-0.5">{usage.secondary}</p>}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-xs font-semibold text-slate-400">Aucune utilisation actuelle</p>
+                    )}
+
+                    <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2" onClick={(e) => e.stopPropagation()}>
+                      <button onClick={() => navigate(`/vehicles/${v.id}`)} className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-blue-50 text-blue-700 text-xs font-bold hover:bg-blue-100 transition-colors">
+                        <Eye size={14} /> Voir
+                      </button>
+                      <button onClick={() => navigate(`/vehicles/${v.id}/edit`)} className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200 transition-colors">
+                        <Edit2 size={14} /> Modifier
+                      </button>
+                      <button onClick={() => handleDelete(v)} className="col-span-2 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-red-50 text-red-600 text-xs font-bold hover:bg-red-100 transition-colors">
+                        <Trash2 size={14} /> Supprimer
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden lg:block overflow-x-auto">
               <table className="w-full min-w-[800px] text-left">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100">
@@ -307,7 +372,7 @@ export default function VehicleList() {
             </div>
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="px-4 sm:px-6 py-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="mt-4 lg:mt-0 bg-white rounded-2xl border border-slate-200 shadow-sm lg:rounded-none lg:border-0 lg:border-t lg:border-slate-100 lg:shadow-none px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <p className="text-xs text-slate-500 font-medium">
                   {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)} sur {filtered.length}
                 </p>

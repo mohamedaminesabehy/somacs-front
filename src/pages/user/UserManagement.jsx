@@ -163,30 +163,30 @@ export default function UserManagement({ currentUser }) {
       </div>
 
       {/* ── STAT CARDS ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-6 py-5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-[#E6F0FF] flex items-center justify-center shrink-0">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-4 sm:px-6 sm:py-5 flex items-center gap-3 sm:gap-4">
+          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-[#E6F0FF] flex items-center justify-center shrink-0">
             <Users size={22} className="text-[#0052CC]" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Total comptes</p>
             <p className="text-2xl font-black text-slate-900 mt-0.5">{users.length}</p>
           </div>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-6 py-5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-green-50 flex items-center justify-center shrink-0">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-4 sm:px-6 sm:py-5 flex items-center gap-3 sm:gap-4">
+          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-green-50 flex items-center justify-center shrink-0">
             <UserPlus size={22} className="text-green-600" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Comptes actifs</p>
             <p className="text-2xl font-black text-slate-900 mt-0.5">{activeUsers}</p>
           </div>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-6 py-5 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center shrink-0">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-4 sm:px-6 sm:py-5 flex items-center gap-3 sm:gap-4">
+          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-purple-50 flex items-center justify-center shrink-0">
             <Shield size={22} className="text-purple-600" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Rôles définis</p>
             <p className="text-2xl font-black text-slate-900 mt-0.5">{totalRoles}</p>
           </div>

@@ -266,7 +266,90 @@ export default function UserTable({
         </select>
       </div>
 
-      <div className="overflow-x-auto">
+      {/* Mobile / tablet cards */}
+      <div className="lg:hidden bg-slate-50 px-4 py-4 sm:px-6 sm:py-5">
+        {isLoading ? (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-6 py-16 text-center">
+            <div className="flex flex-col items-center gap-3">
+              <svg className="animate-spin h-8 w-8 text-[#0052CC]" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+              <p className="text-sm font-semibold text-slate-400">Chargement des utilisateurs...</p>
+            </div>
+          </div>
+        ) : userList.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-6 py-16 text-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center">
+                <Shield size={24} className="text-slate-300" />
+              </div>
+              <p className="font-bold text-slate-500">Aucun utilisateur trouve</p>
+              <p className="text-sm text-slate-400">Modifiez vos criteres ou creez un nouveau compte.</p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4 sm:space-y-5">
+            {userList.map((user) => (
+              <div key={user.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-4 sm:p-5 transition active:scale-[0.99] sm:hover:shadow-md">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0052CC] to-blue-700 flex items-center justify-center text-white font-black text-sm shrink-0 shadow-sm">
+                      {user.avatar}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-900 text-sm truncate">{user.name}</p>
+                      <p className="text-xs text-slate-500 font-medium truncate">{user.email}</p>
+                    </div>
+                  </div>
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 ${statusColors[user.statusColor]}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${user.statusColor === 'green' ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                    {user.status}
+                  </span>
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold ${roleColors[user.roleColor]}`}>
+                    {user.role === 'Administrateur' && <Shield size={12} />}
+                    {user.role}
+                  </span>
+                  {user.department && (
+                    <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">{user.department}</span>
+                  )}
+                </div>
+
+                <div className="mt-2 flex items-center gap-2 text-xs text-slate-500 font-medium">
+                  <Clock size={13} className="text-slate-400 shrink-0" />
+                  {user.lastLogin}
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/users/${user.id}/details`)}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
+                  >
+                    Historique
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEdit(user)}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+                  >
+                    Modifier
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenDelete(user)}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+                  >
+                    Supprimer
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="overflow-x-auto hidden lg:block">
         <table className="w-full min-w-[840px]">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-100">

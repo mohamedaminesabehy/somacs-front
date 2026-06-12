@@ -414,9 +414,30 @@ export default function OperationsDashboard({ currentUser }) {
   }, [selectedMonth, selectedYear])
 
   const yearOptions = useMemo(() => {
-    const y = today.getFullYear()
-    return Array.from({ length: 7 }).map((_, idx) => y - 5 + idx)
-  }, [today])
+    const years = new Set()
+    const addYear = (value) => {
+      const d = parseDateLike(value)
+      if (d instanceof Date && !Number.isNaN(d.getTime())) years.add(d.getFullYear())
+    }
+
+    // Dérive les années à partir des données réellement disponibles
+    missions.forEach((m) => addYear(m?.dueDate || m?.updatedAt || m?.createdAt))
+    interventions.forEach((itv) => addYear(itv?.date || itv?.interventionDate || itv?.updatedAt || itv?.createdAt))
+    machines.forEach((m) => addYear(m?.updatedAt || m?.createdAt || m?.receptionDate))
+    devis.forEach((d) => addYear(d?.DOCDATE || d?.DATEDOC || d?.DateDoc || d?.DATDOC || d?.createdAt))
+
+    // Garantit toujours l'année courante et l'année sélectionnée
+    years.add(today.getFullYear())
+    years.add(selectedYear)
+
+    // Repli si aucune donnée datée : fenêtre autour de l'année courante
+    if (years.size <= 1) {
+      const base = today.getFullYear()
+      for (let i = base - 2; i <= base + 1; i += 1) years.add(i)
+    }
+
+    return Array.from(years).sort((a, b) => b - a)
+  }, [missions, interventions, machines, devis, today, selectedYear])
 
   const selectedLabel = useMemo(
     () => `${MONTHS_FR[selectedMonth]} ${selectedYear}`,

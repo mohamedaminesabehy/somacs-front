@@ -16,9 +16,9 @@ describe('DevisSuiviBadges', () => {
       expect(badge).toBeInTheDocument();
     });
 
-    it('should display HOT_LEAD with emoji', () => {
+    it('should display HOT_LEAD with French label', () => {
       render(<StatusBadge value="HOT_LEAD" />);
-      const badge = screen.getByText('Hot Lead 🔥');
+      const badge = screen.getByText('Prospect chaud');
       expect(badge).toBeInTheDocument();
     });
 

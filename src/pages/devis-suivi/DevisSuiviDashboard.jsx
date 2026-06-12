@@ -11,7 +11,7 @@ import {
   markDevisPurchased, markDevisLost,
 } from '../../api/devisSuiviApi'
 import {
-  STATUS_META, STATUS_OPTIONS_ALL,
+  STATUS_META, STATUS_OPTIONS_ALL, STATUS_HEX_COLORS,
   REFUSAL_REASON_META, TERMINAL_STATUSES,
 } from '../../constants/devisSuiviConstants'
 import { StatusBadge } from '../../components/devis/DevisSuiviBadges'
@@ -105,14 +105,6 @@ function StatusDonutChart({ distribution }) {
   const radius = (size - strokeWidth) / 2
   const circumference = 2 * Math.PI * radius
 
-  // Color palette derived from STATUS_META dot colors
-  const STATUS_COLORS = {
-    CREATED: '#94a3b8', SENT: '#60a5fa', CONTACTED: '#a78bfa',
-    WAITING: '#fbbf24', NEGOTIATION: '#f97316', HOT_LEAD: '#ef4444',
-    ACCEPTED: '#34d399', PURCHASED: '#10b981', REFUSED: '#f43f5e',
-    EXPIRED: '#6b7280',
-  }
-
   let offset = 0
 
   return (
@@ -121,13 +113,13 @@ function StatusDonutChart({ distribution }) {
       <div className="relative shrink-0" style={{ width: size, height: size }}>
         <svg width={size} height={size} className="-rotate-90">
           <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#f1f5f9" strokeWidth={strokeWidth} />
-          {total > 0 && sorted.map((item, i) => {
+          {total > 0 && sorted.map((item) => {
             const pct = item.count / total
             const dash = pct * circumference
             const gap = circumference - dash
             const currentOffset = offset
             offset += dash
-            const color = STATUS_COLORS[item.status] || '#94a3b8'
+            const color = STATUS_HEX_COLORS[item.status] || '#94a3b8'
             return (
               <circle key={item.status} cx={size / 2} cy={size / 2} r={radius} fill="none"
                 stroke={color} strokeWidth={strokeWidth}
@@ -150,7 +142,7 @@ function StatusDonutChart({ distribution }) {
           {sorted.map(item => {
             const m = STATUS_META[item.status] || STATUS_META.CREATED
             const pct = total > 0 ? Math.round((item.count / total) * 100) : 0
-            const color = STATUS_COLORS[item.status] || '#94a3b8'
+            const color = STATUS_HEX_COLORS[item.status] || '#94a3b8'
             return (
               <div key={item.status} className="flex items-center gap-2.5">
                 <span className="h-3 w-3 shrink-0 rounded" style={{ backgroundColor: color }} />
@@ -242,7 +234,11 @@ export default function DevisSuiviDashboard() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [commercialFilter, setCommercialFilter] = useState('ALL')
-  const [dateFilter, setDateFilter] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  // Annuaire des commerciaux : accumulé au fil des pages chargées pour ne pas
+  // se limiter aux seules lignes de la page courante. Persiste tant que la page vit.
+  const [commercialDirectory, setCommercialDirectory] = useState([])
   const [page, setPage] = useState(1)
   const [pageInfo, setPageInfo] = useState({ total: 0, totalPages: 1, limit: 12 })
   const [toast, setToast] = useState(null)
@@ -290,10 +286,21 @@ export default function DevisSuiviDashboard() {
         page, limit: pageInfo.limit, search: debouncedSearch,
         status: statusFilter === 'ALL' ? '' : statusFilter,
         commercialCode: commercialFilter === 'ALL' ? '' : commercialFilter,
-        dateFrom: dateFilter || '', dateTo: dateFilter || '',
+        dateFrom: dateFrom || '', dateTo: dateTo || '',
       }, controller.signal)
       if (controller.signal.aborted || !isMountedRef.current) return
-      setRows(Array.isArray(list?.data) ? list.data : [])
+      const data = Array.isArray(list?.data) ? list.data : []
+      setRows(data)
+      // Accumule les commerciaux rencontrés pour alimenter le filtre globalement
+      setCommercialDirectory(prev => {
+        const map = new Map(prev.map(c => [c.code, c.label]))
+        data.forEach(r => {
+          const code = r.commercialCode || r.commercialLabel
+          if (code && !map.has(code)) map.set(code, r.commercialLabel || r.commercialCode)
+        })
+        return Array.from(map, ([code, label]) => ({ code, label }))
+          .sort((a, b) => (a.label || a.code).localeCompare(b.label || b.code))
+      })
       setPageInfo(prev => ({
         ...prev,
         total: Number(list?.total || 0),
@@ -312,7 +319,7 @@ export default function DevisSuiviDashboard() {
       // GARANTIT que le loader ne reste JAMAIS bloqué
       if (isMountedRef.current && !controller.signal.aborted) setLoading(false)
     }
-  }, [page, debouncedSearch, statusFilter, commercialFilter, dateFilter, pageInfo.limit])
+  }, [page, debouncedSearch, statusFilter, commercialFilter, dateFrom, dateTo, pageInfo.limit])
 
   const loadStats = useCallback(async (externalSignal) => {
     try { statsAbortRef.current?.abort() } catch {}
@@ -353,9 +360,15 @@ export default function DevisSuiviDashboard() {
   }, [loadStats])
 
   const commercialOptions = useMemo(() => {
-    const codes = rows.map(r => r.commercialCode || r.commercialLabel || '').filter(Boolean)
-    return Array.from(new Set(codes)).sort((a, b) => a.localeCompare(b))
-  }, [rows])
+    // Union de l'annuaire accumulé et des commerciaux de la page courante
+    const map = new Map(commercialDirectory.map(c => [c.code, c.label]))
+    rows.forEach(r => {
+      const code = r.commercialCode || r.commercialLabel
+      if (code && !map.has(code)) map.set(code, r.commercialLabel || r.commercialCode)
+    })
+    return Array.from(map, ([code, label]) => ({ code, label: label || code }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  }, [commercialDirectory, rows])
 
   const handleQuickAction = async () => {
     const { row, type } = confirmAction
@@ -411,12 +424,12 @@ export default function DevisSuiviDashboard() {
           </div>
 
           {/* KPI Grid */}
-          <div className="grid gap-3 border-t border-slate-100 p-5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 border-t border-slate-100 p-5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
             <KpiCard label="Total suivis"  value={stats.total}                  sub="Devis en suivi"      color="slate"   icon={BarChart3}   />
             <KpiCard label="Achetés"       value={stats.purchased}              sub="Convertis"           color="emerald" icon={BadgeCheck}  pct={stats.total > 0 ? Math.round(stats.purchased / stats.total * 100) : 0} />
             <KpiCard label="Perdus"        value={stats.refused}                sub="À analyser"          color="rose"    icon={XCircle}     />
             <KpiCard label="Conversion"    value={stats.conversionRate + '%'}   sub="Achetés / total"     color="blue"    icon={Target}      pct={stats.conversionRate} />
-            <KpiCard label="Hot Leads"     value={stats.hotLeads}               sub="Très intéressés"     color="orange"  icon={Flame}       />
+            <KpiCard label="Prospects chauds" value={stats.hotLeads}               sub="Très intéressés"     color="orange"  icon={Flame}       />
             <KpiCard label="Relances"      value={stats.relancesToday}          sub="Aujourd'hui"         color="violet"  icon={Zap}         />
             <KpiCard label="Expirés"       value={stats.expired}                sub="Sans réponse"        color="slate"   icon={AlertCircle} />
           </div>
@@ -536,7 +549,7 @@ export default function DevisSuiviDashboard() {
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
                     value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
-                <div className="grid gap-3 sm:grid-cols-3 xl:flex xl:items-center">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:flex xl:items-center">
                   <div className="relative">
                     <Filter className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                     <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1) }}
@@ -549,13 +562,22 @@ export default function DevisSuiviDashboard() {
                     <select value={commercialFilter} onChange={e => { setCommercialFilter(e.target.value); setPage(1) }}
                       className="w-full min-w-[170px] rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/10 appearance-none">
                       <option value="ALL">Tous les commerciaux</option>
-                      {commercialOptions.map(v => <option key={v} value={v}>{v}</option>)}
+                      {commercialOptions.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
                     </select>
                   </div>
                   <div className="relative">
                     <CalendarDays className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                    <input type="date" value={dateFilter} onChange={e => { setDateFilter(e.target.value); setPage(1) }}
-                      className="w-full min-w-[170px] rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/10" />
+                    <input type="date" value={dateFrom} max={dateTo || undefined}
+                      onChange={e => { setDateFrom(e.target.value); setPage(1) }}
+                      title="Date de début (rappel)"
+                      className="w-full min-w-[150px] rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/10" />
+                  </div>
+                  <div className="relative">
+                    <CalendarDays className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                    <input type="date" value={dateTo} min={dateFrom || undefined}
+                      onChange={e => { setDateTo(e.target.value); setPage(1) }}
+                      title="Date de fin (rappel)"
+                      className="w-full min-w-[150px] rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-500/10" />
                   </div>
                 </div>
               </div>
@@ -569,7 +591,94 @@ export default function DevisSuiviDashboard() {
                   <p className="mt-0.5 text-xs text-slate-400">Tableau de pilotage des devis suivis</p>
                 </div>
               </div>
-              <div className="overflow-x-auto">
+              {/* Mobile / tablet cards */}
+              <div className="lg:hidden bg-slate-50 px-4 py-4 sm:px-6 sm:py-5">
+                {loading ? (
+                  <div className="space-y-4 sm:space-y-5">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 animate-pulse space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="h-4 w-24 rounded-lg bg-slate-100" />
+                          <div className="h-5 w-20 rounded-full bg-slate-100" />
+                        </div>
+                        <div className="h-4 w-36 rounded-lg bg-slate-100" />
+                        <div className="h-4 w-28 rounded-lg bg-slate-100" />
+                      </div>
+                    ))}
+                  </div>
+                ) : rows.length > 0 ? (
+                  <div className="space-y-4 sm:space-y-5">
+                    {rows.map(row => {
+                      const isClosed = TERMINAL_STATUSES.includes(row.status)
+                      const rs = getReminderStatus(row.reminderDate)
+                      return (
+                        <div
+                          key={row.numeroDevis + '-' + row.typDoc}
+                          onClick={() => navigate('/devis/' + row.numeroDevis)}
+                          className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-4 sm:p-5 transition active:scale-[0.99] sm:hover:shadow-md cursor-pointer"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-sm font-black text-slate-950">{row.numeroDevis}</div>
+                              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">{row.typDoc}</div>
+                            </div>
+                            <StatusBadge value={row.status} />
+                          </div>
+
+                          <div className="mt-3 space-y-2">
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-bold text-slate-900">{row.clientLabel || row.clientCode || '-'}</div>
+                              <div className="truncate text-[10px] font-medium text-slate-400">{row.clientCode || '-'}</div>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs font-medium text-slate-600 min-w-0">
+                              <UserCog size={13} className="text-slate-400 shrink-0" />
+                              <span className="truncate">{row.commercialLabel || row.commercialCode || '-'}</span>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5 flex items-center justify-between gap-2">
+                            <span className="text-base font-black text-[#0052CC] tabular-nums">{formatMoney(row.montantDevis)}</span>
+                            {rs && (
+                              <span className={"inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold " + rs.tone}>
+                                <span className={"h-1.5 w-1.5 rounded-full " + rs.dot} />{rs.label}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                            <button type="button" onClick={() => navigate('/devis/' + row.numeroDevis)}
+                              className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-600 hover:border-blue-200 hover:text-[#0052CC] transition-all">
+                              Voir <ArrowRight size={12} />
+                            </button>
+                            {!isClosed && (
+                              <>
+                                <button type="button" title="Marquer acheté" onClick={() => setConfirmAction({ open: true, row, type: 'purchased' })}
+                                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all">
+                                  <ShoppingCart size={15} />
+                                </button>
+                                <button type="button" title="Marquer perdu" onClick={() => setConfirmAction({ open: true, row, type: 'lost' })}
+                                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all">
+                                  <ThumbsDown size={15} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-6 py-16">
+                    <div className="mx-auto max-w-xs text-center">
+                      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400"><XCircle size={24} /></div>
+                      <h3 className="text-base font-black text-slate-900">Aucun résultat</h3>
+                      <p className="mt-1.5 text-sm text-slate-500">Aucun devis ne correspond aux filtres actuels.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="overflow-x-auto hidden lg:block">
                 <table className="w-full min-w-[1100px] border-collapse text-left">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50/80">

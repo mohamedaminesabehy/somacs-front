@@ -265,8 +265,8 @@ export default function MachineList({ currentUser }) {
       </header>
 
       <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 flex items-center gap-4">
             <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-slate-100">
               <Building2 size={20} className="text-slate-700" />
             </div>
@@ -348,7 +348,20 @@ export default function MachineList({ currentUser }) {
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
+            {/* Mobile / tablet cards */}
+            <div className="lg:hidden p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {paginated.map((m) => (
+                <MachineCard key={m.id} machine={m}
+                  onView={(m) => navigate(`/machines/${m.id}`)}
+                  onEdit={(m) => navigate(`/machines/${m.id}/edit`)}
+                  onDelete={handleDelete}
+                  canManage={canManageMachines}
+                />
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden lg:block overflow-x-auto">
               <table className="w-full min-w-[980px] text-left">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100">

@@ -71,21 +71,21 @@ export const STATUS_META = {
     order: 3,
   },
   [DEVIS_STATUS.NEGOTIATION]: {
-    label: 'Négociation',
+    label: 'En négociation',
     tone: 'bg-violet-50 text-violet-700 border-violet-200',
     dot: 'bg-violet-500',
     gradient: 'from-violet-50 to-violet-100',
     order: 4,
   },
   [DEVIS_STATUS.HOT_LEAD]: {
-    label: 'Hot Lead 🔥',
+    label: 'Prospect chaud',
     tone: 'bg-orange-50 text-orange-700 border-orange-200',
     dot: 'bg-orange-500',
     gradient: 'from-orange-50 to-orange-100',
     order: 5,
   },
   [DEVIS_STATUS.COLD_LEAD]: {
-    label: 'Cold Lead',
+    label: 'Prospect froid',
     tone: 'bg-cyan-50 text-cyan-700 border-cyan-200',
     dot: 'bg-cyan-400',
     gradient: 'from-cyan-50 to-cyan-100',
@@ -99,14 +99,14 @@ export const STATUS_META = {
     order: 7,
   },
   [DEVIS_STATUS.ACCEPTED]: {
-    label: 'Accepté',
+    label: "Client d'accord",
     tone: 'bg-teal-50 text-teal-700 border-teal-200',
     dot: 'bg-teal-500',
     gradient: 'from-teal-50 to-teal-100',
     order: 8,
   },
   [DEVIS_STATUS.PURCHASED]: {
-    label: 'Acheté ✓',
+    label: 'Acheté',
     tone: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     dot: 'bg-emerald-500',
     gradient: 'from-emerald-50 to-emerald-100',
@@ -129,6 +129,36 @@ export const STATUS_META = {
 }
 
 export const STATUS_OPTIONS_ALL = ['ALL', ...Object.values(DEVIS_STATUS)]
+
+/**
+ * Hex colors per status — single source of truth for charts (donut, etc.).
+ * Every status has a dedicated color: no fallback collisions.
+ */
+export const STATUS_HEX_COLORS = {
+  [DEVIS_STATUS.CREATED]: '#94a3b8',     // slate
+  [DEVIS_STATUS.SENT]: '#60a5fa',        // sky/blue
+  [DEVIS_STATUS.CONTACTED]: '#3b82f6',   // blue
+  [DEVIS_STATUS.WAITING]: '#fbbf24',     // amber
+  [DEVIS_STATUS.NEGOTIATION]: '#8b5cf6', // violet
+  [DEVIS_STATUS.HOT_LEAD]: '#f97316',    // orange
+  [DEVIS_STATUS.COLD_LEAD]: '#22d3ee',   // cyan
+  [DEVIS_STATUS.NO_RESPONSE]: '#a1a1aa', // zinc
+  [DEVIS_STATUS.ACCEPTED]: '#14b8a6',    // teal
+  [DEVIS_STATUS.PURCHASED]: '#10b981',   // emerald
+  [DEVIS_STATUS.REFUSED]: '#f43f5e',     // rose
+  [DEVIS_STATUS.EXPIRED]: '#6b7280',     // gray
+}
+
+/**
+ * Business categories — single source of truth.
+ *   Validés      = PURCHASED uniquement
+ *   Non validés  = REFUSED + EXPIRED
+ *   En attente   = tous les statuts du pipeline (dont ACCEPTED : accord client,
+ *                  mais achat non encore confirmé → reste "en attente").
+ */
+export const VALIDATED_STATUSES = [DEVIS_STATUS.PURCHASED]
+export const NON_VALIDATED_STATUSES = [DEVIS_STATUS.REFUSED, DEVIS_STATUS.EXPIRED]
+export const PENDING_STATUSES = PIPELINE_STATUSES
 
 // ─── Reminder Priority ────────────────────────────────────────────────────────
 

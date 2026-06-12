@@ -461,8 +461,145 @@ function MissionTableInner(props, ref) {
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden relative">
-      <div className="overflow-x-auto">
+    <div className="relative bg-slate-50 lg:bg-white lg:rounded-lg lg:border lg:border-gray-200 lg:overflow-hidden">
+      {/* Mobile / tablet cards */}
+      <div className="lg:hidden px-4 py-4 sm:px-6 sm:py-5">
+        {paginatedMissions.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-6 py-12">
+            <div className="flex flex-col items-center justify-center text-center">
+              <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center mb-3">
+                <AlertCircle size={22} className="text-gray-400" />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Il n&apos;y a pas de mission correspondant à vos filtres.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4 sm:space-y-5">
+            {paginatedMissions.map((mission) => {
+              const IconComponent = mission.type === 'Intervention' ? Wrench : ClipboardList
+              const priorityColor = mission.priority === 'Critique' ? 'red' : mission.priority === 'Haute' ? 'orange' : mission.priority === 'Moyenne' ? 'yellow' : 'gray'
+              const statusColor = getStatusColorKey(mission.status)
+              const employeeDisplay = mission.employeeDisplay || mission.employee
+              const groupedStatuses = getGroupedEmployeeStatuses(mission)
+              const isGroupedMission = groupedStatuses.length > 1
+              const avatar = getAvatarFromName(employeeDisplay)
+              const isHighlighted =
+                (activeHighlightMissionId && String(mission?.id) === activeHighlightMissionId) ||
+                (activeHighlightGroupId && String(mission?.assignmentGroupId || '').trim() === activeHighlightGroupId)
+              return (
+                <div
+                  key={mission.id}
+                  ref={isHighlighted ? highlightRowRef : null}
+                  className={`bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-4 sm:p-5 transition active:scale-[0.99] sm:hover:shadow-md ${isHighlighted ? 'ring-2 ring-emerald-200 animate-pulse' : ''}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`mt-0.5 w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${mission.type === 'Intervention' ? 'bg-blue-50' : 'bg-gray-100'}`}>
+                      <IconComponent size={18} className={`${mission.type === 'Intervention' ? 'text-[#0052CC]' : 'text-gray-500'}`} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-gray-900 text-sm">{mission.title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5" title={mission.description || ''}>{truncateText(mission.description, 60)}</p>
+                    </div>
+                    <span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-medium shrink-0 ${priorityColors[priorityColor]}`}>
+                      {mission.priority}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-[#0052CC] text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+                      {avatar}
+                    </div>
+                    <span className="text-xs font-medium text-gray-800 truncate">{employeeDisplay}</span>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {mission.type === 'Intervention' ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold text-[#0052CC] bg-blue-50 border border-blue-100">
+                        <Wrench size={11} /> Intervention S.A.V
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-600 bg-slate-100 border border-slate-200">
+                        <ClipboardList size={11} /> Normal
+                      </span>
+                    )}
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium text-gray-600 bg-gray-50 border border-gray-100">
+                      <Calendar size={11} /> {mission.dueDate}{mission.dueTime ? ` · ${mission.dueTime}` : ''}
+                    </span>
+                  </div>
+
+                  <div className="mt-3">
+                    {isGroupedMission ? (
+                      <div className="space-y-1.5">
+                        {groupedStatuses.map((entry) => {
+                          const entryStatusColor = getStatusColorKey(entry.status)
+                          return (
+                            <div key={`${mission.id}_${entry.name}`} className="flex items-center justify-between gap-2">
+                              <span className="text-xs text-gray-700 font-medium truncate">{entry.name}</span>
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${statusColors[entryStatusColor]}`}>
+                                {entry.status}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${statusColors[statusColor]}`}>
+                        {mission.status}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-gray-50 text-gray-700 text-xs font-semibold hover:bg-gray-100 transition-colors"
+                      onClick={() => handleOpenViewModal(mission)}
+                    >
+                      <Eye size={14} /> Voir
+                    </button>
+                    <button
+                      type="button"
+                      className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition-colors"
+                      onClick={() => handleOpenEditModal(mission)}
+                    >
+                      <Edit size={14} /> Modifier
+                    </button>
+                    <button
+                      type="button"
+                      className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-red-50 text-red-600 text-xs font-semibold hover:bg-red-100 transition-colors"
+                      onClick={async () => {
+                        if (typeof onRequestDelete === 'function') {
+                          onRequestDelete(mission)
+                          return
+                        }
+                        if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette mission ?')) return
+                        try {
+                          const response = await apiFetch(`/missions/${mission.id}`, {
+                            method: 'DELETE',
+                            auth: true,
+                          })
+                          if (response.ok) {
+                            if (typeof onMissionsChanged === 'function') onMissionsChanged()
+                            else fetchMissions()
+                          }
+                        } catch (error) {
+                          console.error('Error deleting mission:', error)
+                        }
+                      }}
+                    >
+                      <Trash2 size={14} /> Suppr.
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="overflow-x-auto hidden lg:block">
         <table className="w-full min-w-[720px]">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -640,7 +777,7 @@ function MissionTableInner(props, ref) {
         </table>
       </div>
       {totalMissions > 0 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-6 py-3 border-t border-gray-200 bg-gray-50">
+        <div className="mx-4 mb-4 mt-4 sm:mx-6 sm:mb-5 lg:mx-0 lg:mb-0 lg:mt-0 bg-white rounded-2xl border border-slate-200 shadow-sm lg:rounded-none lg:border-0 lg:border-t lg:border-gray-200 lg:shadow-none lg:bg-gray-50 flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-6 py-3">
           <p className="text-xs sm:text-sm text-gray-600">
             Affichage de{' '}
             <span className="font-medium">

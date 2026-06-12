@@ -6,8 +6,8 @@ import { STATUS_META } from '../../constants/devisSuiviConstants'
 import { StatusBadge } from '../../components/devis/DevisSuiviBadges'
 import {
   Search, Plus, Eye, Edit2, Trash2, FileText,
-  Calendar, RefreshCw, Download, AlertTriangle,
-  ChevronLeft, ChevronRight, BadgeCheck, XCircle, BarChart3,
+  Calendar, RefreshCw, AlertTriangle,
+  ChevronLeft, ChevronRight, BadgeCheck, XCircle, BarChart3, X,
 } from 'lucide-react'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -69,15 +69,15 @@ const KPI_COLORS = {
 function KpiCard({ label, value, sub, color = 'slate', icon: Icon }) {
   const c = KPI_COLORS[color] || KPI_COLORS.slate
   return (
-    <div className={"group rounded-2xl border bg-white p-4 transition-all duration-200 hover:shadow-sm hover:-translate-y-0.5 " + c.card}>
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <div className={"flex h-9 w-9 items-center justify-center rounded-xl " + c.icon}>
-          {Icon && <Icon size={16} />}
+    <div className={"group min-w-0 rounded-2xl border bg-white p-3 sm:p-4 transition-all duration-200 hover:shadow-sm hover:-translate-y-0.5 overflow-hidden " + c.card}>
+      <div className="flex items-start justify-between gap-1.5 mb-2 sm:mb-3">
+        <div className={"flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl shrink-0 " + c.icon}>
+          {Icon && <Icon size={15} />}
         </div>
-        <div className={"text-[9px] font-black uppercase tracking-[0.3em] " + c.label}>{label}</div>
+        <div className={"text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] text-right leading-tight " + c.label}>{label}</div>
       </div>
-      <div className={"text-2xl font-black tabular-nums " + c.value}>{value}</div>
-      {sub && <p className="mt-1 text-[11px] font-medium text-slate-400 leading-4">{sub}</p>}
+      <div className={"text-xl sm:text-2xl font-black tabular-nums " + c.value}>{value}</div>
+      {sub && <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-[11px] font-medium text-slate-400 leading-4 truncate">{sub}</p>}
     </div>
   )
 }
@@ -91,6 +91,8 @@ const DevisList = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [sortOrder, setSortOrder] = useState('desc')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 0, validated: 0, cancelled: 0 })
   // Map of { [numeroDevis]: crmStatus } for the current page
   const [suiviStatuses, setSuiviStatuses] = useState({})
@@ -119,6 +121,11 @@ const DevisList = () => {
     }, 500)
     return () => clearTimeout(timer)
   }, [searchTerm])
+
+  // Tout changement de période ramène à la première page
+  useEffect(() => {
+    setPagination(prev => (prev.page === 1 ? prev : { ...prev, page: 1 }))
+  }, [dateFrom, dateTo])
 
   // After loading a page of devis, fetch their CRM statuses in one batch call
   const loadSuiviStatuses = useCallback(async (rows) => {
@@ -152,6 +159,8 @@ const DevisList = () => {
     try {
       const query = new URLSearchParams({ page: String(page), limit: String(pagination.limit) })
       if (debouncedSearch) query.append('search', debouncedSearch)
+      if (dateFrom) query.append('dateFrom', dateFrom)
+      if (dateTo) query.append('dateTo', dateTo)
       const response = await apiFetch(`/devis?${query.toString()}`, {
         auth: true,
         signal: controller.signal,
@@ -197,11 +206,11 @@ const DevisList = () => {
         setLoading(false)
       }
     }
-  }, [debouncedSearch, pagination.limit, loadSuiviStatuses])
+  }, [debouncedSearch, pagination.limit, loadSuiviStatuses, dateFrom, dateTo])
 
   useEffect(() => {
     fetchDevis(pagination.page)
-  }, [pagination.page, debouncedSearch, fetchDevis])
+  }, [pagination.page, debouncedSearch, dateFrom, dateTo, fetchDevis])
 
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= pagination.totalPages) {
@@ -218,11 +227,36 @@ const DevisList = () => {
     }))
   }
 
+  // Filtre rapide : devis du jour (début = fin = aujourd'hui)
+  const handleToday = () => {
+    const today = new Date().toLocaleDateString('en-CA') // yyyy-MM-dd local
+    setDateFrom(today)
+    setDateTo(today)
+  }
+
+  // Repli page courante (utilisé seulement si le backend ne renvoie aucun compteur).
+  // Même logique métier que le backend : CRM PURCHASED = validé, sinon ETATDOC ERP ;
+  // CRM REFUSED/EXPIRED = annulé, sinon IsAnnuler.
+  const isValidatedDoc = (i) => {
+    const crm = suiviStatuses[i?.NUMERO]
+    if (crm) return crm === 'PURCHASED'
+    return String(i?.ETATDOC) === '3' || String(i?.ETATDOC) === 'C'
+  }
+  const isCancelledDoc = (i) => {
+    const crm = suiviStatuses[i?.NUMERO]
+    if (crm) return crm === 'REFUSED' || crm === 'EXPIRED'
+    return Boolean(i?.IsAnnuler)
+  }
+  const pageValidated = devis.filter(isValidatedDoc).length
+  const pageCancelled = devis.filter(isCancelledDoc).length
+
   const stats = {
     total: pagination.total,
     shown: devis.length,
-    validated: pagination.validated ?? devis.filter(i => i.ETATDOC === 'C' || i.ETATDOC === 3).length,
-    cancelled: pagination.cancelled ?? devis.filter(i => i.IsAnnuler).length,
+    // Priorité au compteur backend (respecte search + période sur l'ensemble des résultats).
+    // Repli sur le décompte de la page seulement si le backend ne renvoie rien.
+    validated: pagination.validated > 0 ? pagination.validated : pageValidated,
+    cancelled: pagination.cancelled > 0 ? pagination.cancelled : pageCancelled,
   }
 
   const pageNumbers = (() => {
@@ -259,7 +293,7 @@ const DevisList = () => {
               </button>
             </div>
           </div>
-          <div className="grid gap-3 border-t border-slate-100 p-5 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 border-t border-slate-100 p-4 sm:p-5 lg:grid-cols-4">
             <KpiCard label="Total devis"  value={stats.total}     sub="Résultats disponibles"                              color="slate"   icon={BarChart3}  />
             <KpiCard label="Affichés"     value={stats.shown}     sub={`Page ${pagination.page} / ${pagination.totalPages || 1}`} color="slate" icon={FileText} />
             <KpiCard label="Validés"      value={stats.validated} sub="Devis confirmés"                                    color="emerald" icon={BadgeCheck} />
@@ -282,9 +316,35 @@ const DevisList = () => {
                 <Calendar size={15} className="text-slate-400" />
                 Date {sortOrder === 'asc' ? '↑' : '↓'}
               </button>
-              <button className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:-translate-y-0.5 hover:shadow-sm">
-                <Download size={15} className="text-slate-400" /> Export
+            </div>
+          </div>
+
+          {/* Période */}
+          <div className="mt-3 flex flex-col gap-3 border-t border-slate-100 pt-3 lg:flex-row lg:items-center lg:gap-3">
+            <span className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Période</span>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button onClick={handleToday}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-700 transition-all hover:-translate-y-0.5 hover:shadow-sm">
+                <Calendar size={15} className="text-blue-500" /> Aujourd'hui
               </button>
+              <div className="flex items-center gap-1.5">
+                <label className="text-[11px] font-bold text-slate-400">Début</label>
+                <input type="date" value={dateFrom} max={dateTo || undefined}
+                  onChange={e => setDateFrom(e.target.value)} title="Date de début"
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-900 outline-none transition-all focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10" />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <label className="text-[11px] font-bold text-slate-400">Fin</label>
+                <input type="date" value={dateTo} min={dateFrom || undefined}
+                  onChange={e => setDateTo(e.target.value)} title="Date de fin"
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-900 outline-none transition-all focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10" />
+              </div>
+              {(dateFrom || dateTo) && (
+                <button onClick={() => { setDateFrom(''); setDateTo('') }}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-500 transition-all hover:-translate-y-0.5 hover:text-rose-600 hover:shadow-sm">
+                  <X size={14} /> Réinitialiser
+                </button>
+              )}
             </div>
           </div>
         </section>
@@ -309,7 +369,97 @@ const DevisList = () => {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Mobile / tablet cards */}
+          <div className="lg:hidden bg-slate-50 px-4 py-4 sm:px-6 sm:py-5">
+            {loading ? (
+              <div className="space-y-4 sm:space-y-5">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 animate-pulse">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-slate-100" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 w-28 rounded-lg bg-slate-100" />
+                        <div className="h-3 w-20 rounded-lg bg-slate-100" />
+                      </div>
+                    </div>
+                    <div className="mt-3 h-3 w-40 rounded-lg bg-slate-100" />
+                  </div>
+                ))}
+              </div>
+            ) : devis.length > 0 ? (
+              <div className="space-y-4 sm:space-y-5">
+                {devis.map(item => (
+                  <div
+                    key={item.NUMERO}
+                    onClick={() => navigate(`/devis/${item.NUMERO}`)}
+                    className={"bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-4 sm:p-5 transition active:scale-[0.99] sm:hover:shadow-md cursor-pointer " + (item.IsAnnuler ? 'opacity-60' : '')}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={"flex h-10 w-10 shrink-0 items-center justify-center rounded-xl " + (item.IsAnnuler ? 'bg-rose-50 text-rose-500' : 'bg-blue-50 text-[#0052CC]')}>
+                          <FileText size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className={"text-sm font-black " + (item.IsAnnuler ? 'text-rose-800 line-through' : 'text-slate-950')}>{item.NUMERO}</div>
+                          <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">{item.TYPDOC || 'DE'}</div>
+                        </div>
+                      </div>
+                      <StatusCell item={item} suiviStatuses={suiviStatuses} />
+                    </div>
+
+                    <div className="mt-3 space-y-2">
+                      <div className="min-w-0">
+                        <div className={"truncate text-sm font-bold " + (item.IsAnnuler ? 'text-rose-800/70' : 'text-slate-900')}>{item.NOMTIE || 'Client inconnu'}</div>
+                        <div className="truncate text-[11px] font-medium text-slate-400">{item.DESTINA || item.CODTIE}</div>
+                      </div>
+                      <div className="flex items-center gap-2 text-slate-600">
+                        <Calendar size={13} className="text-slate-400 shrink-0" />
+                        <span className="text-xs font-medium tabular-nums">{formatDate(item.DATDOC)}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5 flex items-center justify-between">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Montant TTC</span>
+                      <span className={"text-base font-black tabular-nums " + (item.IsAnnuler ? 'text-rose-600' : 'text-[#0052CC]')}>
+                        {formatCurrency(item.TOTTTCDV)}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end gap-2" onClick={e => e.stopPropagation()}>
+                      <button onClick={e => { e.stopPropagation(); navigate(`/devis/${item.NUMERO}`) }}
+                        className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 hover:border-blue-200 hover:text-[#0052CC] transition-all">
+                        <Eye size={16} />
+                      </button>
+                      {!item.IsAnnuler && (
+                        <button onClick={e => e.stopPropagation()}
+                          className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 hover:border-amber-200 hover:text-amber-600 transition-all">
+                          <Edit2 size={16} />
+                        </button>
+                      )}
+                      <button onClick={e => e.stopPropagation()}
+                        className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 hover:border-red-200 hover:text-red-600 transition-all">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-6 py-16 text-center">
+                <div className="mx-auto flex max-w-xs flex-col items-center gap-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-300">
+                    <FileText size={28} />
+                  </div>
+                  <div>
+                    <p className="text-base font-black text-slate-900">Aucun devis trouvé</p>
+                    <p className="mt-1.5 text-sm text-slate-500">Aucun document ne correspond à votre recherche.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="overflow-x-auto hidden lg:block">
             <table className="w-full min-w-[1000px] border-collapse text-left">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/80">

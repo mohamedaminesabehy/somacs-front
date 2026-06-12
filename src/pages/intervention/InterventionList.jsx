@@ -64,25 +64,25 @@ function StatCard({ label, count, total, icon: Icon, active, onClick, colorClass
   return (
     <button
       onClick={onClick}
-      className={`w-full min-w-0 bg-white border-2 rounded-2xl p-5 text-left transition-all relative overflow-hidden group
+      className={`w-full min-w-0 bg-white border-2 rounded-2xl p-3 sm:p-5 text-left transition-all relative overflow-hidden group
         ${active ? 'border-[#0052CC] shadow-xl shadow-blue-100/50 translate-y-[-4px]' : 'border-slate-100 hover:border-slate-300 hover:shadow-lg hover:translate-y-[-2px]'}`}
     >
       <div className={`absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 rounded-full opacity-[0.05] transition-transform group-hover:scale-110 ${colorClass}`} />
-      <div className="flex items-center justify-between mb-4 relative z-10">
-        <div className={`p-2.5 rounded-xl shadow-sm ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-blue-600 transition-colors'}`}>
-          <Icon size={20} />
+      <div className="flex items-center justify-between mb-2 sm:mb-4 relative z-10">
+        <div className={`p-2 sm:p-2.5 rounded-xl shadow-sm ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-blue-600 transition-colors'}`}>
+          <Icon size={18} className="sm:w-5 sm:h-5" />
         </div>
-        <div className="flex flex-col items-end">
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</span>
-          <span className={`text-2xl font-black leading-none mt-1 transition-colors ${active ? 'text-blue-600' : 'text-slate-900'}`}>{count}</span>
+        <div className="flex flex-col items-end min-w-0">
+          <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider sm:tracking-widest text-slate-400 truncate">{label}</span>
+          <span className={`text-xl sm:text-2xl font-black leading-none mt-1 transition-colors ${active ? 'text-blue-600' : 'text-slate-900'}`}>{count}</span>
         </div>
       </div>
       <div className="relative z-10">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-bold text-slate-400 tracking-tight">{pct}% de l'activité</span>
-          <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${active ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-500'}`}>{count} / {total}</span>
+        <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+          <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 tracking-tight">{pct}%</span>
+          <span className={`text-[9px] sm:text-[10px] font-black px-1.5 sm:px-2 py-0.5 rounded-md ${active ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-500'}`}>{count}/{total}</span>
         </div>
-        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+        <div className="w-full h-1.5 sm:h-2 bg-slate-100 rounded-full overflow-hidden shadow-inner">
           <div className={`h-full rounded-full transition-all duration-1000 ease-out shadow-sm ${colorClass}`} style={{ width: `${pct}%` }} />
         </div>
       </div>
@@ -731,7 +731,7 @@ export default function InterventionList() {
       <main className="flex-1 max-w-[1600px] mx-auto w-full px-4 sm:px-6 py-6 sm:py-8 space-y-8">
         
         {/* KPI Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
           <StatCard
             label="Tout"
             count={total}
@@ -845,9 +845,117 @@ export default function InterventionList() {
 
         {/* List View */}
         {viewMode === 'list' && (
-          <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-lg shadow-slate-100/50 overflow-hidden">
-            <div className="overflow-x-auto no-scrollbar">
-              <table className="w-full min-w-[980px] text-left border-collapse">
+          <div className="-mx-4 px-4 py-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:p-0 bg-slate-50 lg:bg-white lg:rounded-2xl lg:border-2 lg:border-slate-200 lg:shadow-lg lg:shadow-slate-100/50 lg:overflow-hidden">
+            {/* Mobile / tablet cards */}
+            <div className="lg:hidden space-y-4 sm:space-y-5">
+              {paginatedData.map((item) => {
+                const normalizedType = normalizeTypeKey(item.type)
+                const st = statusConfig[item.status] || fallbackStatus
+                const ty = typeConfig[normalizedType] || fallbackType
+                const TyIcon = ty.icon || Wrench
+                const isHighlighted = String(item.id) === String(highlightId)
+                const isAssigned = Boolean(String(item.assignee || '').trim()) || Boolean(String(item.assignedTo || '').trim()) || Boolean(String(item.technicianName || '').trim()) || Boolean(item.hasLinkedMission)
+                return (
+                  <div
+                    key={item.id}
+                    ref={isHighlighted ? highlightRowRef : null}
+                    className={`bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-4 sm:p-5 transition active:scale-[0.99] sm:hover:shadow-md ${isHighlighted ? 'ring-2 ring-emerald-200 animate-pulse' : ''}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${ty.color}`}>
+                        <TyIcon size={18} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-black text-slate-900 truncate">{item.machine}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[10px] font-mono font-bold text-slate-400 uppercase truncate">{item.id}</span>
+                          <span className="w-1 h-1 bg-slate-200 rounded-full" />
+                          <span className="text-[9px] font-black uppercase text-[#004a77] truncate">{ty.label}</span>
+                        </div>
+                      </div>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black border-2 uppercase tracking-wider shrink-0 ${st.color}`}>
+                        <span className={`w-2 h-2 rounded-full ${st.dot}`} />
+                        {st.label}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 space-y-1.5">
+                      <div className="flex items-center gap-2 text-sm font-bold text-slate-700 min-w-0">
+                        <Building2 size={14} className="text-slate-300 shrink-0" />
+                        <span className="truncate">{item.client}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                        <Calendar size={14} className="text-blue-500 shrink-0" />
+                        <span className="truncate">{item.date}</span>
+                      </div>
+                      {item.assignee ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[10px] font-black shrink-0">
+                            {item.assignee.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <span className="text-xs font-bold text-slate-800 truncate">{item.assignee}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-amber-500">
+                          <AlertTriangle size={12} />
+                          <span className="text-[10px] font-black uppercase tracking-wider italic">Non affecté</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleNavigate('details', item) }}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white rounded-xl transition-all border border-[#004a77]/10 active:scale-95"
+                      >
+                        <Eye size={12} strokeWidth={3} /> Consulter
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleNavigate('edit', item) }}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white rounded-xl transition-all border border-[#004a77]/10 active:scale-95"
+                      >
+                        <Edit2 size={12} strokeWidth={3} /> Modifier
+                      </button>
+                      <button
+                        disabled={isAssigned}
+                        onClick={(e) => { e.stopPropagation(); if (!isAssigned) handleNavigate('assign', item) }}
+                        className={`flex items-center justify-center gap-1.5 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all border active:scale-95 ${
+                          isAssigned
+                            ? 'text-slate-300 bg-slate-100 border-slate-200 cursor-not-allowed pointer-events-none'
+                            : 'text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white border-[#004a77]/10'
+                        }`}
+                      >
+                        <UserCheck2 size={12} strokeWidth={3} /> Affecter
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleNavigate('delete', item) }}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-red-600 bg-red-50 hover:bg-red-600 hover:text-white rounded-xl transition-all border border-red-100 active:scale-95"
+                      >
+                        <Trash2 size={12} strokeWidth={3} /> Supprimer
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+              {paginatedData.length === 0 && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-6 py-16 text-center">
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-200 border-2 border-dashed border-slate-100">
+                      <Search size={32} />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-base font-black text-slate-400">Aucune intervention trouvée</p>
+                      <p className="text-sm text-slate-300 font-bold">Modifiez vos filtres ou effectuez une nouvelle recherche</p>
+                    </div>
+                    <button onClick={() => { setStartDate(''); setEndDate(''); setSearch(''); setTypeFilter('ALL'); setStatusFilter('ALL'); }} className="mt-1 px-6 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all">EFFACER LES FILTRES</button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden lg:block overflow-x-auto no-scrollbar">
+              <table className="w-full min-w-[860px] text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 border-b-2 border-slate-100">
                     <th className="px-6 py-5 text-[11px] font-black text-slate-500 uppercase tracking-widest border-r border-slate-100 last:border-0">ID / Machine</th>
@@ -855,7 +963,7 @@ export default function InterventionList() {
                     <th className="px-6 py-5 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center border-r border-slate-100 last:border-0">Statut</th>
                     <th className="px-6 py-5 text-[11px] font-black text-slate-500 uppercase tracking-widest border-r border-slate-100 last:border-0">Date d'intervention</th>
                     <th className="px-6 py-5 text-[11px] font-black text-slate-500 uppercase tracking-widest border-r border-slate-100 last:border-0">Technicien</th>
-                    <th className="px-6 py-5 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center">Actions</th>
+                    <th className="px-4 py-5 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center w-[200px]">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -923,18 +1031,18 @@ export default function InterventionList() {
                             </div>
                           )}
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-center gap-2">
+                        <td className="px-4 py-4 w-[200px]">
+                          <div className="grid grid-cols-2 gap-1.5 w-[184px] mx-auto">
                             <button 
                               onClick={(e) => { e.stopPropagation(); handleNavigate('details', item) }}
-                              className="flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white rounded-xl transition-all shadow-sm border border-[#004a77]/10 active:scale-95"
+                              className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white rounded-xl transition-all shadow-sm border border-[#004a77]/10 active:scale-95"
                             >
                               <Eye size={12} strokeWidth={3} />
                               Consulter
                             </button>
                             <button 
                               onClick={(e) => { e.stopPropagation(); handleNavigate('edit', item) }}
-                              className="flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white rounded-xl transition-all shadow-sm border border-[#004a77]/10 active:scale-95"
+                              className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white rounded-xl transition-all shadow-sm border border-[#004a77]/10 active:scale-95"
                             >
                               <Edit2 size={12} strokeWidth={3} />
                               Modifier
@@ -942,7 +1050,7 @@ export default function InterventionList() {
                             <button 
                               disabled={Boolean(item.assignee) || item.status === 'ASSIGNED'}
                               onClick={(e) => { e.stopPropagation(); handleNavigate('assign', item) }}
-                              className={`flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-sm border active:scale-95 ${
+                              className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-sm border active:scale-95 ${
                                 Boolean(String(item.assignee || '').trim()) || Boolean(String(item.assignedTo || '').trim()) || Boolean(String(item.technicianName || '').trim()) || Boolean(item.hasLinkedMission)
                                   ? 'text-slate-300 bg-slate-100 border-slate-200 cursor-not-allowed pointer-events-none'
                                   : 'text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white border-[#004a77]/10'
@@ -953,7 +1061,7 @@ export default function InterventionList() {
                             </button>
                             <button 
                               onClick={(e) => { e.stopPropagation(); handleNavigate('delete', item) }}
-                              className="flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-red-600 bg-red-50 hover:bg-red-600 hover:text-white rounded-xl transition-all shadow-sm border border-red-100 active:scale-95"
+                              className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-red-600 bg-red-50 hover:bg-red-600 hover:text-white rounded-xl transition-all shadow-sm border border-red-100 active:scale-95"
                             >
                               <Trash2 size={12} strokeWidth={3} />
                               Supprimer
@@ -985,7 +1093,7 @@ export default function InterventionList() {
             
             {/* Pagination Controls */}
             {totalPages > 1 && (
-              <div className="px-4 sm:px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="mt-4 lg:mt-0 bg-white rounded-2xl border border-slate-200 shadow-sm lg:rounded-none lg:border-0 lg:border-t lg:border-slate-100 lg:shadow-none lg:bg-slate-50/50 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Page {currentPage} sur {totalPages}</span>
                   <div className="h-4 w-px bg-slate-200 mx-2" />
