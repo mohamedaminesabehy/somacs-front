@@ -1,6 +1,8 @@
 import { forwardRef, useImperativeHandle, useState, useEffect, useCallback, useRef } from 'react'
 import { AlertCircle, Package, ClipboardList, Users, Eye, Edit, Trash2, MapPin, Building2, Phone, Calendar, Wrench, Paperclip, FileText, Clock, UserCheck, Hourglass, Link2, Settings, Download, Truck } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
+import { getAvatarFromName } from '../../utils/format'
+import { getStatusColorKey } from '../../utils/status'
 import technicien from '../../assets/technicien.avif'
 
 const priorityColors = {
@@ -23,21 +25,6 @@ const statusColors = {
 const interventionStatusColors = {
   PENDING: 'bg-amber-100 text-amber-700',
   ASSIGNED: 'bg-blue-100 text-blue-700',
-}
-
-function getAvatarFromName(name) {
-  if (!name) return ''
-  const parts = name.split(' ').filter(Boolean)
-  if (parts.length === 0) return ''
-  if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
-  return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase()
-}
-
-function getStatusColorKey(status) {
-  if (status === 'En cours') return 'yellow'
-  if (status === 'Terminée') return 'green'
-  if (status === 'Bloquée') return 'red'
-  return 'blue'
 }
 
 function getGroupedEmployeeNames(mission) {

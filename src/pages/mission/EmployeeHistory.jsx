@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { AlertCircle, Building2, Calendar, CheckCircle2, Edit3, Eye, FileText, Hash, History, Printer, Search, User, Wrench, X } from 'lucide-react'
+import { AlertCircle, Building2, Calendar, CheckCircle2, Edit3, Eye, FileText, Hash, History, Search, User, Wrench, X } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 import logo from '../../assets/logo.jpg'
 
@@ -472,7 +472,6 @@ export default function EmployeeHistory() {
 
   const [showDetails, setShowDetails] = useState(false)
   const [selected, setSelected] = useState(null)
-  const printRef = useRef(null)
   const [highlightId, setHighlightId] = useState('')
   const highlightTimerRef = useRef(null)
   const highlightRowRef = useRef(null)
@@ -634,19 +633,6 @@ export default function EmployeeHistory() {
     }
   }, [showDetails])
 
-  const handlePrint = () => {
-    if (!printRef.current) return
-    const html = printRef.current.innerHTML
-    const win = window.open('', '_blank', 'width=900,height=700')
-    if (!win) return
-    win.document.write(`<!doctype html><html><head><title>Fiche SAV</title><meta charset="utf-8" />`)
-    win.document.write(`<style>body{font-family:Arial,Helvetica,sans-serif;background:#fff;margin:0;padding:24px}*{box-sizing:border-box}</style>`)
-    win.document.write(`</head><body>${html}</body></html>`)
-    win.document.close()
-    win.focus()
-    win.print()
-  }
-
   const hasActiveFilters = Boolean(searchTerm || fromDate || toDate)
   const resetFilters = () => { setSearchTerm(''); setFromDate(''); setToDate('') }
 
@@ -715,7 +701,7 @@ export default function EmployeeHistory() {
         </div>
 
         {/* ── Filtres ── */}
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row gap-3">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row gap-4">
           <div className="relative flex-1 min-w-0 group">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" />
             <input
@@ -723,43 +709,52 @@ export default function EmployeeHistory() {
               placeholder="Rechercher (réf, fiche, client, machine, site)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] hover:border-slate-300 transition-all placeholder:text-slate-400"
+              className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] hover:border-slate-300 transition-all placeholder:text-slate-400"
             />
           </div>
 
-          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3">
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 flex-1 sm:flex-none justify-center hover:border-slate-300 transition-colors">
-              <Calendar size={16} className="text-slate-400 shrink-0" />
+          {/* Filtres date : empilés sur mobile, 2 colonnes sur tablette */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:flex xl:items-end gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="filter-from-date" className="text-[11px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar size={13} className="text-slate-400" /> Date de début
+              </label>
               <input
+                id="filter-from-date"
                 type="date"
                 value={fromDate}
                 onChange={(e) => setFromDate(e.target.value)}
                 aria-label="Date de début"
-                className="bg-transparent border-none text-sm text-slate-700 font-medium focus:outline-none w-[110px] sm:w-[120px]"
+                className="w-full sm:w-auto xl:w-[160px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-base sm:text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] hover:border-slate-300 transition-all"
               />
-              <span className="text-slate-300 font-bold">→</span>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="filter-to-date" className="text-[11px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar size={13} className="text-slate-400" /> Date de fin
+              </label>
               <input
+                id="filter-to-date"
                 type="date"
                 value={toDate}
                 onChange={(e) => setToDate(e.target.value)}
                 aria-label="Date de fin"
-                className="bg-transparent border-none text-sm text-slate-700 font-medium focus:outline-none w-[110px] sm:w-[120px]"
+                className="w-full sm:w-auto xl:w-[160px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-base sm:text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] hover:border-slate-300 transition-all"
               />
             </div>
             {hasActiveFilters && (
               <button
                 type="button"
                 onClick={resetFilters}
-                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-600 text-xs font-black hover:bg-red-100 transition-colors active:scale-95"
+                className="sm:col-span-2 xl:col-span-1 inline-flex items-center justify-center gap-1.5 px-3.5 py-3 rounded-xl border border-red-200 bg-red-50 text-red-600 text-sm font-black hover:bg-red-100 transition-colors active:scale-95"
               >
-                <X size={14} /> Réinitialiser
+                <X size={16} /> Réinitialiser
               </button>
             )}
           </div>
         </div>
 
         {/* ── Vue mobile : cartes ── */}
-        <div className="space-y-3 lg:hidden">
+        <div className="space-y-4 sm:space-y-5 lg:hidden">
           {isLoading ? (
             <>{renderSkeletonCard('s1')}{renderSkeletonCard('s2')}{renderSkeletonCard('s3')}</>
           ) : filtered.length === 0 ? (
@@ -973,13 +968,6 @@ export default function EmployeeHistory() {
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
-                    onClick={handlePrint}
-                    className="inline-flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black transition-colors"
-                  >
-                    <Printer size={14} /> Imprimer
-                  </button>
-                  <button
-                    type="button"
                     onClick={handleCloseDetails}
                     className="w-10 h-10 flex items-center justify-center bg-slate-100 text-slate-400 rounded-full hover:bg-slate-200 transition-colors"
                   >
@@ -987,7 +975,7 @@ export default function EmployeeHistory() {
                   </button>
                 </div>
               </div>
-              <div ref={printRef} className="flex-1 overflow-hidden flex">
+              <div className="flex-1 overflow-hidden flex">
                 <InterventionPreview intervention={selected} />
               </div>
               <div className="p-4 bg-slate-50 border-t border-slate-100 shrink-0">

@@ -173,3 +173,28 @@ body {
   opacity: 0.6;
   animation: preloader-neon-wave 8s ease-in-out infinite;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Anti-zoom mobile (iOS Safari + Android Chrome)
+   Sur mobile/tablette, iOS zoome automatiquement sur un champ dont la
+   font-size est < 16px. On force donc 16px minimum sur tous les champs
+   interactifs en dessous de 768px, sans désactiver le zoom utilisateur
+   (pas de user-scalable=no). Le design desktop (>=768px) reste intact.
+   ───────────────────────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+
+  input,
+  select,
+  textarea,
+  input[type='text'],
+  input[type='search'],
+  input[type='email'],
+  input[type='password'],
+  input[type='number'],
+  input[type='tel'],
+  input[type='date'],
+  input[type='time'],
+  input[type='datetime-local'] {
+    font-size: 16px !important;
+  }
+}

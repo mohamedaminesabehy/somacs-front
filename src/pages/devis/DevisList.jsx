@@ -4,6 +4,8 @@ import { apiFetch } from '../../api/apiClient'
 import { fetchDevisSuiviStatuses } from '../../api/devisSuiviApi'
 import { STATUS_META } from '../../constants/devisSuiviConstants'
 import { StatusBadge } from '../../components/devis/DevisSuiviBadges'
+import { formatCurrency } from '../../utils/format'
+import { formatDateTime as formatDate, todayInputDate } from '../../utils/date'
 import {
   Search, Plus, Eye, Edit2, Trash2, FileText,
   Calendar, RefreshCw, AlertTriangle,
@@ -11,18 +13,6 @@ import {
 } from 'lucide-react'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatDate(dateString) {
-  if (!dateString) return '-'
-  return new Date(dateString).toLocaleDateString('fr-FR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
-}
-
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'TND' }).format(amount || 0)
-}
 
 // ─── ERP doc state badge (Annulé / Validé / Sans statut) ─────────────────────
 // Distinct from the CRM suivi status — shown only when no CRM status exists.
@@ -229,7 +219,7 @@ const DevisList = () => {
 
   // Filtre rapide : devis du jour (début = fin = aujourd'hui)
   const handleToday = () => {
-    const today = new Date().toLocaleDateString('en-CA') // yyyy-MM-dd local
+    const today = todayInputDate() // yyyy-MM-dd local
     setDateFrom(today)
     setDateTo(today)
   }
