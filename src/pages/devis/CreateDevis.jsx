@@ -14,9 +14,11 @@ import {
   Package,
   CheckCircle2,
   RefreshCw,
-  Truck
+  Truck,
+  Phone
 } from 'lucide-react'
 import ArticleSelectionModal from '../../components/devis/ArticleSelectionModal'
+import ArticleRecommendations from '../../components/devis/ArticleRecommendations'
 
 // --- Helpers ---
 const formatCurrency = (amount) =>
@@ -121,6 +123,11 @@ const CreateDevis = () => {
     TELCLI: '',
     CODTVA: '',
     OBSERVATION: '',
+    Region: '',
+    CODREP: '',
+    NomRep: '',
+    CODPAI: '',
+    LIBPAI: '',
   })
 
   const [details, setDetails] = useState([createEmptyLine()])
@@ -399,6 +406,101 @@ const CreateDevis = () => {
                 </div>
               </section>
 
+              {/* Commercial / Additional Information Section */}
+              <section className="overflow-hidden rounded-[28px] border border-white/70 bg-white/92 shadow-[0_18px_60px_rgba(15,23,42,0.06)] backdrop-blur">
+                <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-6 py-5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                      <Building2 size={20} />
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-black uppercase tracking-[0.3em] text-slate-900">Informations complémentaires</h2>
+                      <p className="mt-1 text-xs font-medium text-slate-500">Commercial, paiement et localisation</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid gap-4 p-6 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                      <User size={12} className="text-emerald-600" /> Commercial
+                    </label>
+                    <input
+                      type="text"
+                      name="NomRep"
+                      value={header.NomRep}
+                      onChange={handleHeaderChange}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                      placeholder="Nom du commercial..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                      Code représentant
+                    </label>
+                    <input
+                      type="text"
+                      name="CODREP"
+                      value={header.CODREP}
+                      onChange={handleHeaderChange}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                      placeholder="Code rep..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                      <Phone size={12} className="text-emerald-600" /> Téléphone client
+                    </label>
+                    <input
+                      type="text"
+                      name="TELCLI"
+                      value={header.TELCLI}
+                      onChange={handleHeaderChange}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                      placeholder="Numéro de téléphone..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                      Région
+                    </label>
+                    <input
+                      type="text"
+                      name="Region"
+                      value={header.Region}
+                      onChange={handleHeaderChange}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                      placeholder="Région..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                      Mode de paiement
+                    </label>
+                    <input
+                      type="text"
+                      name="LIBPAI"
+                      value={header.LIBPAI}
+                      onChange={handleHeaderChange}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                      placeholder="Ex: Virement, Chèque..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                      Observation
+                    </label>
+                    <input
+                      type="text"
+                      name="OBSERVATION"
+                      value={header.OBSERVATION}
+                      onChange={handleHeaderChange}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                      placeholder="Notes..."
+                    />
+                  </div>
+                </div>
+              </section>
+
               <section className="overflow-hidden rounded-[28px] border border-white/70 bg-white/92 shadow-[0_18px_60px_rgba(15,23,42,0.06)] backdrop-blur">
                 <div className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
@@ -514,6 +616,12 @@ const CreateDevis = () => {
                   </table>
                 </div>
               </section>
+
+              {/* ML Article Recommendations */}
+              <ArticleRecommendations
+                currentArticles={details}
+                onAddArticle={selectArticle}
+              />
             </div>
 
             <aside className="space-y-6 xl:col-span-4 xl:sticky xl:top-6 xl:self-start">

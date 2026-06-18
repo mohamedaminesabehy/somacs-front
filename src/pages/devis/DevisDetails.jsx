@@ -562,6 +562,7 @@ export default function DevisDetails() {
                   <User size={16} className="text-blue-500" />
                   {header.NOMTIE}
                 </div>
+                {header.CODTIE && <div className="text-xs text-slate-500">Code: {header.CODTIE}</div>}
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Numéro Devis</label>
@@ -584,6 +585,41 @@ export default function DevisDetails() {
                   {formatDate(header.DATLIV)}
                 </div>
               </div>
+              {(header.NomRep || header.CODREP) && (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Commercial</label>
+                  <div className="font-bold text-slate-900">{header.NomRep || header.CODREP}</div>
+                </div>
+              )}
+              {header.TEL && (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Téléphone</label>
+                  <div className="font-bold text-slate-900 flex items-center gap-2">
+                    <Phone size={16} className="text-blue-500" />
+                    {header.TEL}
+                  </div>
+                </div>
+              )}
+              {(header.ADRCLI || header.VILLE) && (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Adresse</label>
+                  <div className="text-sm text-slate-700">
+                    {[header.ADRCLI, header.CODPOS, header.VILLE, header.Region].filter(Boolean).join(', ')}
+                  </div>
+                </div>
+              )}
+              {header.LIBPAI && (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mode de paiement</label>
+                  <div className="text-sm font-bold text-slate-700">{header.LIBPAI}</div>
+                </div>
+              )}
+              {header.OBSERVATION && (
+                <div className="space-y-1 md:col-span-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Observation</label>
+                  <div className="text-sm text-slate-600">{header.OBSERVATION}</div>
+                </div>
+              )}
             </div>
           </div>
 
