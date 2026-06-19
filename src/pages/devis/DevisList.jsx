@@ -7,7 +7,7 @@ import { StatusBadge } from '../../components/devis/DevisSuiviBadges'
 import { formatCurrency } from '../../utils/format'
 import { formatDateTime as formatDate, todayInputDate } from '../../utils/date'
 import {
-  Search, Plus, Eye, Edit2, Trash2, FileText,
+  Search, Plus, Eye, Trash2, FileText,
   Calendar, RefreshCw, AlertTriangle,
   ChevronLeft, ChevronRight, BadgeCheck, XCircle, BarChart3, X,
 } from 'lucide-react'
@@ -87,6 +87,11 @@ const DevisList = () => {
   // Map of { [numeroDevis]: crmStatus } for the current page
   const [suiviStatuses, setSuiviStatuses] = useState({})
   const navigate = useNavigate()
+
+  // Delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState(null) // NUMERO du devis à supprimer
+  const [deleting, setDeleting] = useState(false)
+  const [deleteSuccess, setDeleteSuccess] = useState(null)
 
   // Refs pour gérer les requêtes concurrentes / annulations propres
   const fetchAbortRef = useRef(null)
@@ -205,6 +210,28 @@ const DevisList = () => {
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= pagination.totalPages) {
       setPagination(prev => ({ ...prev, page: newPage }))
+    }
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget || deleting) return
+    setDeleting(true)
+    try {
+      const response = await apiFetch(`/devis/${encodeURIComponent(deleteTarget)}`, { method: 'DELETE', auth: true })
+      if (response.ok) {
+        setDevis(prev => prev.filter(d => d.NUMERO !== deleteTarget))
+        setPagination(prev => ({ ...prev, total: Math.max(0, prev.total - 1) }))
+        setDeleteSuccess(`Le devis ${deleteTarget} a été supprimé avec succès.`)
+        setTimeout(() => setDeleteSuccess(null), 4000)
+      } else {
+        const data = await response.json().catch(() => ({}))
+        setError(data.message || 'Erreur lors de la suppression du devis.')
+      }
+    } catch {
+      setError('Impossible de supprimer le devis. Vérifiez votre connexion.')
+    } finally {
+      setDeleting(false)
+      setDeleteTarget(null)
     }
   }
 
@@ -420,13 +447,7 @@ const DevisList = () => {
                         className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 hover:border-blue-200 hover:text-[#0052CC] transition-all">
                         <Eye size={16} />
                       </button>
-                      {!item.IsAnnuler && (
-                        <button onClick={e => e.stopPropagation()}
-                          className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 hover:border-amber-200 hover:text-amber-600 transition-all">
-                          <Edit2 size={16} />
-                        </button>
-                      )}
-                      <button onClick={e => e.stopPropagation()}
+                      <button onClick={e => { e.stopPropagation(); setDeleteTarget(item.NUMERO) }}
                         className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 hover:border-red-200 hover:text-red-600 transition-all">
                         <Trash2 size={16} />
                       </button>
@@ -536,13 +557,7 @@ const DevisList = () => {
                             className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition-all hover:border-blue-200 hover:text-[#0052CC] hover:shadow-sm">
                             <Eye size={15} />
                           </button>
-                          {!item.IsAnnuler && (
-                            <button onClick={e => e.stopPropagation()}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition-all hover:border-amber-200 hover:text-amber-600 hover:shadow-sm">
-                              <Edit2 size={15} />
-                            </button>
-                          )}
-                          <button onClick={e => e.stopPropagation()}
+                          <button onClick={e => { e.stopPropagation(); setDeleteTarget(item.NUMERO) }}
                             className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition-all hover:border-red-200 hover:text-red-600 hover:shadow-sm">
                             <Trash2 size={15} />
                           </button>
@@ -597,6 +612,48 @@ const DevisList = () => {
         </section>
 
       </div>
+
+      {/* Popup confirmation suppression */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => !deleting && setDeleteTarget(null)} />
+          <div className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-500">
+                <AlertTriangle size={28} />
+              </div>
+              <h3 className="mt-4 text-lg font-black text-slate-900">Supprimer ce devis ?</h3>
+              <p className="mt-2 text-sm text-slate-500">
+                Êtes-vous sûr de vouloir supprimer le devis <span className="font-bold text-slate-800">{deleteTarget}</span> ?<br />
+                Cette action est irréversible.
+              </p>
+              <div className="mt-6 flex w-full gap-3">
+                <button
+                  onClick={() => setDeleteTarget(null)}
+                  disabled={deleting}
+                  className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleDeleteConfirm}
+                  disabled={deleting}
+                  className="flex-1 rounded-2xl bg-red-600 px-4 py-3 text-sm font-bold text-white transition-all hover:bg-red-700 disabled:opacity-50"
+                >
+                  {deleting ? 'Suppression...' : 'Supprimer'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast succès suppression */}
+      {deleteSuccess && (
+        <div className="fixed bottom-6 left-1/2 z-[210] -translate-x-1/2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 shadow-lg">
+          <p className="text-sm font-bold text-emerald-700">{deleteSuccess}</p>
+        </div>
+      )}
     </div>
   )
 }

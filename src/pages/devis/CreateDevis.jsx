@@ -36,6 +36,17 @@ const toNumber = (value, fallback = 0) => {
 
 const normalizeRate = (value) => Math.max(0, toNumber(value, 0))
 
+// Récupère l'utilisateur connecté (commercial) depuis le localStorage
+const getAuthUser = () => {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem('auth_user')
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
 // Extrait le taux numérique depuis le CodeTVA si TVA n'est pas renseigné
 // Ex: "19  " → 19, "TVA7" → 7, "7" → 7
 const extractTauxFromCode = (codeTva) => {
@@ -112,6 +123,10 @@ const CreateDevis = () => {
   const [success, setSuccess] = useState(false)
   const [createdNumero, setCreatedNumero] = useState(null)
 
+  // Commercial = utilisateur connecté (lecture seule)
+  const authUser = getAuthUser()
+  const commercialName = authUser?.name || authUser?.username || ''
+
   const [header, setHeader] = useState({
     DATDOC: new Date().toISOString().split('T')[0],
     DATLIV: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -125,7 +140,7 @@ const CreateDevis = () => {
     OBSERVATION: '',
     Region: '',
     CODREP: '',
-    NomRep: '',
+    NomRep: commercialName,
     CODPAI: '',
     LIBPAI: '',
   })
@@ -211,6 +226,10 @@ const CreateDevis = () => {
       setError('Le nom du client est obligatoire.')
       return
     }
+    if (!header.TELCLI || header.TELCLI.length !== 8) {
+      setError('Le téléphone du client est obligatoire (8 chiffres).')
+      return
+    }
     if (validLines.length === 0) {
       setError('Ajoutez au moins un article avec une quantité.')
       return
@@ -247,8 +266,7 @@ const CreateDevis = () => {
         const result = await response.json()
         setCreatedNumero(result.NUMERO)
         setSuccess(true)
-        // Redirection vers les détails du devis créé
-        setTimeout(() => navigate(`/devis/${result.NUMERO}`), 2000)
+        navigate(`/devis/${result.NUMERO}`)
       } else {
         const data = await response.json().catch(() => ({}))
         setError(data.message || 'Erreur lors de la création du devis.')
@@ -354,149 +372,136 @@ const CreateDevis = () => {
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
             <div className="space-y-6 xl:col-span-8">
               <section className="overflow-hidden rounded-[28px] border border-white/70 bg-white/92 shadow-[0_18px_60px_rgba(15,23,42,0.06)] backdrop-blur">
-                <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-6 py-5">
+                <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6 sm:py-5">
                   <div className="flex items-center gap-3">
                     <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 text-[#0052CC]">
                       <Building2 size={20} />
                     </div>
                     <div>
-                      <h2 className="text-sm font-black uppercase tracking-[0.3em] text-slate-900">Informations client</h2>
-                      <p className="mt-1 text-xs font-medium text-slate-500">Les données principales du devis et les dates clés</p>
+                      <h2 className="text-sm font-black uppercase tracking-[0.25em] text-slate-900 sm:tracking-[0.3em]">Informations client</h2>
+                      <p className="mt-1 text-xs font-medium text-slate-500">Identité du client, contact et dates clés</p>
                     </div>
                   </div>
                 </div>
-                <div className="grid gap-4 p-6 md:grid-cols-3">
-                  <div className="space-y-2 md:col-span-2">
-                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
-                      <User size={12} className="text-[#0052CC]" /> Client (Nom)
-                    </label>
-                    <input
-                      type="text"
-                      name="NOMTIE"
-                      value={header.NOMTIE}
-                      onChange={handleHeaderChange}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
-                      placeholder="Nom du client..."
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
-                      <Calendar size={12} className="text-[#0052CC]" /> Date document
-                    </label>
-                    <input
-                      type="date"
-                      name="DATDOC"
-                      value={header.DATDOC}
-                      onChange={handleHeaderChange}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
-                      <Truck size={12} className="text-[#0052CC]" /> Livraison prévue
-                    </label>
-                    <input
-                      type="date"
-                      name="DATLIV"
-                      value={header.DATLIV}
-                      onChange={handleHeaderChange}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
-                    />
-                  </div>
-                </div>
-              </section>
 
-              {/* Commercial / Additional Information Section */}
-              <section className="overflow-hidden rounded-[28px] border border-white/70 bg-white/92 shadow-[0_18px_60px_rgba(15,23,42,0.06)] backdrop-blur">
-                <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-6 py-5">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
-                      <Building2 size={20} />
+                <div className="space-y-6 p-5 sm:p-6">
+                  {/* Bloc 1 : identité client */}
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="space-y-2 sm:col-span-2 lg:col-span-3">
+                      <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                        <User size={12} className="text-[#0052CC]" /> Client (Nom) <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="NOMTIE"
+                        value={header.NOMTIE}
+                        onChange={handleHeaderChange}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                        placeholder="Nom du client..."
+                      />
                     </div>
-                    <div>
-                      <h2 className="text-sm font-black uppercase tracking-[0.3em] text-slate-900">Informations complémentaires</h2>
-                      <p className="mt-1 text-xs font-medium text-slate-500">Commercial, paiement et localisation</p>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                        <Phone size={12} className="text-[#0052CC]" /> Téléphone client
+                      </label>
+                      <div className="flex items-stretch overflow-hidden rounded-2xl border border-slate-200 transition-all focus-within:border-blue-300 focus-within:ring-4 focus-within:ring-blue-500/10">
+                        <span className="flex shrink-0 items-center bg-slate-100 px-3 text-sm font-bold text-slate-600 select-none">+216</span>
+                        <input
+                          type="tel"
+                          inputMode="numeric"
+                          maxLength={8}
+                          value={header.TELCLI}
+                          onChange={(e) => {
+                            const digits = e.target.value.replace(/\D/g, '').slice(0, 8)
+                            setHeader((prev) => ({ ...prev, TELCLI: digits }))
+                          }}
+                          className="w-full bg-slate-50/80 px-3 py-3 text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400"
+                          placeholder="12 345 678"
+                        />
+                      </div>
+                      {header.TELCLI && header.TELCLI.length > 0 && header.TELCLI.length < 8 && (
+                        <p className="text-[10px] font-bold text-amber-500">Le numéro doit contenir 8 chiffres ({header.TELCLI.length}/8)</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                        <Building2 size={12} className="text-[#0052CC]" /> Région
+                      </label>
+                      <select
+                        name="Region"
+                        value={header.Region}
+                        onChange={handleHeaderChange}
+                        className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                      >
+                        <option value="">— Sélectionner —</option>
+                        <option value="Ariana">Ariana</option>
+                        <option value="Béja">Béja</option>
+                        <option value="Ben Arous">Ben Arous</option>
+                        <option value="Bizerte">Bizerte</option>
+                        <option value="Gabès">Gabès</option>
+                        <option value="Gafsa">Gafsa</option>
+                        <option value="Jendouba">Jendouba</option>
+                        <option value="Kairouan">Kairouan</option>
+                        <option value="Kasserine">Kasserine</option>
+                        <option value="Kébili">Kébili</option>
+                        <option value="Le Kef">Le Kef</option>
+                        <option value="Mahdia">Mahdia</option>
+                        <option value="La Manouba">La Manouba</option>
+                        <option value="Médenine">Médenine</option>
+                        <option value="Monastir">Monastir</option>
+                        <option value="Nabeul">Nabeul</option>
+                        <option value="Sfax">Sfax</option>
+                        <option value="Sidi Bouzid">Sidi Bouzid</option>
+                        <option value="Siliana">Siliana</option>
+                        <option value="Sousse">Sousse</option>
+                        <option value="Tataouine">Tataouine</option>
+                        <option value="Tozeur">Tozeur</option>
+                        <option value="Tunis">Tunis</option>
+                        <option value="Zaghouan">Zaghouan</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                        <User size={12} className="text-emerald-600" /> Commercial
+                      </label>
+                      <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-100/80 px-4 py-3">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-black text-emerald-700">
+                          {(commercialName || '—').trim().charAt(0).toUpperCase() || '—'}
+                        </span>
+                        <span className="truncate text-sm font-bold text-slate-700">
+                          {commercialName || 'Non identifié'}
+                        </span>
+                        <span className="ml-auto rounded-full bg-slate-200 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-500">Auto</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="grid gap-4 p-6 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
-                      <User size={12} className="text-emerald-600" /> Commercial
-                    </label>
-                    <input
-                      type="text"
-                      name="NomRep"
-                      value={header.NomRep}
-                      onChange={handleHeaderChange}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                      placeholder="Nom du commercial..."
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
-                      Code représentant
-                    </label>
-                    <input
-                      type="text"
-                      name="CODREP"
-                      value={header.CODREP}
-                      onChange={handleHeaderChange}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                      placeholder="Code rep..."
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
-                      <Phone size={12} className="text-emerald-600" /> Téléphone client
-                    </label>
-                    <input
-                      type="text"
-                      name="TELCLI"
-                      value={header.TELCLI}
-                      onChange={handleHeaderChange}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                      placeholder="Numéro de téléphone..."
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
-                      Région
-                    </label>
-                    <input
-                      type="text"
-                      name="Region"
-                      value={header.Region}
-                      onChange={handleHeaderChange}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                      placeholder="Région..."
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
-                      Mode de paiement
-                    </label>
-                    <input
-                      type="text"
-                      name="LIBPAI"
-                      value={header.LIBPAI}
-                      onChange={handleHeaderChange}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                      placeholder="Ex: Virement, Chèque..."
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
-                      Observation
-                    </label>
-                    <input
-                      type="text"
-                      name="OBSERVATION"
-                      value={header.OBSERVATION}
-                      onChange={handleHeaderChange}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                      placeholder="Notes..."
-                    />
+
+                  {/* Bloc 2 : dates */}
+                  <div className="grid gap-4 border-t border-slate-100 pt-5 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                        <Calendar size={12} className="text-[#0052CC]" /> Date document
+                      </label>
+                      <input
+                        type="date"
+                        name="DATDOC"
+                        value={header.DATDOC}
+                        onChange={handleHeaderChange}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                        <Truck size={12} className="text-[#0052CC]" /> Livraison prévue
+                      </label>
+                      <input
+                        type="date"
+                        name="DATLIV"
+                        value={header.DATLIV}
+                        onChange={handleHeaderChange}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition-all focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                      />
+                    </div>
                   </div>
                 </div>
               </section>
@@ -520,8 +525,9 @@ const CreateDevis = () => {
                   </button>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[1050px] border-collapse text-left">
+                {/* Vue desktop : tableau (xl et plus) */}
+                <div className="hidden overflow-x-auto xl:block">
+                  <table className="w-full border-collapse text-left">
                     <thead className="bg-slate-50/70">
                       <tr className="border-b border-slate-100">
                         <th className="w-[18%] px-4 py-4 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Article</th>
@@ -551,12 +557,14 @@ const CreateDevis = () => {
                             </div>
                           </td>
                           <td className="px-4 py-4 align-top">
-                            <input
-                              type="text"
+                            <textarea
                               value={item.Designation}
                               onChange={(e) => handleLineChange(idx, 'Designation', e.target.value)}
-                              className="w-full rounded-2xl border border-transparent bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                              rows={1}
+                              className="w-full resize-none rounded-2xl border border-transparent bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
                               placeholder="Désignation..."
+                              style={{ overflow: 'hidden' }}
+                              onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px' }}
                             />
                           </td>
                           <td className="px-4 py-4 text-center align-top">
@@ -569,13 +577,9 @@ const CreateDevis = () => {
                             />
                           </td>
                           <td className="px-4 py-4 text-right align-top">
-                            <input
-                              type="number"
-                              min="0"
-                              value={item.PU_HT}
-                              onChange={(e) => handleLineChange(idx, 'PU_HT', e.target.value)}
-                              className="w-28 rounded-2xl border border-transparent bg-slate-50/80 px-3 py-3 text-right text-sm font-bold text-slate-900 outline-none transition-all focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
-                            />
+                            <div className="w-28 rounded-2xl border border-transparent bg-slate-50/80 px-3 py-3 text-right text-sm font-bold tabular-nums text-slate-900">
+                              {formatCurrency(item.PU_HT)}
+                            </div>
                           </td>
                           <td className="px-4 py-4 text-center align-top">
                             <input
@@ -614,6 +618,95 @@ const CreateDevis = () => {
                       ))}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Vue mobile / tablette : cartes empilées (sous xl) */}
+                <div className="space-y-4 p-4 sm:p-5 xl:hidden">
+                  {details.map((item, idx) => (
+                    <div
+                      key={item.id}
+                      className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[10px] font-black uppercase tracking-[0.25em] text-[#0052CC]">
+                            {item.Code || <span className="text-slate-300">Aucun article</span>}
+                          </div>
+                          <button
+                            onClick={() => openArticleModal(idx)}
+                            className="mt-2 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-700 shadow-sm transition-all hover:border-blue-200 hover:text-[#0052CC]"
+                          >
+                            <Package size={13} /> Sélectionner
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => removeLine(idx)}
+                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-300 shadow-sm transition-all hover:border-red-200 hover:text-red-500"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+
+                      <div className="mt-4 space-y-3">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Désignation</label>
+                          <textarea
+                            value={item.Designation}
+                            onChange={(e) => handleLineChange(idx, 'Designation', e.target.value)}
+                            rows={2}
+                            className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                            placeholder="Désignation..."
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Qté</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.Qte}
+                              onChange={(e) => handleLineChange(idx, 'Qte', e.target.value)}
+                              className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3 text-center text-sm font-black text-slate-800 outline-none transition-all focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">P.U HT</label>
+                            <div className="w-full rounded-2xl border border-slate-200 bg-slate-100/80 px-3 py-3 text-right text-sm font-bold tabular-nums text-slate-900">
+                              {formatCurrency(item.PU_HT)}
+                            </div>
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Rem (%)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              value={item.Remise}
+                              onChange={(e) => handleLineChange(idx, 'Remise', e.target.value)}
+                              className="w-full rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3 text-center text-sm font-bold text-amber-600 outline-none transition-all focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50/80 px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">TVA</span>
+                            <span className="text-sm font-black text-slate-800">
+                              {item.CodeTVA ? item.CodeTVA.trim() : '—'}
+                            </span>
+                            {resolveTVA(item) > 0 && (
+                              <span className="text-[10px] font-bold text-slate-400">{resolveTVA(item)}%</span>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Total net HT</div>
+                            <div className="text-base font-black text-[#0052CC]">{formatCurrency(item.TotalNetHT)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </section>
 
@@ -730,6 +823,17 @@ const CreateDevis = () => {
           </div>
         </div>
       </div>
+
+      {/* Popup de chargement centré pendant la création */}
+      {loading && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4 rounded-3xl bg-white p-8 shadow-2xl">
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#0052CC] border-t-transparent" />
+            <p className="text-sm font-black text-slate-900">Création du devis en cours…</p>
+            <p className="text-xs text-slate-500">Veuillez patienter.</p>
+          </div>
+        </div>
+      )}
 
       <ArticleSelectionModal
         isOpen={isArticleModalOpen}

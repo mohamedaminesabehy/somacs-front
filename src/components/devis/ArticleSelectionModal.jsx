@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
-import { X, Search, Package, Plus, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
+import { X, Search, Package, Plus, ChevronLeft, ChevronRight, RefreshCw, AlertCircle } from 'lucide-react'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
@@ -151,122 +151,180 @@ const ArticleSelectionModal = ({ isOpen, onClose, onSelect }) => {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 sm:p-6">
+    <div className="fixed inset-0 z-[160] flex items-end justify-center sm:items-center sm:p-6">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white w-full max-w-5xl h-[85vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+      <div className="relative flex h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:h-[85vh] sm:rounded-3xl">
 
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600"><Package size={20} /></div>
-            <div>
-              <h3 className="text-lg font-black text-slate-900">Sélectionner un article</h3>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-                {pagination.total > 0 ? `${pagination.total} articles` : 'Catalogue'}
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-blue-50/80 to-white px-4 py-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#0052CC] text-white shadow-lg shadow-blue-200">
+              <Package size={20} />
+            </div>
+            <div className="min-w-0">
+              <h3 className="truncate text-base font-black text-slate-900 sm:text-lg">Sélectionner un article</h3>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 sm:text-[11px]">
+                {pagination.total > 0 ? `${pagination.total} articles disponibles` : 'Catalogue articles'}
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="w-10 h-10 rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition-all flex items-center justify-center">
+          <button
+            onClick={onClose}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm transition-all hover:bg-red-50 hover:text-red-500"
+          >
             <X size={18} />
           </button>
         </div>
 
         {/* Search */}
-        <div className="px-6 py-3 border-b border-slate-100 shrink-0">
+        <div className="shrink-0 border-b border-slate-100 px-4 py-3 sm:px-6">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Recherche optionnelle par code ou désignation..."
-              className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 text-sm"
+              placeholder="Rechercher par code ou désignation..."
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-10 text-sm font-medium outline-none transition-all focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
             />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-slate-200 text-slate-500 transition-all hover:bg-slate-300"
+              >
+                <X size={13} />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Table Header */}
-        <div className="px-6 py-2 border-b border-slate-200 bg-slate-50/80 shrink-0">
-          <div className="grid grid-cols-[1.2fr_2.5fr_90px_80px_70px_70px_44px] gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
-            <span>Code</span>
-            <span>Désignation</span>
-            <span className="text-right">PV (TND)</span>
-            <span className="text-center">Code TVA</span>
-            <span className="text-center">Taux %</span>
-            <span className="text-center">Année</span>
-            <span></span>
-          </div>
-        </div>
+        {/* Table header intégré dans le <table> desktop ci-dessous */}
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {loading ? (
-            <div className="p-6 space-y-2">
+            <div className="space-y-2 p-4 sm:p-5">
               {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="h-11 bg-slate-100 rounded-xl animate-pulse" />
+                <div key={i} className="h-14 animate-pulse rounded-2xl bg-slate-100 sm:h-12" />
               ))}
             </div>
           ) : error ? (
-            <div className="text-center py-12">
-              <p className="text-red-600 font-bold mb-4">{error}</p>
-              <button onClick={() => fetchArticles(debouncedSearch, pagination.page)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-sm font-bold hover:bg-slate-200 transition-all">
+            <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-500">
+                <AlertCircle size={26} />
+              </div>
+              <p className="mb-4 text-sm font-bold text-red-600">{error}</p>
+              <button
+                onClick={() => fetchArticles(debouncedSearch, pagination.page)}
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white transition-all hover:bg-[#0052CC]"
+              >
                 <RefreshCw size={14} /> Réessayer
               </button>
             </div>
           ) : articles.length === 0 ? (
-            <div className="text-center py-12 text-slate-400 font-medium">Aucun article trouvé</div>
+            <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                <Search size={26} />
+              </div>
+              <p className="text-sm font-bold text-slate-500">Aucun article trouvé</p>
+              <p className="mt-1 text-xs text-slate-400">Essayez un autre terme de recherche</p>
+            </div>
           ) : (
-            <table className="w-full text-left border-collapse">
-              <tbody className="divide-y divide-slate-50">
+            <>
+              {/* Vue desktop : tableau complet avec thead aligné */}
+              <table className="hidden w-full border-collapse text-left sm:table">
+                <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50/95 backdrop-blur-sm">
+                  <tr>
+                    <th className="w-[14%] py-2.5 pl-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Code</th>
+                    <th className="w-[34%] py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500">Désignation</th>
+                    <th className="w-[12%] py-2.5 pr-4 text-right text-[10px] font-black uppercase tracking-widest text-slate-500">PV (TND)</th>
+                    <th className="w-[11%] py-2.5 text-center text-[10px] font-black uppercase tracking-widest text-slate-500">Code TVA</th>
+                    <th className="w-[9%] py-2.5 text-center text-[10px] font-black uppercase tracking-widest text-slate-500">Taux %</th>
+                    <th className="w-[9%] py-2.5 text-center text-[10px] font-black uppercase tracking-widest text-slate-500">Année</th>
+                    <th className="w-[5%] py-2.5 pr-6"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {articles.map((article) => (
+                    <tr
+                      key={article.CODE}
+                      onClick={() => handleSelect(article)}
+                      className="group cursor-pointer transition-colors hover:bg-blue-50/50"
+                    >
+                      <td className="py-3 pl-6">
+                        <span className="text-xs font-black uppercase tracking-wide text-blue-700">{article.CODE}</span>
+                      </td>
+                      <td className="py-3 pr-2">
+                        <span className="line-clamp-1 text-sm font-medium text-slate-800">{article.LIBELL}</span>
+                      </td>
+                      <td className="py-3 pr-4 text-right">
+                        <span className="text-xs font-bold tabular-nums text-slate-700">{formatCurrency(article.PV)}</span>
+                      </td>
+                      <td className="py-3 text-center">
+                        <span className="text-[10px] font-bold text-slate-500">{article.CodeTVA || '—'}</span>
+                      </td>
+                      <td className="py-3 text-center">
+                        <span className="text-xs font-bold text-emerald-700">{article.TauxTVA ? `${article.TauxTVA}%` : '—'}</span>
+                      </td>
+                      <td className="py-3 text-center">
+                        <span className="text-[10px] font-medium text-slate-400">{article.AnneeTaxe || '—'}</span>
+                      </td>
+                      <td className="py-3 pr-6 text-center">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleSelect(article) }}
+                          className="mx-auto flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white opacity-0 transition-all hover:bg-blue-600 group-hover:opacity-100"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* Vue mobile : cartes */}
+              <div className="space-y-3 p-4 sm:hidden">
                 {articles.map((article) => (
-                  <tr
+                  <button
                     key={article.CODE}
                     onClick={() => handleSelect(article)}
-                    className="px-6 hover:bg-blue-50/50 transition-colors cursor-pointer group"
+                    className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-all active:scale-[0.98] active:bg-blue-50/50"
                   >
-                    <td className="pl-6 py-2.5 w-[14%]">
-                      <span className="text-xs font-black text-blue-700 uppercase tracking-wide">{article.CODE}</span>
-                    </td>
-                    <td className="py-2.5 w-[34%]">
-                      <span className="text-sm font-medium text-slate-800 line-clamp-1">{article.LIBELL}</span>
-                    </td>
-                    <td className="py-2.5 w-[12%] text-right">
-                      <span className="text-xs font-bold text-slate-700 tabular-nums">{formatCurrency(article.PV)}</span>
-                    </td>
-                    <td className="py-2.5 w-[10%] text-center">
-                      <span className="text-[10px] font-bold text-slate-500">{article.CodeTVA || '—'}</span>
-                    </td>
-                    <td className="py-2.5 w-[9%] text-center">
-                      <span className="text-xs font-bold text-emerald-700">{article.TauxTVA ? `${article.TauxTVA}%` : '—'}</span>
-                    </td>
-                    <td className="py-2.5 w-[9%] text-center">
-                      <span className="text-[10px] font-medium text-slate-400">{article.AnneeTaxe || '—'}</span>
-                    </td>
-                    <td className="pr-6 py-2.5 w-[6%]">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleSelect(article) }}
-                        className="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-600"
-                      >
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-xs font-black uppercase tracking-wide text-blue-700">{article.CODE}</span>
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
                         <Plus size={14} />
-                      </button>
-                    </td>
-                  </tr>
+                      </span>
+                    </div>
+                    <p className="mt-1.5 line-clamp-2 text-sm font-bold text-slate-800">{article.LIBELL}</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-medium">
+                      <span className="text-slate-500">
+                        PV : <span className="font-black text-slate-800">{formatCurrency(article.PV)} TND</span>
+                      </span>
+                      <span className="text-slate-500">
+                        TVA : <span className="font-bold text-emerald-700">{article.TauxTVA ? `${article.TauxTVA}%` : '—'}</span>
+                        {article.CodeTVA ? <span className="text-slate-400"> ({article.CodeTVA})</span> : null}
+                      </span>
+                      {article.AnneeTaxe ? (
+                        <span className="text-slate-400">Année : {article.AnneeTaxe}</span>
+                      ) : null}
+                    </div>
+                  </button>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </>
           )}
         </div>
 
         {/* Pagination Footer */}
         {!loading && !error && articles.length > 0 && (
-          <div className="px-6 py-3 border-t border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+          <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/50 px-3 py-3 sm:px-6">
             <button
               onClick={() => handlePageChange(pagination.page - 1)}
               disabled={pagination.page <= 1}
-              className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-bold text-slate-600 hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              className="inline-flex items-center gap-1 rounded-lg px-2.5 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-white hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-30 sm:px-3"
             >
-              <ChevronLeft size={16} /> Précédent
+              <ChevronLeft size={16} /> <span className="hidden sm:inline">Précédent</span>
             </button>
 
             <div className="flex items-center gap-1">
@@ -274,9 +332,9 @@ const ArticleSelectionModal = ({ isOpen, onClose, onSelect }) => {
                 <button
                   key={p}
                   onClick={() => handlePageChange(p)}
-                  className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                  className={`h-9 w-9 rounded-lg text-xs font-bold transition-all ${
                     p === pagination.page
-                      ? 'bg-blue-600 text-white shadow-sm'
+                      ? 'bg-[#0052CC] text-white shadow-sm'
                       : 'text-slate-600 hover:bg-white hover:shadow-sm'
                   }`}
                 >
@@ -288,9 +346,9 @@ const ArticleSelectionModal = ({ isOpen, onClose, onSelect }) => {
             <button
               onClick={() => handlePageChange(pagination.page + 1)}
               disabled={!pagination.hasNext}
-              className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-bold text-slate-600 hover:bg-white hover:shadow-sm disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              className="inline-flex items-center gap-1 rounded-lg px-2.5 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-white hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-30 sm:px-3"
             >
-              Suivant <ChevronRight size={16} />
+              <span className="hidden sm:inline">Suivant</span> <ChevronRight size={16} />
             </button>
           </div>
         )}
