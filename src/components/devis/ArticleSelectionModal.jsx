@@ -58,13 +58,23 @@ const ArticleSelectionModal = ({ isOpen, onClose, onSelect }) => {
       const data = await response.json()
       if (!isMountedRef.current) return
 
-      setArticles(Array.isArray(data.items) ? data.items : [])
+      const items = Array.isArray(data.items) ? data.items : []
+      setArticles(items)
       setPagination({
         page: data.page || pageNum,
         total: data.total || 0,
         totalPages: data.totalPages || 0,
         hasNext: Boolean(data.hasNext),
       })
+
+      // Cache page 1 (sans recherche) dans localStorage pour ouverture instantanée
+      if (pageNum === 1 && !search && items.length > 0) {
+        try {
+          window.localStorage.setItem('articles_page1_cache', JSON.stringify({
+            items, total: data.total, totalPages: data.totalPages, hasNext: data.hasNext,
+          }))
+        } catch {}
+      }
     } catch (err) {
       if (err.name === 'AbortError') return
       if (!isMountedRef.current) return
@@ -75,8 +85,7 @@ const ArticleSelectionModal = ({ isOpen, onClose, onSelect }) => {
     }
   }, [])
 
-  // Modal open: reset state. Le fetch est piloté uniquement par l'effet
-  // debouncedSearch ci-dessous (une seule source de vérité, comme DevisList).
+  // Modal open: affiche le cache local immédiatement, puis rafraîchit en arrière-plan
   useEffect(() => {
     if (!isOpen) {
       setSearchTerm('')
@@ -86,7 +95,18 @@ const ArticleSelectionModal = ({ isOpen, onClose, onSelect }) => {
       setPagination({ page: 1, total: 0, totalPages: 0, hasNext: false })
       return
     }
-    // À l'ouverture : charge la page 1 immédiatement.
+    // Afficher le cache page 1 instantanément (si disponible)
+    try {
+      const cached = window.localStorage.getItem('articles_page1_cache')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (parsed?.items?.length) {
+          setArticles(parsed.items)
+          setPagination({ page: 1, total: parsed.total || 0, totalPages: parsed.totalPages || 0, hasNext: Boolean(parsed.hasNext) })
+        }
+      }
+    } catch {}
+    // Puis rafraîchir depuis le serveur
     fetchArticles('', 1)
     return () => { try { controllerRef.current?.abort() } catch {} }
   }, [isOpen, fetchArticles])

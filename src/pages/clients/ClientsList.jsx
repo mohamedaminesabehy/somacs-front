@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   ArrowUpRight,
   X,
+  Trash2,
 } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 
@@ -82,6 +83,24 @@ export default function ClientsList() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [filter, setFilter] = useState('all') // 'all' | 'incomplete'
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteSuccess, setDeleteSuccess] = useState(null)
+
+  // Role-based access
+  const authUser = (() => {
+    try { return JSON.parse(window.localStorage.getItem('auth_user') || 'null') } catch { return null }
+  })()
+  const role = String(authUser?.role || '').trim().toLowerCase()
+  const isCommercial = role === 'commerciale' || role === 'commercial'
+  const canDelete = role === 'administrateur' || role === 'coordinateur' || role === 'responsable technicien'
+
+  // Block Commercial from accessing this page
+  useEffect(() => {
+    if (isCommercial) navigate('/', { replace: true })
+  }, [isCommercial, navigate])
+
+  if (isCommercial) return null
 
   const loadClients = () => {
     let alive = true
@@ -123,6 +142,27 @@ export default function ClientsList() {
   useEffect(() => { setPage(1) }, [search, filter])
 
   const goTo360 = (client) => navigate(`/clients/${client.id}/360`)
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget || deleting) return
+    setDeleting(true)
+    try {
+      const response = await apiFetch(`/clients/${deleteTarget.id}`, { method: 'DELETE', auth: true })
+      if (response.ok) {
+        setClients(prev => prev.filter(c => c.id !== deleteTarget.id))
+        setDeleteSuccess(`Le client « ${deleteTarget.name} » a été supprimé avec succès.`)
+        setTimeout(() => setDeleteSuccess(null), 4000)
+      } else {
+        const data = await response.json().catch(() => ({}))
+        setError(new Error(data.message || 'Erreur lors de la suppression.'))
+      }
+    } catch {
+      setError(new Error('Impossible de supprimer le client. Vérifiez votre connexion.'))
+    } finally {
+      setDeleting(false)
+      setDeleteTarget(null)
+    }
+  }
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 space-y-6">
@@ -359,8 +399,16 @@ export default function ClientsList() {
                       className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0052CC] text-white text-xs font-bold rounded-lg hover:bg-[#0047b3] transition-colors shadow-sm"
                     >
                       <Eye size={12} />
-                      Voir fiche client
+                      Voir fiche
                     </button>
+                    {canDelete && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDeleteTarget(client) }}
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-400 hover:border-red-200 hover:text-red-600 transition-all"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </div>
                 </div>
               )
@@ -390,6 +438,42 @@ export default function ClientsList() {
             </div>
           )}
         </>
+      )}
+
+      {/* Popup confirmation suppression */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => !deleting && setDeleteTarget(null)} />
+          <div className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
+            <div className="flex flex-col items-center text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-500">
+                <AlertTriangle size={28} />
+              </div>
+              <h3 className="mt-4 text-lg font-black text-slate-900">Supprimer ce client ?</h3>
+              <p className="mt-2 text-sm text-slate-500">
+                Êtes-vous sûr de vouloir supprimer <span className="font-bold text-slate-800">{deleteTarget.name}</span> ?<br />
+                Cette action est irréversible.
+              </p>
+              <div className="mt-6 flex w-full gap-3">
+                <button onClick={() => setDeleteTarget(null)} disabled={deleting}
+                  className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 disabled:opacity-50">
+                  Annuler
+                </button>
+                <button onClick={handleDeleteConfirm} disabled={deleting}
+                  className="flex-1 rounded-2xl bg-red-600 px-4 py-3 text-sm font-bold text-white transition-all hover:bg-red-700 disabled:opacity-50">
+                  {deleting ? 'Suppression...' : 'Supprimer'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast succès suppression */}
+      {deleteSuccess && (
+        <div className="fixed bottom-6 left-1/2 z-[210] -translate-x-1/2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 shadow-lg">
+          <p className="text-sm font-bold text-emerald-700">{deleteSuccess}</p>
+        </div>
       )}
     </div>
   )

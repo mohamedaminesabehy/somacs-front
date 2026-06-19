@@ -825,7 +825,11 @@ export default function ClientDetails360() {
                 Enregistrer
               </button>
             </div>
-          ) : (
+          ) : (() => {
+            const _authUser = (() => { try { return JSON.parse(window.localStorage.getItem('auth_user') || 'null') } catch { return null } })()
+            const _role = String(_authUser?.role || '').trim().toLowerCase()
+            const _canEdit = _role !== 'technicien' && _role !== 'commerciale' && _role !== 'commercial'
+            return _canEdit ? (
             <button
               type="button"
               onClick={startClientEdit}
@@ -833,7 +837,8 @@ export default function ClientDetails360() {
             >
               <Pencil size={12} /> Modifier
             </button>
-          )}
+            ) : null
+          })()}
         </div>
 
         {clientEditError && (
@@ -947,6 +952,14 @@ export default function ClientDetails360() {
     </div>
   )
 }
+// Role-based visibility
+const __authUser = (() => {
+  try { return JSON.parse(window.localStorage.getItem('auth_user') || 'null') } catch { return null }
+})()
+const __userRole = String(__authUser?.role || '').trim().toLowerCase()
+const isCommercial = __userRole === 'commerciale' || __userRole === 'commercial'
+const isTechnicien = __userRole === 'technicien'
+const canEdit = !isTechnicien && !isCommercial
 
 
 // ─── Modal détail intervention ─────────────────────────────────────────────

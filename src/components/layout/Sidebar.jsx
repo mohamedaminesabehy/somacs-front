@@ -173,10 +173,6 @@ function SidebarContent({ onClose, currentUser, onLogout }) {
                 <FileText size={20} className="group-hover:scale-110 transition-transform" />
                 <span className="font-medium">Devis</span>
               </NavLink>
-              <NavLink to="/clients" className={menuLinkClass} onClick={onClose}>
-                <Building2 size={20} className="group-hover:scale-110 transition-transform" />
-                <span className="font-medium">Clients 360</span>
-              </NavLink>
               <SubMenu icon={ClipboardList} label="Suivi commercial" matchPaths={["/devis-suivi"]}>
                 <SubLink to="/devis-suivi" end icon={PieChart} label="Dashboard suivi" onClick={onClose} />
                 <SubLink to="/devis-suivi/relance" icon={Send} label="Relances du jour" onClick={onClose} />
@@ -204,6 +200,11 @@ function SidebarContent({ onClose, currentUser, onLogout }) {
               <NavLink to="/machines" className={menuLinkClass} onClick={onClose}>
                 <Settings size={20} className="group-hover:scale-110 transition-transform" />
                 <span className="font-medium">Machines</span>
+              </NavLink>
+
+              <NavLink to="/clients" className={menuLinkClass} onClick={onClose}>
+                <Building2 size={20} className="group-hover:scale-110 transition-transform" />
+                <span className="font-medium">Clients 360</span>
               </NavLink>
             </div>
           </div>
