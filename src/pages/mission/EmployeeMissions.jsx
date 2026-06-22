@@ -1,11 +1,11 @@
 import { useCallback, useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ClipboardList, Wrench, AlertTriangle, CheckCircle2, Clock,
-  Filter, Search, ChevronRight, Link2, Building2,
-  Calendar, XCircle, Loader2, BarChart2, User,
-  ChevronLeft, LayoutList, CalendarDays, MapPin,
-  TrendingUp, Zap,
+  ClipboardList, Wrench, CheckCircle2,
+  ChevronRight, Link2, Building2,
+  Calendar, XCircle, Loader2, User,
+  ChevronLeft, LayoutList, CalendarDays,
+  Zap,
 } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 
@@ -574,11 +574,8 @@ export default function EmployeeMissions() {
 
   const [missions, setMissions] = useState([])
   const [interventions, setInterventions] = useState([])
-  const [search,       setSearch]       = useState('')
   const [filterStatus, setFilterStatus] = useState('Tous')
   const [filterType,   setFilterType]   = useState('Tous')
-  const [listPage, setListPage] = useState(1)
-  const daysPerPage = 3
 
   const refreshMissions = useCallback(async () => {
     try {
@@ -707,77 +704,23 @@ export default function EmployeeMissions() {
     })()
   }
 
-  const filtered = useMemo(() => {
+  // Missions d'aujourd'hui filtrées par statut et priorité
+  const todayFiltered = useMemo(() => {
+    const todayRef = new Date()
     return missions
       .filter((m) => {
+        // Filtrer uniquement les missions d'aujourd'hui
+        const parsed = parseDueDate(m?.dueDate)
+        if (!parsed) return false
+        if (!isSameDay(parsed, todayRef)) return false
+        // Filtre statut
         if (filterStatus !== 'Tous' && m.status !== filterStatus) return false
-        if (filterType   !== 'Tous' && m.type   !== filterType)   return false
-        if (search && !m.title.toLowerCase().includes(search.toLowerCase()) &&
-            !m.description.toLowerCase().includes(search.toLowerCase())) return false
+        // Filtre prioritaire (Critique ou Haute uniquement)
+        if (filterType === 'Prioritaire' && m.priority !== 'Critique' && m.priority !== 'Haute') return false
         return true
       })
       .sort((a, b) => (PRIORITY_ORDER[a.priority] || 9) - (PRIORITY_ORDER[b.priority] || 9))
-  }, [missions, filterStatus, filterType, search])
-
-  const dateGroups = useMemo(() => {
-    const todayRef = new Date()
-    const todayStart = new Date(todayRef.getFullYear(), todayRef.getMonth(), todayRef.getDate())
-    const map = new Map()
-
-    for (const mission of filtered) {
-      const parsed = parseDueDate(mission?.dueDate)
-      const dateObj = parsed ? new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()) : null
-      const key = dateObj ? dateObj.toISOString().slice(0, 10) : 'no_date'
-      if (!map.has(key)) {
-        map.set(key, { key, dateObj, missions: [] })
-      }
-      map.get(key).missions.push(mission)
-    }
-
-    const groups = Array.from(map.values()).map((g) => {
-      if (!g.dateObj) return { ...g, label: 'Sans date', dayDiff: null }
-      const dayDiff = Math.round((g.dateObj.getTime() - todayStart.getTime()) / 86400000)
-      const label =
-        dayDiff === 0
-          ? "Aujourd'hui"
-          : dayDiff === 1
-            ? 'Demain'
-            : dayDiff === -1
-              ? 'Hier'
-              : g.dateObj.toLocaleDateString('fr-FR', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              })
-      return { ...g, label, dayDiff }
-    })
-
-    const category = (g) => {
-      if (!g.dateObj) return 3
-      if (g.dayDiff === 0) return 0
-      if (typeof g.dayDiff === 'number' && g.dayDiff > 0) return 1
-      return 2
-    }
-
-    groups.sort((a, b) => {
-      const ca = category(a)
-      const cb = category(b)
-      if (ca !== cb) return ca - cb
-      if (!a.dateObj || !b.dateObj) return 0
-      if (ca === 1) return a.dateObj.getTime() - b.dateObj.getTime()
-      return b.dateObj.getTime() - a.dateObj.getTime()
-    })
-
-    return groups
-  }, [filtered])
-
-  const totalListPages = Math.max(1, Math.ceil(dateGroups.length / daysPerPage))
-  const safeListPage = Math.min(Math.max(1, listPage), totalListPages)
-  const pagedDateGroups = dateGroups.slice(
-    (safeListPage - 1) * daysPerPage,
-    (safeListPage - 1) * daysPerPage + daysPerPage,
-  )
+  }, [missions, filterStatus, filterType])
 
   const total     = missions.length
   const enCours   = missions.filter((m) => m.status === 'En cours').length
@@ -790,8 +733,6 @@ export default function EmployeeMissions() {
       .filter((m) => m.status !== 'Terminée' && (m.priority === 'Critique' || m.priority === 'Haute'))
       .sort((a, b) => (PRIORITY_ORDER[a.priority] || 9) - (PRIORITY_ORDER[b.priority] || 9))[0]
   , [missions])
-
-  const hasActiveFilters = search || filterStatus !== 'Tous' || filterType !== 'Tous'
 
   return (
     <div className="flex flex-col min-h-screen lg:h-screen lg:overflow-hidden bg-slate-50">
@@ -876,13 +817,13 @@ export default function EmployeeMissions() {
                 <div className="w-6 h-6 bg-[#0052CC] rounded-md flex items-center justify-center shrink-0">
                   <LayoutList size={13} className="text-white" />
                 </div>
-                Toutes les missions
-                <span className="px-2 py-0.5 bg-[#0052CC]/10 text-[#0052CC] rounded-md text-[10px] font-black">{filtered.length}</span>
+                Missions d'aujourd'hui
+                <span className="px-2 py-0.5 bg-[#0052CC]/10 text-[#0052CC] rounded-md text-[10px] font-black">{todayFiltered.length}</span>
               </h2>
-              {hasActiveFilters && (
+              {(filterStatus !== 'Tous' || filterType !== 'Tous') && (
                 <button
                   type="button"
-                  onClick={() => { setSearch(''); setFilterStatus('Tous'); setFilterType('Tous'); setListPage(1) }}
+                  onClick={() => { setFilterStatus('Tous'); setFilterType('Tous') }}
                   className="flex items-center gap-1 text-[11px] font-black text-red-500 hover:text-red-700 transition-colors"
                 >
                   <XCircle size={12} /> Reset
@@ -890,111 +831,49 @@ export default function EmployeeMissions() {
               )}
             </div>
 
-            {/* Recherche */}
-            <div className="relative group mb-2">
-              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" />
-              <input
-                type="text"
-                placeholder="Rechercher une mission..."
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setListPage(1) }}
-                className="w-full pl-8 pr-3 py-2 bg-slate-50 border-2 border-slate-200 rounded-xl text-xs font-medium text-slate-700 placeholder:text-slate-400 focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all hover:border-slate-300"
-              />
-            </div>
-
-            {/* Filtres statut + type */}
+            {/* Filtres : Prioritaire + Tous statuts */}
             <div className="flex gap-2">
               <select
+                value={filterType}
+                onChange={(e) => { setFilterType(e.target.value) }}
+                className="flex-1 px-2 py-1.5 border-2 border-slate-200 rounded-xl text-xs bg-white focus:border-[#0052CC] outline-none font-bold text-slate-600 hover:border-slate-300 transition-all"
+              >
+                <option value="Tous">Toutes priorités</option>
+                <option value="Prioritaire">Prioritaire</option>
+              </select>
+              <select
                 value={filterStatus}
-                onChange={(e) => { setFilterStatus(e.target.value); setListPage(1) }}
+                onChange={(e) => { setFilterStatus(e.target.value) }}
                 className="flex-1 px-2 py-1.5 border-2 border-slate-200 rounded-xl text-xs bg-white focus:border-[#0052CC] outline-none font-bold text-slate-600 hover:border-slate-300 transition-all"
               >
                 <option value="Tous">Tous statuts</option>
                 {statusList.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
-              <select
-                value={filterType}
-                onChange={(e) => { setFilterType(e.target.value); setListPage(1) }}
-                className="flex-1 px-2 py-1.5 border-2 border-slate-200 rounded-xl text-xs bg-white focus:border-[#0052CC] outline-none font-bold text-slate-600 hover:border-slate-300 transition-all"
-              >
-                <option value="Tous">Tous types</option>
-                <option value="Normal">Normal</option>
-                <option value="Intervention">SAV</option>
-              </select>
             </div>
           </div>
 
-          {/* Liste scrollable */}
+          {/* Liste scrollable — missions d'aujourd'hui uniquement */}
           <div className="flex-1 lg:overflow-y-auto scrollbar-gray px-3 py-3 space-y-2 pb-10 lg:pb-3">
-            {filtered.length === 0 ? (
+            {todayFiltered.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center py-12">
                 <div className="w-12 h-12 bg-white border-2 border-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                  <ClipboardList size={22} className="text-slate-300" />
+                  <CalendarDays size={22} className="text-slate-300" />
                 </div>
-                <p className="text-slate-600 font-black text-sm">Aucune mission</p>
-                <p className="text-slate-400 text-xs mt-1">Modifiez vos filtres</p>
+                <p className="text-slate-600 font-black text-sm">Aucune mission aujourd'hui jusqu'à maintenant.</p>
+                <p className="text-slate-400 text-xs mt-1">Vous n'avez aucune mission planifiée pour aujourd'hui.</p>
               </div>
             ) : (
-              pagedDateGroups.map((group) => (
-                <div key={group.key} className="space-y-2">
-                  <div className="flex items-center justify-between px-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500">
-                        <CalendarDays size={14} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-black text-slate-700 truncate capitalize">{group.label}</p>
-                        {group.dateObj ? (
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            {group.dateObj.toISOString().slice(0, 10)}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                    <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-black">
-                      {group.missions.length}
-                    </span>
-                  </div>
-                  {group.missions.map((m) => (
-                    <MissionRow
-                      key={m.id}
-                      mission={m}
-                      interventions={interventions}
-                      onStatusChange={handleStatusChange}
-                      onOpen={(id) => navigate('/missions/' + id)}
-                    />
-                  ))}
-                </div>
+              todayFiltered.map((m) => (
+                <MissionRow
+                  key={m.id}
+                  mission={m}
+                  interventions={interventions}
+                  onStatusChange={handleStatusChange}
+                  onOpen={(id) => navigate('/missions/' + id)}
+                />
               ))
             )}
           </div>
-
-          {/* Pagination */}
-          {dateGroups.length > 0 && totalListPages > 1 && (
-            <div className="px-4 py-3 border-t border-slate-100 bg-white shrink-0">
-              <div className="flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setListPage((p) => Math.max(1, p - 1))}
-                  disabled={safeListPage <= 1}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-slate-200 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <ChevronLeft size={14} /> Précédent
-                </button>
-                <div className="text-[11px] font-black text-slate-500">
-                  Page <span className="text-slate-900">{safeListPage}</span> / {totalListPages}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setListPage((p) => Math.min(totalListPages, p + 1))}
-                  disabled={safeListPage >= totalListPages}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-slate-200 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  Suivant <ChevronRight size={14} />
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Footer colonne droite */}
           <div className="px-4 py-3 border-t border-slate-100 bg-white shrink-0">
