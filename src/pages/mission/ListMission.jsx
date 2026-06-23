@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  Plus, Search, Download,
+  Plus, Search,
   Calendar, Clock, CheckCircle2, AlertCircle, Layers,
   ArrowUpRight, Wrench, ClipboardList, RefreshCw,
   X, TrendingUp,
@@ -659,10 +659,6 @@ export default function ListMission() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-            <button className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 bg-white rounded-xl text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all text-sm font-semibold shadow-sm active:scale-95">
-              <Download size={16} />
-              <span className="hidden sm:inline">Exporter</span>
-            </button>
             <button
               type="button"
               onClick={() => navigate('/missions/assign')}
@@ -811,19 +807,25 @@ export default function ListMission() {
                   </button>
                 </div>
                 {dateMode === 'range' && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/30 bg-white"
-                    />
-                    <input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/30 bg-white"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date début</label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0052CC]/30 bg-white min-w-0"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date fin</label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0052CC]/30 bg-white min-w-0"
+                      />
+                    </div>
                   </div>
                 )}
               </div>

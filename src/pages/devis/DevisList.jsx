@@ -93,6 +93,14 @@ const DevisList = () => {
   const [deleting, setDeleting] = useState(false)
   const [deleteSuccess, setDeleteSuccess] = useState(null)
 
+  // Export Excel modal state
+  const [exportModalOpen, setExportModalOpen] = useState(false)
+  const [exportStartDate, setExportStartDate] = useState('')
+  const [exportEndDate, setExportEndDate] = useState('')
+  const [exportLoading, setExportLoading] = useState(false)
+  const [exportError, setExportError] = useState('')
+  const [exportSuccess, setExportSuccess] = useState('')
+
   // Refs pour gérer les requêtes concurrentes / annulations propres
   const fetchAbortRef = useRef(null)
   const suiviAbortRef = useRef(null)
@@ -284,6 +292,42 @@ const DevisList = () => {
     return [cur - 2, cur - 1, cur, cur + 1, cur + 2]
   })()
 
+  const handleExportExcel = async () => {
+    setExportError('')
+    setExportSuccess('')
+    if (!exportStartDate) { setExportError('La date de début est obligatoire.'); return }
+    if (!exportEndDate) { setExportError('La date de fin est obligatoire.'); return }
+    if (new Date(exportStartDate) > new Date(exportEndDate)) { setExportError('La date de début ne peut pas être supérieure à la date de fin.'); return }
+
+    setExportLoading(true)
+    try {
+      const response = await apiFetch(`/devis/export/excel?startDate=${exportStartDate}&endDate=${exportEndDate}`, {
+        auth: true,
+        timeoutMs: 60000,
+      })
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        setExportError(errData.message || `Erreur serveur : ${response.status}`)
+        return
+      }
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `devis_${exportStartDate}_${exportEndDate}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      setExportSuccess('Fichier Excel téléchargé avec succès.')
+      setTimeout(() => { setExportSuccess(''); setExportModalOpen(false) }, 2000)
+    } catch (err) {
+      setExportError('Impossible de télécharger le fichier. Vérifiez votre connexion.')
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_left,_rgba(0,82,204,0.07),_transparent_40%),linear-gradient(180deg,#f8fbff_0%,#eef4fb_100%)] px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-5">
@@ -300,6 +344,10 @@ const DevisList = () => {
               <p className="text-sm text-slate-500">Consultez, filtrez et gérez vos devis · Tri, recherche et navigation rapide</p>
             </div>
             <div className="flex flex-wrap gap-2.5 self-start xl:self-auto">
+              <button onClick={() => setExportModalOpen(true)}
+                className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700 transition-all hover:-translate-y-0.5 hover:shadow-sm hover:bg-emerald-100">
+                <FileText size={16} /> Télécharger Excel
+              </button>
               <button onClick={() => fetchDevis(pagination.page)}
                 className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:-translate-y-0.5 hover:shadow-sm">
                 <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Actualiser
@@ -326,13 +374,6 @@ const DevisList = () => {
               <input type="text" placeholder="Rechercher par numéro, nom ou code client..."
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
                 value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-            </div>
-            <div className="flex gap-2.5">
-              <button onClick={handleSort}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:-translate-y-0.5 hover:shadow-sm">
-                <Calendar size={15} className="text-slate-400" />
-                Date {sortOrder === 'asc' ? '↑' : '↓'}
-              </button>
             </div>
           </div>
 
@@ -365,6 +406,56 @@ const DevisList = () => {
             </div>
           </div>
         </section>
+
+        {/* ── Export Excel Modal ── */}
+        {exportModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => { setExportModalOpen(false); setExportError(''); setExportSuccess('') }}>
+            <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" />
+            <div className="relative z-10 w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden" onClick={e => e.stopPropagation()}>
+              <div className="bg-gradient-to-r from-[#0052CC] to-blue-700 px-6 py-4">
+                <h3 className="text-white font-black text-base flex items-center gap-2">
+                  <FileText size={18} /> Exporter les devis en Excel
+                </h3>
+                <p className="text-blue-200 text-xs mt-0.5">Sélectionnez la période pour l'export</p>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-600">Date début *</label>
+                  <input type="date" value={exportStartDate} max={exportEndDate || undefined}
+                    onChange={e => setExportStartDate(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-600">Date fin *</label>
+                  <input type="date" value={exportEndDate} min={exportStartDate || undefined}
+                    onChange={e => setExportEndDate(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10" />
+                </div>
+                {exportError && (
+                  <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-700">
+                    <AlertTriangle size={14} className="shrink-0" /> {exportError}
+                  </div>
+                )}
+                {exportSuccess && (
+                  <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-700">
+                    <BadgeCheck size={14} className="shrink-0" /> {exportSuccess}
+                  </div>
+                )}
+                <div className="flex gap-3 pt-2">
+                  <button onClick={() => { setExportModalOpen(false); setExportError(''); setExportSuccess('') }}
+                    className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50">
+                    Annuler
+                  </button>
+                  <button onClick={handleExportExcel} disabled={exportLoading}
+                    className="flex-1 rounded-xl bg-[#0052CC] px-4 py-2.5 text-sm font-black text-white transition-all hover:bg-[#0747A6] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                    {exportLoading ? <RefreshCw size={14} className="animate-spin" /> : <FileText size={14} />}
+                    {exportLoading ? 'Export...' : 'Télécharger'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Error ── */}
         {error && (

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { AlertCircle, Building2, Calendar, CheckCircle2, Edit3, Eye, FileText, Hash, History, Search, User, Wrench, X } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
@@ -715,31 +716,45 @@ export default function EmployeeHistory() {
 
           {/* Filtres date : empilés sur mobile, 2 colonnes sur tablette */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:flex xl:items-end gap-3">
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5 min-w-0">
               <label htmlFor="filter-from-date" className="text-[11px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                 <Calendar size={13} className="text-slate-400" /> Date de début
               </label>
-              <input
-                id="filter-from-date"
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                aria-label="Date de début"
-                className="w-full sm:w-auto xl:w-[160px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-base sm:text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] hover:border-slate-300 transition-all"
-              />
+              <div className="relative min-w-0">
+                <input
+                  id="filter-from-date"
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  aria-label="Date de début"
+                  className="w-full sm:w-auto xl:w-[160px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-base sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] hover:border-slate-300 transition-all min-w-0"
+                />
+                {!fromDate && (
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-medium pointer-events-none sm:hidden">
+                    JJ/MM/AAAA
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5 min-w-0">
               <label htmlFor="filter-to-date" className="text-[11px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                 <Calendar size={13} className="text-slate-400" /> Date de fin
               </label>
-              <input
-                id="filter-to-date"
-                type="date"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                aria-label="Date de fin"
-                className="w-full sm:w-auto xl:w-[160px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-base sm:text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] hover:border-slate-300 transition-all"
-              />
+              <div className="relative min-w-0">
+                <input
+                  id="filter-to-date"
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  aria-label="Date de fin"
+                  className="w-full sm:w-auto xl:w-[160px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-base sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] hover:border-slate-300 transition-all min-w-0"
+                />
+                {!toDate && (
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-medium pointer-events-none sm:hidden">
+                    JJ/MM/AAAA
+                  </span>
+                )}
+              </div>
             </div>
             {hasActiveFilters && (
               <button
@@ -951,10 +966,9 @@ export default function EmployeeHistory() {
           </div>
         </div>
 
-        {showDetails && selected && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 overscroll-contain" onClick={handleCloseDetails}>
-            <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
-            <div className="relative z-10 w-full max-w-5xl bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col h-[92vh]" onClick={(e) => e.stopPropagation()}>
+        {showDetails && selected && createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm overscroll-contain" onClick={handleCloseDetails}>
+            <div className="relative w-full max-w-5xl bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col h-[92vh]" onClick={(e) => e.stopPropagation()}>
               <div className="px-5 py-4 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center">
@@ -988,7 +1002,8 @@ export default function EmployeeHistory() {
                 </button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     </div>

@@ -7,7 +7,7 @@ import {
   UserCheck, Building2, Calendar, Settings,
   PlayCircle, LayoutGrid, LayoutList, X, TrendingUp, AlertTriangle,
   SlidersHorizontal, RefreshCw, UserCheck2, Filter, ChevronDown,
-  ArrowUpRight, Clock, MapPin, MoreHorizontal, Download, Printer,
+  ArrowUpRight, Clock, MapPin, MoreHorizontal, Printer,
   Share2, ShieldCheck, Zap, FileSearch, Truck, GraduationCap,
   ShieldAlert, ClipboardCheck, ChevronLeft, ChevronRight as ChevronRightIcon
 } from 'lucide-react'
@@ -707,9 +707,6 @@ export default function InterventionList() {
           </div>
 
           <div className="flex items-center justify-end gap-3 w-full sm:w-auto">
-            <button className="hidden sm:flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all">
-              <Download size={16} /> Export
-            </button>
             <button
               onClick={fetchInterventions}
               className="hidden sm:flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all"

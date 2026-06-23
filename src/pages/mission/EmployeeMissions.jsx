@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import {
   ClipboardList, Wrench, CheckCircle2,
@@ -275,8 +276,8 @@ function MissionCalendar({ missions, interventions = [], onOpen, onStatusChange 
         {/* Nav */}
         <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between bg-white gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#0052CC] rounded-xl flex items-center justify-center shadow-md shadow-blue-200 shrink-0">
-              <CalendarDays size={18} className="text-white w-[15px] h-[15px] sm:w-[18px] sm:h-[18px]" />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-[#0052CC] rounded-xl flex items-center justify-center shadow-md shadow-blue-200 shrink-0">
+              <CalendarDays size={18} className="text-white w-[16px] h-[16px] sm:w-[18px] sm:h-[18px]" />
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-none">
@@ -307,12 +308,15 @@ function MissionCalendar({ missions, interventions = [], onOpen, onStatusChange 
           </div>
         </div>
 
+        {/* Calendar grid wrapper */}
+        <div>
+
         {/* Grid header */}
         <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-100">
           {DAYS_FR.map((d) => (
-            <div key={d} className="py-2 sm:py-2.5 text-center text-[9px] sm:text-[11px] font-black text-slate-600 uppercase tracking-widest truncate px-0.5">
+            <div key={d} className="py-2.5 sm:py-2.5 text-center text-[10px] sm:text-[11px] font-black text-slate-600 uppercase tracking-wider sm:tracking-widest truncate px-0.5">
               <span className="hidden sm:inline">{d}</span>
-              <span className="sm:hidden">{d.charAt(0)}</span>
+              <span className="sm:hidden">{d.slice(0, 3)}</span>
             </div>
           ))}
         </div>
@@ -328,7 +332,7 @@ function MissionCalendar({ missions, interventions = [], onOpen, onStatusChange 
               <div
                 key={idx}
                 onClick={() => date && setSelected(date)}
-                className={`min-h-[50px] sm:min-h-[90px] border-b border-slate-100 p-1 sm:p-2 flex flex-col transition-colors ${
+                className={`min-h-[60px] sm:min-h-[90px] border-b border-slate-100 p-1.5 sm:p-2 flex flex-col transition-colors ${
                   !date      ? 'bg-slate-50' :
                   isSelected ? 'bg-blue-50 cursor-pointer' :
                                'bg-white hover:bg-slate-50 cursor-pointer'
@@ -336,7 +340,7 @@ function MissionCalendar({ missions, interventions = [], onOpen, onStatusChange 
               >
                 {date && (
                   <>
-                    <span className={`w-5 h-5 sm:w-7 sm:h-7 flex items-center justify-center rounded-full text-[10px] sm:text-xs font-black mb-1 sm:mb-1.5 mx-auto transition-all ${
+                    <span className={`w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded-full text-[11px] sm:text-xs font-black mb-1 sm:mb-1.5 mx-auto transition-all ${
                       isToday
                         ? 'bg-[#0052CC] text-white shadow-md shadow-blue-200'
                         : isSelected
@@ -354,7 +358,7 @@ function MissionCalendar({ missions, interventions = [], onOpen, onStatusChange 
                             key={m.id}
                             onClick={(e) => { e.stopPropagation(); setSelected(date) }}
                             title={m.title}
-                            className={`text-[8px] sm:text-[9px] font-bold px-1 sm:px-1.5 py-[2px] sm:py-[3px] rounded truncate border leading-tight hover:brightness-95 transition-all w-full text-center sm:text-left ${cfg.calBg}`}
+                            className={`text-[9px] sm:text-[9px] font-bold px-1 sm:px-1.5 py-[3px] sm:py-[3px] rounded truncate border leading-tight hover:brightness-95 transition-all w-full text-center sm:text-left ${cfg.calBg}`}
                           >
                             <span className="hidden sm:block truncate">{m.title}</span>
                           </div>
@@ -363,7 +367,7 @@ function MissionCalendar({ missions, interventions = [], onOpen, onStatusChange 
                       {dayMissions.length > 2 && (
                         <span
                           onClick={(e) => { e.stopPropagation(); setSelected(date) }}
-                          className="text-[8px] sm:text-[9px] font-black text-slate-500 px-1 cursor-pointer hover:text-slate-700 text-center sm:text-left truncate"
+                          className="text-[9px] sm:text-[9px] font-black text-slate-500 px-1 cursor-pointer hover:text-slate-700 text-center sm:text-left truncate"
                         >
                           +{dayMissions.length - 2} <span className="hidden sm:inline">autres</span>
                         </span>
@@ -374,6 +378,7 @@ function MissionCalendar({ missions, interventions = [], onOpen, onStatusChange 
               </div>
             )
           })}
+        </div>
         </div>
 
         {/* Legend */}
@@ -387,64 +392,60 @@ function MissionCalendar({ missions, interventions = [], onOpen, onStatusChange 
       </div>
 
       {/* ── Modal jour sélectionné ── */}
-      {selected && (
+      {selected && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm"
           onClick={() => setSelected(null)}
         >
-          {/* Backdrop */}
-          <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
-
           {/* Panel */}
           <div
-            className="relative z-10 w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-            style={{ maxHeight: '85vh' }}
+            className="relative w-full max-w-md max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
 
             {/* ── Header (couleur sidebar = slate-900) ── */}
-            <div className="bg-slate-900 px-5 pt-5 pb-4 shrink-0">
+            <div className="bg-slate-900 px-4 sm:px-5 pt-4 sm:pt-5 pb-3 sm:pb-4 shrink-0">
 
               {/* Top row : date block + close */}
-              <div className="flex items-start justify-between gap-3 mb-4">
-                <div className="flex items-center gap-3.5">
+              <div className="flex items-start justify-between gap-3 mb-3 sm:mb-4">
+                <div className="flex items-center gap-3">
                   {/* Mini calendar block */}
-                  <div className="w-14 h-14 bg-white/10 border border-white/20 rounded-xl flex flex-col items-center justify-center shrink-0">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white/10 border border-white/20 rounded-xl flex flex-col items-center justify-center shrink-0">
+                    <span className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">
                       {selected.toLocaleDateString('fr-FR', { month: 'short' })}
                     </span>
-                    <span className="text-3xl font-black text-white leading-tight">{selected.getDate()}</span>
+                    <span className="text-2xl sm:text-3xl font-black text-white leading-tight">{selected.getDate()}</span>
                   </div>
                   <div>
-                    <p className="text-white font-black text-[15px] leading-snug capitalize">
+                    <p className="text-white font-black text-sm sm:text-[15px] leading-snug capitalize">
                       {selected.toLocaleDateString('fr-FR', { weekday: 'long' })}
                     </p>
-                    <p className="text-slate-400 text-xs font-semibold">
+                    <p className="text-slate-400 text-[11px] sm:text-xs font-semibold">
                       {selected.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setSelected(null)}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-slate-400 hover:text-white border border-white/10 transition-all shrink-0 mt-0.5"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-slate-400 hover:text-white border border-white/10 transition-all shrink-0"
                 >
                   <XCircle size={16} />
                 </button>
               </div>
 
               {/* Stats row */}
-              <div className="flex items-center gap-2">
-                <span className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 border border-white/15 rounded-lg text-[11px] font-black text-white">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-white/10 border border-white/15 rounded-lg text-[10px] sm:text-[11px] font-black text-white">
                   <ClipboardList size={11} className="text-slate-400" />
                   {selectedMissions.length} mission{selectedMissions.length !== 1 ? 's' : ''}
                 </span>
                 {selectedMissions.filter(m => m.status === 'En cours').length > 0 && (
-                  <span className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 border border-amber-500/30 rounded-lg text-[11px] font-black text-amber-300">
+                  <span className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-amber-500/20 border border-amber-500/30 rounded-lg text-[10px] sm:text-[11px] font-black text-amber-300">
                     <Loader2 size={11} /> {selectedMissions.filter(m => m.status === 'En cours').length} en cours
                   </span>
                 )}
                 {selectedMissions.some(m => m.priority === 'Critique') && (
-                  <span className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/20 border border-red-500/30 rounded-lg text-[11px] font-black text-red-300">
+                  <span className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-red-500/20 border border-red-500/30 rounded-lg text-[10px] sm:text-[11px] font-black text-red-300">
                     <Zap size={11} /> Critique
                   </span>
                 )}
@@ -452,11 +453,11 @@ function MissionCalendar({ missions, interventions = [], onOpen, onStatusChange 
             </div>
 
             {/* ── Body ── */}
-            <div className="flex-1 overflow-y-auto scrollbar-gray bg-slate-50">
+            <div className="flex-1 overflow-y-auto bg-slate-50">
               {selectedMissions.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center px-6">
-                  <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 border border-slate-200 shadow-sm">
-                    <CalendarDays size={26} className="text-slate-300" />
+                <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center px-6">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 border border-slate-200 shadow-sm">
+                    <CalendarDays size={24} className="text-slate-300" />
                   </div>
                   <p className="text-slate-700 font-black text-sm">Aucune mission ce jour</p>
                   <p className="text-slate-400 text-xs mt-1">Aucune tâche planifiée pour cette date.</p>
@@ -477,7 +478,7 @@ function MissionCalendar({ missions, interventions = [], onOpen, onStatusChange 
                         {/* Top: priority stripe */}
                         <div className={`h-1 w-full ${PRIORITY_BAR[m.priorityColor] || 'bg-slate-200'}`} />
 
-                        <div className="px-4 py-3">
+                        <div className="px-3 sm:px-4 py-3">
                           {/* Row 1: badges + status */}
                           <div className="flex items-center justify-between gap-2 mb-2">
                             <div className="flex items-center gap-1.5 flex-wrap">
@@ -530,8 +531,8 @@ function MissionCalendar({ missions, interventions = [], onOpen, onStatusChange 
             </div>
 
             {/* ── Footer ── */}
-            <div className="px-5 py-3.5 border-t border-slate-200 bg-white flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-3 flex-wrap">
+            <div className="px-4 sm:px-5 py-3 border-t border-slate-200 bg-white flex items-center justify-between shrink-0">
+              <div className="hidden sm:flex items-center gap-3 flex-wrap">
                 {Object.entries(STATUS_CONFIG).map(([label, cfg]) => (
                   <span key={label} className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
                     <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />{label}
@@ -540,14 +541,15 @@ function MissionCalendar({ missions, interventions = [], onOpen, onStatusChange 
               </div>
               <button
                 onClick={() => setSelected(null)}
-                className="px-3.5 py-1.5 text-xs font-black text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all"
+                className="px-4 py-2 text-xs font-black text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all sm:ml-auto"
               >
                 Fermer
               </button>
             </div>
 
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
@@ -749,6 +751,11 @@ export default function EmployeeMissions() {
               <span className="px-2 py-0.5 bg-[#0052CC]/10 text-[#0052CC] text-[10px] font-black rounded-full uppercase tracking-wider">
                 Technicien
               </span>
+              <span className="lg:hidden flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 border border-blue-100 rounded-lg">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                <span className="text-sm font-black text-blue-600 leading-none">{total}</span>
+                <span className="text-[10px] font-bold text-slate-500">Total</span>
+              </span>
             </div>
             <p className="text-slate-400 text-xs font-semibold flex items-center gap-1 mt-0.5">
               <User size={10} /> {currentUser?.name || '—'} <span className="hidden sm:inline">— {today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
@@ -757,14 +764,14 @@ export default function EmployeeMissions() {
         </div>
 
         {/* KPI inline dans le header */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 lg:pb-0 scrollbar-hide w-full lg:w-auto">
+        <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap pb-2 lg:pb-0 w-full lg:w-auto">
           {[
-            { label: 'Total',     value: total,     bg: 'bg-blue-50',   text: 'text-blue-600',  ring: 'border-blue-100',  dot: 'bg-blue-500'  },
-            { label: 'En cours',  value: enCours,   bg: 'bg-amber-50',  text: 'text-amber-600', ring: 'border-amber-100', dot: 'bg-amber-500' },
-            { label: 'Terminées', value: terminees, bg: 'bg-green-50',  text: 'text-green-600', ring: 'border-green-100', dot: 'bg-green-500' },
-            { label: 'Bloquées',  value: bloquees,  bg: 'bg-red-50',    text: 'text-red-600',   ring: 'border-red-100',   dot: 'bg-red-500'   },
-          ].map(({ label, value, bg, text, ring, dot }) => (
-            <div key={label} className={`flex items-center gap-2.5 px-3.5 py-2 ${bg} border ${ring} rounded-xl shrink-0`}>
+            { label: 'Total',     value: total,     bg: 'bg-blue-50',   text: 'text-blue-600',  ring: 'border-blue-100',  dot: 'bg-blue-500', hideOnMobile: true  },
+            { label: 'En cours',  value: enCours,   bg: 'bg-amber-50',  text: 'text-amber-600', ring: 'border-amber-100', dot: 'bg-amber-500', hideOnMobile: false },
+            { label: 'Terminées', value: terminees, bg: 'bg-green-50',  text: 'text-green-600', ring: 'border-green-100', dot: 'bg-green-500', hideOnMobile: false },
+            { label: 'Bloquées',  value: bloquees,  bg: 'bg-red-50',    text: 'text-red-600',   ring: 'border-red-100',   dot: 'bg-red-500',  hideOnMobile: false },
+          ].map(({ label, value, bg, text, ring, dot, hideOnMobile }) => (
+            <div key={label} className={`flex items-center gap-2.5 px-3.5 py-2 ${bg} border ${ring} rounded-xl shrink-0 ${hideOnMobile ? 'hidden lg:flex' : ''}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
               <span className={`text-lg font-black ${text} leading-none`}>{value}</span>
               <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">{label}</span>

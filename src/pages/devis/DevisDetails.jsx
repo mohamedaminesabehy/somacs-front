@@ -8,7 +8,6 @@ import {
   User,
   DollarSign,
   RefreshCw,
-  Printer,
   Download,
   AlertTriangle,
   Eye,
@@ -167,14 +166,14 @@ const normalizeDevisPayload = (payload) => {
 }
 
 // --- Fiche Devis (Preview) ---
-function DevisFiche({ data }) {
+const DevisFiche = React.forwardRef(function DevisFiche({ data }, ref) {
   if (!data || !data.header) return null
 
   const { header, details, footer } = data
   const totals = computeTotals(details, footer, header)
 
   return (
-    <div className="bg-white shadow-2xl px-7 pt-5 pb-8 relative overflow-hidden border border-slate-300 text-slate-900 leading-tight" 
+    <div ref={ref} className="bg-white shadow-2xl px-7 pt-5 pb-8 relative overflow-hidden border border-slate-300 text-slate-900 leading-tight" 
          style={{ fontFamily: 'Arial, Helvetica, sans-serif', minHeight: '842px', width: '595px', margin: '0 auto' }}>
       
       {/* Header Info */}
@@ -218,40 +217,40 @@ function DevisFiche({ data }) {
       </div>
 
       {/* Items Table */}
-      <table className="w-full border-collapse border border-slate-900 mb-4 text-[9px]">
+      <table className="w-full border-collapse border border-slate-900 mb-4 text-[9px]" style={{ borderCollapse: 'collapse', tableLayout: 'fixed', width: '100%' }}>
         <thead>
           <tr className="bg-slate-50 border-b border-slate-900 italic font-bold">
-            <th className="border-r border-slate-900 p-1 w-[15%]">Code</th>
-            <th className="border-r border-slate-900 p-1 text-center w-[40%]">Désignation</th>
-            <th className="border-r border-slate-900 p-1 text-center w-[8%]">Qte</th>
-            <th className="border-r border-slate-900 p-1 text-center w-[12%]">P.U HT</th>
-            <th className="border-r border-slate-900 p-1 text-center w-[7%]">Rem</th>
-            <th className="border-r border-slate-900 p-1 text-center w-[7%]">TVA</th>
-            <th className="p-1 text-center w-[11%]">Tot Net HT</th>
+            <th className="border-r border-slate-900" style={{ width: '15%', padding: '5px 4px', verticalAlign: 'middle', textAlign: 'center', lineHeight: '1.3' }}>Code</th>
+            <th className="border-r border-slate-900" style={{ width: '40%', padding: '5px 4px', verticalAlign: 'middle', textAlign: 'center', lineHeight: '1.3' }}>Désignation</th>
+            <th className="border-r border-slate-900" style={{ width: '8%', padding: '5px 4px', verticalAlign: 'middle', textAlign: 'center', lineHeight: '1.3' }}>Qte</th>
+            <th className="border-r border-slate-900" style={{ width: '12%', padding: '5px 4px', verticalAlign: 'middle', textAlign: 'center', lineHeight: '1.3' }}>P.U HT</th>
+            <th className="border-r border-slate-900" style={{ width: '7%', padding: '5px 4px', verticalAlign: 'middle', textAlign: 'center', lineHeight: '1.3' }}>Rem</th>
+            <th className="border-r border-slate-900" style={{ width: '7%', padding: '5px 4px', verticalAlign: 'middle', textAlign: 'center', lineHeight: '1.3' }}>TVA</th>
+            <th style={{ width: '11%', padding: '5px 4px', verticalAlign: 'middle', textAlign: 'center', lineHeight: '1.3' }}>Tot Net HT</th>
           </tr>
         </thead>
         <tbody>
           {details.map((item, idx) => (
-            <tr key={idx} className="border-b border-slate-900/10">
-              <td className="border-r border-slate-900 p-1 font-mono">{item.Code}</td>
-              <td className="border-r border-slate-900 p-1">{item.Designation}</td>
-              <td className="border-r border-slate-900 p-1 text-center">{item.Qte}</td>
-              <td className="border-r border-slate-900 p-1 text-right">{formatPrice(item.PU_HT)}</td>
-              <td className="border-r border-slate-900 p-1 text-center">{item.Remise > 0 ? formatPrice(item.Remise) : ''}</td>
-              <td className="border-r border-slate-900 p-1 text-center">{formatPrice(item.TVA)}</td>
-              <td className="p-1 text-right">{formatPrice(item.Total_HT)}</td>
+            <tr key={idx} className="border-b border-slate-900/10" style={{ height: '18px' }}>
+              <td className="border-r border-slate-900 font-mono" style={{ padding: '4px', verticalAlign: 'middle', textAlign: 'center', overflow: 'hidden' }}>{item.Code}</td>
+              <td className="border-r border-slate-900" style={{ padding: '4px', verticalAlign: 'middle', textAlign: 'left', overflow: 'hidden' }}>{item.Designation}</td>
+              <td className="border-r border-slate-900" style={{ padding: '4px', verticalAlign: 'middle', textAlign: 'center' }}>{item.Qte}</td>
+              <td className="border-r border-slate-900" style={{ padding: '4px', verticalAlign: 'middle', textAlign: 'right' }}>{formatPrice(item.PU_HT)}</td>
+              <td className="border-r border-slate-900" style={{ padding: '4px', verticalAlign: 'middle', textAlign: 'center' }}>{item.Remise > 0 ? formatPrice(item.Remise) : ''}</td>
+              <td className="border-r border-slate-900" style={{ padding: '4px', verticalAlign: 'middle', textAlign: 'center' }}>{formatPrice(item.TVA)}</td>
+              <td style={{ padding: '4px', verticalAlign: 'middle', textAlign: 'right' }}>{formatPrice(item.Total_HT)}</td>
             </tr>
           ))}
-          {/* Fill empty rows to maintain layout if needed */}
+          {/* Fill empty rows to maintain layout */}
           {Array.from({ length: Math.max(0, 10 - details.length) }).map((_, i) => (
-            <tr key={`empty-${i}`} className="h-4 border-b border-slate-900/10">
-              <td className="border-r border-slate-900"></td>
-              <td className="border-r border-slate-900"></td>
-              <td className="border-r border-slate-900"></td>
-              <td className="border-r border-slate-900"></td>
-              <td className="border-r border-slate-900"></td>
-              <td className="border-r border-slate-900"></td>
-              <td></td>
+            <tr key={`empty-${i}`} className="border-b border-slate-900/10" style={{ height: '18px' }}>
+              <td className="border-r border-slate-900" style={{ padding: '4px' }}></td>
+              <td className="border-r border-slate-900" style={{ padding: '4px' }}></td>
+              <td className="border-r border-slate-900" style={{ padding: '4px' }}></td>
+              <td className="border-r border-slate-900" style={{ padding: '4px' }}></td>
+              <td className="border-r border-slate-900" style={{ padding: '4px' }}></td>
+              <td className="border-r border-slate-900" style={{ padding: '4px' }}></td>
+              <td style={{ padding: '4px' }}></td>
             </tr>
           ))}
         </tbody>
@@ -261,26 +260,26 @@ function DevisFiche({ data }) {
       <div className="flex gap-4 mb-4">
         {/* TVA Summary Table */}
         <div className="w-[45%]">
-          <table className="w-full border-collapse border border-slate-900 text-[9px]">
+          <table className="w-full border-collapse border border-slate-900 text-[9px]" style={{ borderCollapse: 'collapse', tableLayout: 'fixed', width: '100%' }}>
             <thead>
               <tr className="bg-slate-50 border-b border-slate-900 font-bold italic">
-                <th className="border-r border-slate-900 p-1 text-left">Taux TVA</th>
-                <th className="border-r border-slate-900 p-1 text-center">Base TVA</th>
-                <th className="p-1 text-center">Montant TVA</th>
+                <th className="border-r border-slate-900" style={{ width: '35%', padding: '5px 4px', verticalAlign: 'middle', textAlign: 'left', lineHeight: '1.3' }}>Taux TVA</th>
+                <th className="border-r border-slate-900" style={{ width: '35%', padding: '5px 4px', verticalAlign: 'middle', textAlign: 'center', lineHeight: '1.3' }}>Base TVA</th>
+                <th style={{ width: '30%', padding: '5px 4px', verticalAlign: 'middle', textAlign: 'center', lineHeight: '1.3' }}>Montant TVA</th>
               </tr>
             </thead>
             <tbody>
               {footer.map((f, idx) => (
-                <tr key={idx} className="border-b border-slate-900/10">
-                  <td className="border-r border-slate-900 p-1 font-bold">TVA {f.TVA_Footer}%</td>
-                  <td className="border-r border-slate-900 p-1 text-right">{formatPrice(f.Base_TVA)}</td>
-                  <td className="p-1 text-right">{formatPrice(f.Montant_TVA)}</td>
+                <tr key={idx} className="border-b border-slate-900/10" style={{ height: '18px' }}>
+                  <td className="border-r border-slate-900 font-bold" style={{ padding: '4px', verticalAlign: 'middle' }}>TVA {f.TVA_Footer}%</td>
+                  <td className="border-r border-slate-900" style={{ padding: '4px', verticalAlign: 'middle', textAlign: 'right' }}>{formatPrice(f.Base_TVA)}</td>
+                  <td style={{ padding: '4px', verticalAlign: 'middle', textAlign: 'right' }}>{formatPrice(f.Montant_TVA)}</td>
                 </tr>
               ))}
-              <tr className="font-bold border-t border-slate-900">
-                <td className="border-r border-slate-900 p-1">Total</td>
-                <td className="border-r border-slate-900 p-1"></td>
-                <td className="p-1 text-right">{formatPrice(footer.reduce((acc, f) => acc + f.Montant_TVA, 0))}</td>
+              <tr className="font-bold border-t border-slate-900" style={{ height: '18px' }}>
+                <td className="border-r border-slate-900" style={{ padding: '4px', verticalAlign: 'middle' }}>Total</td>
+                <td className="border-r border-slate-900" style={{ padding: '4px', verticalAlign: 'middle' }}></td>
+                <td style={{ padding: '4px', verticalAlign: 'middle', textAlign: 'right' }}>{formatPrice(footer.reduce((acc, f) => acc + f.Montant_TVA, 0))}</td>
               </tr>
             </tbody>
           </table>
@@ -350,7 +349,7 @@ function DevisFiche({ data }) {
       </div>
     </div>
   )
-}
+})
 
 // --- Main Page Component ---
 export default function DevisDetails() {
@@ -365,6 +364,60 @@ export default function DevisDetails() {
 
   const abortRef = useRef(null)
   const isMountedRef = useRef(true)
+  const ficheRef = useRef(null)
+
+  // --- PDF download handler: renders fiche to canvas then exports as A4 PDF ---
+  const handleDownloadPdf = async () => {
+    if (!ficheRef.current) return
+    try {
+      const html2canvas = (await import('html2canvas')).default
+      const { jsPDF } = await import('jspdf')
+
+      // Capture the hidden full-size fiche at high resolution
+      // windowWidth forces html2canvas to compute styles at the exact 595px width
+      const element = ficheRef.current
+      const canvas = await html2canvas(element, {
+        scale: 4,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        windowWidth: 595,
+        width: element.scrollWidth,
+        height: element.scrollHeight,
+      })
+
+      // A4 in mm: 210 x 297
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const pdfWidth = 210
+      const pdfHeight = 297
+
+      // Fit image to A4 maintaining aspect ratio
+      const imgAspect = canvas.width / canvas.height
+      const pageAspect = pdfWidth / pdfHeight
+
+      let imgWidth, imgHeight
+      if (imgAspect > pageAspect) {
+        // Wider than A4 — constrain by width
+        imgWidth = pdfWidth
+        imgHeight = pdfWidth / imgAspect
+      } else {
+        // Taller than A4 — constrain by height
+        imgHeight = pdfHeight
+        imgWidth = pdfHeight * imgAspect
+      }
+
+      // Center on page
+      const offsetX = (pdfWidth - imgWidth) / 2
+      const offsetY = (pdfHeight - imgHeight) / 2
+
+      const imgData = canvas.toDataURL('image/png', 1.0)
+      pdf.addImage(imgData, 'PNG', offsetX, offsetY, imgWidth, imgHeight)
+      pdf.save(`devis_${data?.header?.NUMERO || 'document'}.pdf`)
+    } catch (err) {
+      console.error('PDF generation failed:', err)
+      alert('Erreur lors de la génération du PDF. Veuillez réessayer.')
+    }
+  }
 
   useEffect(() => {
     isMountedRef.current = true
@@ -508,11 +561,7 @@ export default function DevisDetails() {
         </div>
         
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition-all shadow-sm">
-            <Printer size={18} />
-            <span className="hidden sm:inline">Imprimer</span>
-          </button>
-          <button className="flex items-center gap-2 px-5 py-2.5 bg-[#0052CC] text-white rounded-xl font-bold hover:bg-[#0747A6] transition-all shadow-lg shadow-blue-200">
+          <button onClick={handleDownloadPdf} className="flex items-center gap-2 px-5 py-2.5 bg-[#0052CC] text-white rounded-xl font-bold hover:bg-[#0747A6] transition-all shadow-lg shadow-blue-200">
             <Download size={18} />
             <span className="hidden sm:inline">Télécharger PDF</span>
           </button>
@@ -785,6 +834,11 @@ export default function DevisDetails() {
               <div className="origin-top transform scale-[0.6] sm:scale-[0.7] md:scale-[0.8] lg:scale-[0.9] xl:scale-[0.75] 2xl:scale-[0.85] transition-transform duration-500">
                 <DevisFiche data={data} />
               </div>
+            </div>
+
+            {/* Hidden full-size fiche for PDF capture — no transform, no scale, exact A4 size */}
+            <div style={{ position: 'fixed', left: '-9999px', top: '0', width: '595px', zIndex: -1 }} aria-hidden="true">
+              <DevisFiche ref={ficheRef} data={data} />
             </div>
             
             {/* Action Hint */}
