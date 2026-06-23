@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { apiFetch } from '../../api/apiClient'
 import {
   ChevronLeft,
   Plus,
@@ -238,7 +239,6 @@ const CreateDevis = () => {
     try {
       setLoading(true)
       setError(null)
-      const token = localStorage.getItem('auth_token')
 
       const payload = {
         ...header,
@@ -253,13 +253,10 @@ const CreateDevis = () => {
         })),
       }
 
-      const response = await fetch('http://localhost:3000/devis', {
+      const response = await apiFetch('/devis', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
+        body: payload,
+        auth: true,
       })
 
       if (response.ok) {
