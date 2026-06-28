@@ -356,6 +356,7 @@ export default function OperationsDashboard({ currentUser }) {
   const [draftMonth, setDraftMonth] = useState(() => new Date().getMonth())
   const [draftYear, setDraftYear] = useState(() => new Date().getFullYear())
   const [isLoading, setIsLoading] = useState(true)
+  const [currentActivityPage, setCurrentActivityPage] = useState(1)
   const [users, setUsers] = useState([])
   const [missions, setMissions] = useState([])
   const [interventions, setInterventions] = useState([])
@@ -370,8 +371,8 @@ export default function OperationsDashboard({ currentUser }) {
       const [usersRes, missionsRes, interventionsRes, machinesRes, devisRes] = await Promise.allSettled([
         apiFetch('/users', { auth: true }),
         apiFetch('/missions', { auth: true }),
-        apiFetch('/interventions', { auth: true }),
-        apiFetch('/machines', { auth: true }),
+        apiFetch('/interventions/summary', { auth: true }),
+        apiFetch('/machines/summary', { auth: true }),
         apiFetch('/devis?page=1&limit=200', { auth: true }),
       ])
       if (cancelled) return
@@ -883,36 +884,65 @@ export default function OperationsDashboard({ currentUser }) {
                 <SkeletonRows count={5} />
               ) : recentActivity.length === 0 ? (
                 <EmptyState text="Aucune activité récente sur la période sélectionnée." />
-              ) : (
-                <div className="divide-y divide-slate-100">
-                  {recentActivity.map((item) => {
-                    const meta = activityKindMeta[item.kind]
-                    return (
-                      <div key={item.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-                        <div className={`mt-1 h-2 w-2 rounded-full shrink-0 ${meta?.dot || 'bg-slate-400'}`} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="text-sm font-medium text-slate-800 truncate">{item.title}</p>
-                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium shrink-0 ${statusTone[item.status] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
-                              {missionStatusLabel[item.status] || interventionStatusLabel[item.status] || item.status}
-                            </span>
+              ) : (() => {
+                const ACTIVITY_PER_PAGE = 6
+                const totalActivityPages = Math.ceil(recentActivity.length / ACTIVITY_PER_PAGE)
+                const safeActivityPage = Math.min(currentActivityPage, totalActivityPages)
+                const activityVisible = recentActivity.slice((safeActivityPage - 1) * ACTIVITY_PER_PAGE, safeActivityPage * ACTIVITY_PER_PAGE)
+                return (
+                  <>
+                    <div className="divide-y divide-slate-100">
+                      {activityVisible.map((item) => {
+                        const meta = activityKindMeta[item.kind]
+                        return (
+                          <div key={item.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                            <div className={`mt-1 h-2 w-2 rounded-full shrink-0 ${meta?.dot || 'bg-slate-400'}`} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-sm font-medium text-slate-800 truncate">{item.title}</p>
+                                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium shrink-0 ${statusTone[item.status] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                                  {missionStatusLabel[item.status] || interventionStatusLabel[item.status] || item.status}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 mt-1 flex-wrap">
+                                <span className="text-xs text-slate-500 truncate">{item.meta}</span>
+                                <span className="text-xs text-slate-400 flex items-center gap-1 shrink-0">
+                                  <Clock3 size={11} />
+                                  {relativeDateLabel(item.rawDate)}
+                                </span>
+                                <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium shrink-0 ${meta?.tone || 'text-slate-600 bg-slate-100 border-slate-200'}`}>
+                                  {meta?.label || item.kind}
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-3 mt-1">
-                            <span className="text-xs text-slate-500 truncate">{item.meta}</span>
-                            <span className="text-xs text-slate-400 flex items-center gap-1 shrink-0">
-                              <Clock3 size={11} />
-                              {relativeDateLabel(item.rawDate)}
-                            </span>
-                            <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium shrink-0 ${meta?.tone || 'text-slate-600 bg-slate-100 border-slate-200'}`}>
-                              {meta?.label || item.kind}
-                            </span>
-                          </div>
-                        </div>
+                        )
+                      })}
+                    </div>
+                    {totalActivityPages > 1 && (
+                      <div className="flex items-center justify-center gap-3 mt-4 pt-3 border-t border-slate-100">
+                        <button
+                          onClick={() => setCurrentActivityPage((p) => Math.max(1, p - 1))}
+                          disabled={safeActivityPage <= 1}
+                          className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        >
+                          ←
+                        </button>
+                        <span className="text-xs font-bold text-slate-500">
+                          {safeActivityPage} / {totalActivityPages}
+                        </span>
+                        <button
+                          onClick={() => setCurrentActivityPage((p) => Math.min(totalActivityPages, p + 1))}
+                          disabled={safeActivityPage >= totalActivityPages}
+                          className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        >
+                          →
+                        </button>
                       </div>
-                    )
-                  })}
-                </div>
-              )}
+                    )}
+                  </>
+                )
+              })()}
             </Card>
           </div>
 

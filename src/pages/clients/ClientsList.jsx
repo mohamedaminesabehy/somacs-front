@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 
-const PAGE_SIZE = 12
+const PAGE_SIZE = 9
 
 function normalize(value) {
   return String(value || '')
@@ -82,7 +82,6 @@ export default function ClientsList() {
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const [filter, setFilter] = useState('all') // 'all' | 'incomplete'
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteSuccess, setDeleteSuccess] = useState(null)
@@ -100,8 +99,6 @@ export default function ClientsList() {
     if (isCommercial) navigate('/', { replace: true })
   }, [isCommercial, navigate])
 
-  if (isCommercial) return null
-
   const loadClients = () => {
     let alive = true
     setLoading(true)
@@ -114,14 +111,16 @@ export default function ClientsList() {
     return () => { alive = false }
   }
 
-  useEffect(() => loadClients(), [])
+  useEffect(() => {
+    if (isCommercial) return undefined
+    return loadClients()
+  }, [isCommercial])
 
   const isIncomplete = (c) => !c.phone && !c.email
   const totalIncomplete = useMemo(() => clients.filter(isIncomplete).length, [clients])
 
   const filtered = useMemo(() => {
     let list = clients
-    if (filter === 'incomplete') list = list.filter(isIncomplete)
     const q = normalize(search.trim())
     if (q) {
       list = list.filter((c) => {
@@ -132,14 +131,14 @@ export default function ClientsList() {
       })
     }
     return list
-  }, [clients, search, filter])
+  }, [clients, search])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
   const startIdx = (safePage - 1) * PAGE_SIZE
   const visible = filtered.slice(startIdx, startIdx + PAGE_SIZE)
 
-  useEffect(() => { setPage(1) }, [search, filter])
+  useEffect(() => { setPage(1) }, [search])
 
   const goTo360 = (client) => navigate(`/clients/${client.id}/360`)
 
@@ -163,6 +162,8 @@ export default function ClientsList() {
       setDeleteTarget(null)
     }
   }
+
+  if (isCommercial) return null
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 space-y-6">
@@ -241,7 +242,7 @@ export default function ClientsList() {
         </div>
       </div>
 
-      {/* Recherche + filtres */}
+      {/* Recherche */}
       <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-4 flex flex-col lg:flex-row lg:items-center gap-3">
         <div className="relative w-full lg:max-w-md">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -260,25 +261,6 @@ export default function ClientsList() {
               <X size={14} />
             </button>
           )}
-        </div>
-
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-              filter === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            Tous
-          </button>
-          <button
-            onClick={() => setFilter('incomplete')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-              filter === 'incomplete' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            Données manquantes
-          </button>
         </div>
 
         <p className="lg:ml-auto text-xs text-slate-400">
@@ -314,11 +296,11 @@ export default function ClientsList() {
           </div>
           <p className="text-sm font-bold text-slate-700">Aucun client trouvé</p>
           <p className="text-xs text-slate-400 mt-1">
-            {search || filter !== 'all' ? 'Essayez d’ajuster vos filtres.' : 'Aucun client enregistré pour le moment.'}
+            {search ? 'Ajustez votre recherche.' : 'Aucun client enregistr\u00e9 pour le moment.'}
           </p>
-          {(search || filter !== 'all') && (
+          {search && (
             <button
-              onClick={() => { setSearch(''); setFilter('all') }}
+              onClick={() => { setSearch('') }}
               className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0052CC] bg-blue-50 hover:bg-blue-100 rounded-lg"
             >
               Réinitialiser

@@ -789,26 +789,38 @@ export default function InterventionList() {
               <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
 
-            {/* Date Filters Row (Now on the same line) */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
-              <div className="relative w-full sm:w-auto">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500" size={12} />
-                <input 
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-600 focus:bg-white outline-none transition-all w-full sm:w-36"
-                />
+            {/* Date Filters Row */}
+            <div className="flex flex-col sm:flex-row sm:items-end gap-2 w-full sm:w-auto">
+              <div className="flex flex-col gap-1 w-full sm:w-auto min-w-0">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date début</label>
+                <div className="relative w-full sm:w-40 min-w-0">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 pointer-events-none" size={12} />
+                  <input 
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all w-full min-w-0"
+                  />
+                  {!startDate && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium pointer-events-none sm:hidden">JJ/MM/AAAA</span>
+                  )}
+                </div>
               </div>
-              <span className="text-slate-300 text-xs hidden sm:inline">à</span>
-              <div className="relative w-full sm:w-auto">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500" size={12} />
-                <input 
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold text-slate-600 focus:bg-white outline-none transition-all w-full sm:w-36"
-                />
+              <span className="text-slate-300 text-xs hidden sm:inline pb-2.5">à</span>
+              <div className="flex flex-col gap-1 w-full sm:w-auto min-w-0">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date fin</label>
+                <div className="relative w-full sm:w-40 min-w-0">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 pointer-events-none" size={12} />
+                  <input 
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all w-full min-w-0"
+                  />
+                  {!endDate && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium pointer-events-none sm:hidden">JJ/MM/AAAA</span>
+                  )}
+                </div>
               </div>
             </div>
 

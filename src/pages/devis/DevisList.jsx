@@ -380,26 +380,36 @@ const DevisList = () => {
           {/* Période */}
           <div className="mt-3 flex flex-col gap-3 border-t border-slate-100 pt-3 lg:flex-row lg:items-center lg:gap-3">
             <span className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Période</span>
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-end gap-2.5 w-full sm:w-auto">
               <button onClick={handleToday}
                 className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-700 transition-all hover:-translate-y-0.5 hover:shadow-sm">
                 <Calendar size={15} className="text-blue-500" /> Aujourd'hui
               </button>
-              <div className="flex items-center gap-1.5">
-                <label className="text-[11px] font-bold text-slate-400">Début</label>
-                <input type="date" value={dateFrom} max={dateTo || undefined}
-                  onChange={e => setDateFrom(e.target.value)} title="Date de début"
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-900 outline-none transition-all focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10" />
+              <div className="flex flex-col gap-1 min-w-0 w-full sm:w-auto">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date début</label>
+                <div className="relative min-w-0">
+                  <input type="date" value={dateFrom} max={dateTo || undefined}
+                    onChange={e => setDateFrom(e.target.value)} title="Date de début"
+                    className="w-full sm:w-40 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-900 outline-none transition-all focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10 min-w-0" />
+                  {!dateFrom && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium pointer-events-none sm:hidden">JJ/MM/AAAA</span>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <label className="text-[11px] font-bold text-slate-400">Fin</label>
-                <input type="date" value={dateTo} min={dateFrom || undefined}
-                  onChange={e => setDateTo(e.target.value)} title="Date de fin"
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-900 outline-none transition-all focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10" />
+              <div className="flex flex-col gap-1 min-w-0 w-full sm:w-auto">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date fin</label>
+                <div className="relative min-w-0">
+                  <input type="date" value={dateTo} min={dateFrom || undefined}
+                    onChange={e => setDateTo(e.target.value)} title="Date de fin"
+                    className="w-full sm:w-40 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-900 outline-none transition-all focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10 min-w-0" />
+                  {!dateTo && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium pointer-events-none sm:hidden">JJ/MM/AAAA</span>
+                  )}
+                </div>
               </div>
               {(dateFrom || dateTo) && (
                 <button onClick={() => { setDateFrom(''); setDateTo('') }}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-500 transition-all hover:-translate-y-0.5 hover:text-rose-600 hover:shadow-sm">
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-500 transition-all hover:-translate-y-0.5 hover:text-rose-600 hover:shadow-sm self-end">
                   <X size={14} /> Réinitialiser
                 </button>
               )}
@@ -421,15 +431,25 @@ const DevisList = () => {
               <div className="p-6 space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-600">Date début *</label>
-                  <input type="date" value={exportStartDate} max={exportEndDate || undefined}
-                    onChange={e => setExportStartDate(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10" />
+                  <div className="relative">
+                    <input type="date" value={exportStartDate} max={exportEndDate || undefined}
+                      onChange={e => setExportStartDate(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 min-w-0" />
+                    {!exportStartDate && (
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-medium pointer-events-none sm:hidden">JJ/MM/AAAA</span>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-600">Date fin *</label>
-                  <input type="date" value={exportEndDate} min={exportStartDate || undefined}
-                    onChange={e => setExportEndDate(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-900 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10" />
+                  <div className="relative">
+                    <input type="date" value={exportEndDate} min={exportStartDate || undefined}
+                      onChange={e => setExportEndDate(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 min-w-0" />
+                    {!exportEndDate && (
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-medium pointer-events-none sm:hidden">JJ/MM/AAAA</span>
+                    )}
+                  </div>
                 </div>
                 {exportError && (
                   <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-bold text-red-700">

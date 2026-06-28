@@ -810,21 +810,31 @@ export default function ListMission() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
                     <div className="flex flex-col gap-1 min-w-0">
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date début</label>
-                      <input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0052CC]/30 bg-white min-w-0"
-                      />
+                      <div className="relative min-w-0">
+                        <input
+                          type="date"
+                          value={startDate}
+                          onChange={(e) => setStartDate(e.target.value)}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0052CC]/30 bg-white min-w-0"
+                        />
+                        {!startDate && (
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium pointer-events-none sm:hidden">JJ/MM/AAAA</span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex flex-col gap-1 min-w-0">
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date fin</label>
-                      <input
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0052CC]/30 bg-white min-w-0"
-                      />
+                      <div className="relative min-w-0">
+                        <input
+                          type="date"
+                          value={endDate}
+                          onChange={(e) => setEndDate(e.target.value)}
+                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0052CC]/30 bg-white min-w-0"
+                        />
+                        {!endDate && (
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium pointer-events-none sm:hidden">JJ/MM/AAAA</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}

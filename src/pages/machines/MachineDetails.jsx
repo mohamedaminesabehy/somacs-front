@@ -905,26 +905,36 @@ export default function MachineDetails({ currentUser }) {
                 )}
 
                 {assistantResult && (
-                  <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div className="mt-4 space-y-4">
+                    {/* Causes possibles */}
                     <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
                       <h4 className="text-xs font-black uppercase tracking-wider text-amber-800 flex items-center gap-2 mb-3">
                         <Lightbulb size={13} /> Causes possibles
                       </h4>
                       <ul className="space-y-2">
-                        {assistantResult.causes.map((cause) => (
-                          <li key={cause} className="text-sm text-amber-900/90">• {cause}</li>
-                        ))}
+                        {assistantResult.causes.length > 0 ? (
+                          assistantResult.causes.map((cause) => (
+                            <li key={cause} className="text-sm text-amber-900/90">• {cause}</li>
+                          ))
+                        ) : (
+                          <li className="text-sm text-amber-700/70 italic">Aucune cause retournee.</li>
+                        )}
                       </ul>
                     </div>
 
+                    {/* Solutions recommandées */}
                     <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
                       <h4 className="text-xs font-black uppercase tracking-wider text-emerald-800 flex items-center gap-2 mb-3">
                         <Wrench size={13} /> Solutions recommandees
                       </h4>
                       <ul className="space-y-2">
-                        {assistantResult.solutions.map((solution) => (
-                          <li key={solution} className="text-sm text-emerald-900/90">• {solution}</li>
-                        ))}
+                        {assistantResult.solutions.length > 0 ? (
+                          assistantResult.solutions.map((solution) => (
+                            <li key={solution} className="text-sm text-emerald-900/90">• {solution}</li>
+                          ))
+                        ) : (
+                          <li className="text-sm text-emerald-700/70 italic">Aucune solution retournee.</li>
+                        )}
                       </ul>
                     </div>
                   </div>

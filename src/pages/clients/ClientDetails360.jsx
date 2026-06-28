@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Building2,
@@ -541,6 +541,7 @@ export default function ClientDetails360() {
   const [clientEditError, setClientEditError] = useState('')
   const [savingClient, setSavingClient] = useState(false)
   const [toast, setToast] = useState('')
+  const [currentSavPage, setCurrentSavPage] = useState(1)
 
   const load = () => {
     let alive = true
@@ -877,6 +878,9 @@ export default function ClientDetails360() {
         )}
       </section>
 
+      {/* ── Separator ── */}
+      <div className="border-t border-slate-200 lg:hidden" />
+
       {/* Équipements du client */}
       <section>
         <div className="flex items-center justify-between mb-3">
@@ -908,6 +912,9 @@ export default function ClientDetails360() {
         )}
       </section>
 
+      {/* -- Separator -- */}
+      <div className="border-t border-slate-200 lg:hidden" />
+
       {/* Suivi SAV du client */}
       <section>
         <div className="flex items-center justify-between mb-3">
@@ -928,19 +935,48 @@ export default function ClientDetails360() {
               <Wrench className="text-slate-300" size={20} />
             </div>
             <p className="text-sm font-bold text-slate-700">Aucune intervention</p>
-            <p className="text-xs text-slate-400 mt-1">Ce client n’a pas encore d’intervention enregistrée.</p>
+            <p className="text-xs text-slate-400 mt-1">Ce client n'a pas encore d'intervention enregistr&eacute;e.</p>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            {interventions.map((i) => (
-              <InterventionCard
-                key={i.id}
-                intervention={i}
-                onView={() => setSelectedIntervention(i)}
-              />
-            ))}
-          </div>
-        )}
+        ) : (() => {
+          const SAV_PER_PAGE = 4
+          const totalSavPages = Math.ceil(interventions.length / SAV_PER_PAGE)
+          const safeSavPage = Math.min(currentSavPage, totalSavPages)
+          const savVisible = interventions.slice((safeSavPage - 1) * SAV_PER_PAGE, safeSavPage * SAV_PER_PAGE)
+          return (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {savVisible.map((i) => (
+                  <InterventionCard
+                    key={i.id}
+                    intervention={i}
+                    onView={() => setSelectedIntervention(i)}
+                  />
+                ))}
+              </div>
+              {totalSavPages > 1 && (
+                <div className="flex items-center justify-center gap-3 mt-4">
+                  <button
+                    onClick={() => setCurrentSavPage((p) => Math.max(1, p - 1))}
+                    disabled={safeSavPage <= 1}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    Pr&eacute;c&eacute;dent
+                  </button>
+                  <span className="text-xs font-bold text-slate-500">
+                    {safeSavPage} / {totalSavPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentSavPage((p) => Math.min(totalSavPages, p + 1))}
+                    disabled={safeSavPage >= totalSavPages}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    Suivant
+                  </button>
+                </div>
+              )}
+            </>
+          )
+        })()}
       </section>
 
       {/* Modal détail intervention */}
