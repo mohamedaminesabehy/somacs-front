@@ -66,6 +66,38 @@ function truncateText(value, max = 70) {
   return `${text.slice(0, max)}....`
 }
 
+function getMissionDisplayData(mission, employeeUsers) {
+  const IconComponent = mission.type === 'Intervention' ? Wrench : ClipboardList
+  const priorityColor = getPriorityColor(mission.priority)
+  const statusColor = getStatusColorKey(mission.status)
+  const employeeDisplay = mission.employeeDisplay || mission.employee
+  const groupedStatuses = getGroupedEmployeeStatuses(mission)
+  const isGroupedMission = groupedStatuses.length > 1
+  const avatar = getAvatarFromName(employeeDisplay)
+  return {
+    IconComponent,
+    priorityColor,
+    statusColor,
+    employeeDisplay,
+    groupedStatuses,
+    isGroupedMission,
+    avatar
+  }
+}
+
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center text-center">
+      <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center mb-3">
+        <AlertCircle size={22} className="text-gray-400" />
+      </div>
+      <p className="text-xs text-gray-500 mt-1">
+        Il n&apos;y a pas de mission correspondant à vos filtres.
+      </p>
+    </div>
+  )
+}
+
 function getPriorityColor(priority) {
   if (priority === 'Critique') return 'red'
   if (priority === 'Haute') return 'orange'
@@ -502,25 +534,20 @@ function MissionTableInner(props, ref) {
       <div className="lg:hidden px-4 py-4 sm:px-6 sm:py-5">
         {paginatedMissions.length === 0 ? (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-6 py-12">
-            <div className="flex flex-col items-center justify-center text-center">
-              <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center mb-3">
-                <AlertCircle size={22} className="text-gray-400" />
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Il n&apos;y a pas de mission correspondant à vos filtres.
-              </p>
-            </div>
+            <EmptyState />
           </div>
         ) : (
           <div className="space-y-4 sm:space-y-5">
             {paginatedMissions.map((mission) => {
-              const IconComponent = mission.type === 'Intervention' ? Wrench : ClipboardList
-              const priorityColor = getPriorityColor(mission.priority)
-              const statusColor = getStatusColorKey(mission.status)
-              const employeeDisplay = mission.employeeDisplay || mission.employee
-              const groupedStatuses = getGroupedEmployeeStatuses(mission)
-              const isGroupedMission = groupedStatuses.length > 1
-              const avatar = getAvatarFromName(employeeDisplay)
+              const {
+                IconComponent,
+                priorityColor,
+                statusColor,
+                employeeDisplay,
+                groupedStatuses,
+                isGroupedMission,
+                avatar
+              } = getMissionDisplayData(mission, employeeUsers)
               const isHighlighted =
                 (activeHighlightMissionId && String(mission?.id) === activeHighlightMissionId) ||
                 (activeHighlightGroupId && String(mission?.assignmentGroupId || '').trim() === activeHighlightGroupId)
@@ -634,25 +661,20 @@ function MissionTableInner(props, ref) {
           {paginatedMissions.length === 0 ? (
             <tr>
               <td colSpan={7} className="px-6 py-12">
-                <div className="flex flex-col items-center justify-center text-center">
-                  <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center mb-3">
-                    <AlertCircle size={22} className="text-gray-400" />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Il n&apos;y a pas de mission correspondant à vos filtres.
-                  </p>
-                </div>
+                <EmptyState />
               </td>
             </tr>
           ) : null}
           {paginatedMissions.map((mission) => {
-            const IconComponent = mission.type === 'Intervention' ? Wrench : ClipboardList
-            const priorityColor = getPriorityColor(mission.priority)
-            const statusColor = getStatusColorKey(mission.status)
-            const employeeDisplay = mission.employeeDisplay || mission.employee
-            const groupedStatuses = getGroupedEmployeeStatuses(mission)
-            const isGroupedMission = groupedStatuses.length > 1
-            const avatar = getAvatarFromName(employeeDisplay)
+            const {
+              IconComponent,
+              priorityColor,
+              statusColor,
+              employeeDisplay,
+              groupedStatuses,
+              isGroupedMission,
+              avatar
+            } = getMissionDisplayData(mission, employeeUsers)
             const isHighlighted =
               (activeHighlightMissionId && String(mission?.id) === activeHighlightMissionId) ||
               (activeHighlightGroupId && String(mission?.assignmentGroupId || '').trim() === activeHighlightGroupId)
