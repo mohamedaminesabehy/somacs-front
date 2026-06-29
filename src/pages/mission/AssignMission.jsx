@@ -31,6 +31,13 @@ import {
 } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 
+const createSafeRandomId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID().replace(/-/g, '')
+  }
+  return String(Date.now())
+}
+
 function getAvatarFromName(name) {
   if (!name) return ''
   const parts = name.split(' ').filter(Boolean)
@@ -366,7 +373,7 @@ export default function AssignMission() {
       const createdMissions = []
       const assignmentGroupId =
         selectedEmployeeObjs.length > 1
-          ? `AG-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+          ? `AG-${Date.now()}-${createSafeRandomId().slice(0, 8)}`
           : null
       for (const employee of selectedEmployeeObjs) {
         // backend requires non-empty description; for interventions, default to the

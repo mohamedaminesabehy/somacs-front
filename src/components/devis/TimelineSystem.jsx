@@ -33,23 +33,6 @@ const getDateGroupLabel = (group) => {
   return labels[group] || group
 }
 
-const groupLogsByDate = (logs) => {
-  const groups = {
-    today: [],
-    yesterday: [],
-    thisWeek: [],
-    thisMonth: [],
-    older: []
-  }
-  
-  logs.forEach(log => {
-    const group = getDateGroup(log.createdAt)
-    if (groups[group]) groups[group].push(log)
-  })
-  
-  return groups
-}
-
 // ─── Composant : Timeline Empty State ──────────────────────────────────────
 
 export function TimelineEmptyState() {
@@ -188,8 +171,6 @@ export function TimelineContainer({ logs, loading, actionMeta, statusMeta, maxVi
     return <TimelineEmptyState />
   }
 
-  // Grouper par date
-  const grouped = groupLogsByDate(logs)
   const visibleLogs = expanded ? logs : logs.slice(0, maxVisible)
   const hasMore = logs.length > maxVisible
 
@@ -257,7 +238,7 @@ export function TimelineContainer({ logs, loading, actionMeta, statusMeta, maxVi
 
 // ─── Composant : Premium Timeline Wrapper ─────────────────────────────────
 
-export function PremiumAuditTimeline({ suiviId, actionMeta, statusMeta, loading, logs }) {
+export function PremiumAuditTimeline({ actionMeta, statusMeta, loading, logs }) {
   return (
     <div className="space-y-0">
       <TimelineContainer

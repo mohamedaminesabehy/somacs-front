@@ -394,7 +394,7 @@ export function DevisSuiviTimeline({ devis, selectedStatuses: selectedStatusesPr
 
     loadTimeline()
     return () => { mounted = false }
-  }, [init.numeroDevis, init.typDoc, selectedStatusesProp])
+  }, [init.createdAt, init.numeroDevis, init.typDoc, selectedStatusesProp])
 
   return (
     <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
@@ -458,7 +458,9 @@ function getStoredStatuses(numeroDevis, typDoc) {
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed) && parsed.length > 0) return parsed
     }
-  } catch {}
+  } catch {
+    // Stored statuses are optional.
+  }
   return null
 }
 
@@ -466,7 +468,9 @@ function setStoredStatuses(numeroDevis, typDoc, statuses) {
   try {
     const key = `devis_statuses_${numeroDevis}_${typDoc}`
     localStorage.setItem(key, JSON.stringify(statuses))
-  } catch {}
+  } catch {
+    // Stored statuses are optional.
+  }
 }
 
 function getStoredStatusDates(numeroDevis, typDoc) {
@@ -476,7 +480,9 @@ function getStoredStatusDates(numeroDevis, typDoc) {
     if (!raw) return null
     const parsed = JSON.parse(raw)
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed
-  } catch {}
+  } catch {
+    // Stored status dates are optional.
+  }
   return null
 }
 
@@ -484,7 +490,9 @@ function setStoredStatusDates(numeroDevis, typDoc, statusDates) {
   try {
     const key = `devis_status_dates_${numeroDevis}_${typDoc}`
     localStorage.setItem(key, JSON.stringify(statusDates || {}))
-  } catch {}
+  } catch {
+    // Stored status dates are optional.
+  }
 }
 
 function mergeStatusDates(existingDates, selectedStatuses) {
@@ -511,7 +519,9 @@ function parseServerStatusesHistory(jsonString) {
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       return parsed
     }
-  } catch {}
+  } catch {
+    // Server status history is optional.
+  }
   return null
 }
 export default function DevisSuiviSection({ devis, enableTimeline = true, onStatusesChange }) {
@@ -527,7 +537,6 @@ export default function DevisSuiviSection({ devis, enableTimeline = true, onStat
   const [recordExists, setRecordExists] = useState(false)
   const [suiviId, setSuiviId] = useState(null)
   const [showTimeline, setShowTimeline] = useState(false)
-  const [activeSection, setActiveSection] = useState('form')
 
   // Sync uniquement les champs non-statuts si devis change (ex: montant recalculé)
   // Ne jamais écraser selectedStatuses depuis init — déjà géré dans defaultDraft via localStorage

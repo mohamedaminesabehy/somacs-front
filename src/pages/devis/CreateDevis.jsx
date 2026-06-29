@@ -37,6 +37,13 @@ const toNumber = (value, fallback = 0) => {
 
 const normalizeRate = (value) => Math.max(0, toNumber(value, 0))
 
+const createLineId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return String(Date.now())
+}
+
 // Récupère l'utilisateur connecté (commercial) depuis le localStorage
 const getAuthUser = () => {
   if (typeof window === 'undefined') return null
@@ -65,7 +72,7 @@ const resolveTVA = (line) => {
 }
 
 const createEmptyLine = () => ({
-  id: Date.now() + Math.floor(Math.random() * 1000),
+  id: createLineId(),
   Code: '',
   Designation: '',
   CodeTVA: '',

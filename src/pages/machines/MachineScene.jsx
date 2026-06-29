@@ -2,6 +2,15 @@
 import * as THREE from 'three'
 import { gsap } from 'gsap'
 
+const secureRandomFloat = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const values = new Uint32Array(1)
+    crypto.getRandomValues(values)
+    return values[0] / 0x100000000
+  }
+  return 0.5
+}
+
 export default function MachineScene({ status }) {
   const mountRef = useRef(null)
 
@@ -87,9 +96,9 @@ export default function MachineScene({ status }) {
     const particleCount = 60
     const positions = new Float32Array(particleCount * 3)
     for (let i = 0; i < particleCount; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * 6
-      positions[i * 3 + 1] = (Math.random() - 0.5) * 6
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 4
+      positions[i * 3] = (secureRandomFloat() - 0.5) * 6
+      positions[i * 3 + 1] = (secureRandomFloat() - 0.5) * 6
+      positions[i * 3 + 2] = (secureRandomFloat() - 0.5) * 4
     }
     const particleGeo = new THREE.BufferGeometry()
     particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3))

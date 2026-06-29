@@ -30,12 +30,16 @@ const ArticleSelectionModal = ({ isOpen, onClose, onSelect }) => {
     isMountedRef.current = true
     return () => {
       isMountedRef.current = false
-      try { controllerRef.current?.abort() } catch {}
+      try { controllerRef.current?.abort() } catch {
+        // Ignore abort errors during modal cleanup.
+      }
     }
   }, [])
 
   const fetchArticles = useCallback(async (search, pageNum) => {
-    try { controllerRef.current?.abort() } catch {}
+    try { controllerRef.current?.abort() } catch {
+      // Ignore abort errors when replacing the active request.
+    }
     const controller = new AbortController()
     controllerRef.current = controller
 
@@ -73,7 +77,9 @@ const ArticleSelectionModal = ({ isOpen, onClose, onSelect }) => {
           window.localStorage.setItem('articles_page1_cache', JSON.stringify({
             items, total: data.total, totalPages: data.totalPages, hasNext: data.hasNext,
           }))
-        } catch {}
+        } catch {
+          // Cache writes are optional.
+        }
       }
     } catch (err) {
       if (err.name === 'AbortError') return
@@ -105,10 +111,16 @@ const ArticleSelectionModal = ({ isOpen, onClose, onSelect }) => {
           setPagination({ page: 1, total: parsed.total || 0, totalPages: parsed.totalPages || 0, hasNext: Boolean(parsed.hasNext) })
         }
       }
-    } catch {}
+    } catch {
+      // Cache reads are optional.
+    }
     // Puis rafraîchir depuis le serveur
     fetchArticles('', 1)
-    return () => { try { controllerRef.current?.abort() } catch {} }
+    return () => {
+      try { controllerRef.current?.abort() } catch {
+        // Ignore abort errors during modal cleanup.
+      }
+    }
   }, [isOpen, fetchArticles])
 
   // Debounce de la recherche (500ms, comme DevisList)

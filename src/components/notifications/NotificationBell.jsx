@@ -3,16 +3,6 @@ import { Bell } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useNotifications } from '../../notifications/NotificationsProvider'
 
-function formatDate(value) {
-  try {
-    const d = value instanceof Date ? value : new Date(value)
-    if (Number.isNaN(d.getTime())) return ''
-    return d.toLocaleString('fr-FR', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
-  } catch {
-    return ''
-  }
-}
-
 function formatTime(value) {
   try {
     const d = value instanceof Date ? value : new Date(value)

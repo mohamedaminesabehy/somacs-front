@@ -36,14 +36,18 @@ function clearStoredAuth() {
   try {
     window.localStorage.removeItem('auth_token')
     window.localStorage.removeItem('auth_user')
-  } catch {}
+  } catch {
+    // Storage access can fail in restricted browser contexts.
+  }
 }
 
 function dispatchAuthInvalid(reason) {
   if (typeof window === 'undefined') return
   try {
     window.dispatchEvent(new CustomEvent('auth:invalid', { detail: { reason } }))
-  } catch {}
+  } catch {
+    // Ignore browsers that block CustomEvent dispatch in this context.
+  }
 }
 
 function createUnauthorizedResponse(message = 'Unauthorized') {
@@ -133,4 +137,3 @@ export async function logoutSession() {
     // Local cleanup is handled by the caller even if API logout fails.
   }
 }
-

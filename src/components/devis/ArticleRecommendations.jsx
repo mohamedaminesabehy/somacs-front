@@ -127,7 +127,7 @@ const ArticleRecommendations = ({ currentArticles, onAddArticle }) => {
       }
       detailCacheRef.current.set(code, full)
       onAddArticle(full)
-    } catch (err) {
+    } catch {
       setAddError("Erreur lors de l'ajout. Réessayez.")
     } finally {
       setAddingCode(null)

@@ -34,7 +34,7 @@ export default function LoginForm({ onLoginSuccess }) {
           setError('Réponse du serveur invalide.')
         }
       }
-    } catch (err) {
+    } catch {
       setError('Impossible de joindre le serveur.')
     } finally {
       setIsLoading(false)

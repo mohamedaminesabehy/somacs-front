@@ -21,8 +21,9 @@ import {
 } from 'lucide-react'
 import logo from '../../assets/logo.jpg'
 
-function SubMenu({ icon: Icon, label, children, matchPaths }) {
+function SubMenu({ icon, label, children, matchPaths }) {
   const location = useLocation()
+  const MenuIcon = icon
   const isAnyChildActive = matchPaths.some((path) => location.pathname.startsWith(path))
   const [open, setOpen] = useState(isAnyChildActive)
 
@@ -37,7 +38,7 @@ function SubMenu({ icon: Icon, label, children, matchPaths }) {
             : 'text-slate-400 hover:bg-slate-800 hover:text-white'
         }`}
       >
-        <Icon size={20} className="group-hover:scale-110 transition-transform shrink-0" />
+        <MenuIcon size={20} className="group-hover:scale-110 transition-transform shrink-0" />
         <span className="font-medium flex-1 text-left">{label}</span>
         {open
           ? <ChevronDown size={15} className="shrink-0 opacity-60" />
@@ -53,7 +54,8 @@ function SubMenu({ icon: Icon, label, children, matchPaths }) {
   )
 }
 
-function SubLink({ to, icon: Icon, label, onClick, end }) {
+function SubLink({ to, icon, label, onClick, end }) {
+  const LinkIcon = icon
   return (
     <NavLink
       to={to}
@@ -67,7 +69,7 @@ function SubLink({ to, icon: Icon, label, onClick, end }) {
       }
       onClick={onClick}
     >
-      <Icon size={16} className="group-hover:scale-110 transition-transform shrink-0" />
+      <LinkIcon size={16} className="group-hover:scale-110 transition-transform shrink-0" />
       <span className="font-medium text-sm">{label}</span>
     </NavLink>
   )

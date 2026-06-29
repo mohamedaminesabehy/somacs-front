@@ -27,14 +27,12 @@ const ClientSelectionModal = ({ isOpen, onClose, onSelect }) => {
   const [editingClient, setEditingClient] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const [loading, setLoading] = useState(false)
   const itemsPerPage = 5
 
   // Mock data for clients
   const [clients, setClients] = useState([])
 
   const fetchClients = async () => {
-    setLoading(true)
     try {
       const response = await apiFetch('/clients', { auth: true })
       if (response.ok) {
@@ -43,8 +41,6 @@ const ClientSelectionModal = ({ isOpen, onClose, onSelect }) => {
       }
     } catch (error) {
       console.error('Error fetching clients:', error)
-    } finally {
-      setLoading(false)
     }
   }
 
