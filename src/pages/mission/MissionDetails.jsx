@@ -4,10 +4,10 @@ import {
   ArrowLeft, CheckCircle2, XCircle, Clock, Calendar, MapPin,
   Building2, Wrench, ClipboardList, AlertTriangle, Link2,
   User, FileText, Hash, ChevronRight, Edit2, Loader2,
-  CheckSquare, Flag, BarChart2, Phone, Zap, Info,
-  ExternalLink, MessageSquare, History, Save, Trash2,
-  MoreVertical, Share2, Printer, Paperclip, File, Image, X,
-  Download, Eye, Plus, Truck
+  CheckSquare, Flag, Phone, Zap, Info,
+  ExternalLink, History, Save,
+  MoreVertical, Paperclip, File, X,
+  Download, Eye, Truck
 } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 
@@ -88,6 +88,17 @@ function syncVehicleMileageState(setDepart, setRetour, missionLike) {
       ? missionLike.vehicleKilometrageRetour
       : '',
   )
+}
+
+function downloadDocument(url, filename) {
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename || 'document'
+  link.target = '_blank'
+  link.rel = 'noopener noreferrer'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
 }
 
 export default function MissionDetails() {
@@ -1059,16 +1070,7 @@ export default function MissionDetails() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            const a = document.createElement('a')
-                            a.href = attachments[0].downloadUrl || attachments[0].url
-                            a.download = attachments[0].name || 'document'
-                            a.target = '_blank'
-                            a.rel = 'noopener noreferrer'
-                            document.body.appendChild(a)
-                            a.click()
-                            document.body.removeChild(a)
-                          }}
+                          onClick={() => downloadDocument(attachments[0].downloadUrl || attachments[0].url, attachments[0].name)}
                           className="p-2 bg-white rounded-lg text-slate-900 shadow-xl hover:scale-110 transition-transform"
                         >
                           <Download size={18} />
@@ -1109,15 +1111,7 @@ export default function MissionDetails() {
                   )}
                   <button
                     type="button"
-                    onClick={() => {
-                      const link = document.createElement('a')
-                      link.href = docViewer.downloadUrl || docViewer.url
-                      link.download = docViewer.name || 'document'
-                      link.target = '_blank'
-                      document.body.appendChild(link)
-                      link.click()
-                      document.body.removeChild(link)
-                    }}
+                    onClick={() => downloadDocument(docViewer.downloadUrl || docViewer.url, docViewer.name)}
                     className="inline-flex items-center justify-center w-10 h-10 bg-green-50 hover:bg-green-100 text-green-600 rounded-xl transition-colors"
                     title="Télécharger"
                   >
@@ -1165,15 +1159,7 @@ export default function MissionDetails() {
                     <p className="text-sm font-bold text-slate-700 mb-2">{docViewer.name}</p>
                     <button
                       type="button"
-                      onClick={() => {
-                        const link = document.createElement('a')
-                        link.href = docViewer.downloadUrl || docViewer.url
-                        link.download = docViewer.name || 'document'
-                        link.target = '_blank'
-                        document.body.appendChild(link)
-                        link.click()
-                        document.body.removeChild(link)
-                      }}
+                      onClick={() => downloadDocument(docViewer.downloadUrl || docViewer.url, docViewer.name)}
                       className="px-4 py-2 bg-[#0052CC] text-white rounded-lg text-sm font-bold hover:bg-[#0042a3] transition-colors flex items-center gap-2"
                     >
                       <Download size={16} />

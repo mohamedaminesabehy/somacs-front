@@ -20,6 +20,10 @@ function getRoleColorKey(role) {
   return 'gray'
 }
 
+function getStatusColorKey(isActive) {
+  return isActive ? 'green' : 'gray'
+}
+
 export default function UserTable({
   users,
   isLoading,

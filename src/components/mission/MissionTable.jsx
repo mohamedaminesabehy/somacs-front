@@ -73,6 +73,35 @@ function getPriorityColor(priority) {
   return 'gray'
 }
 
+function getStatusIcon(status) {
+  switch (status) {
+    case 'En cours':
+    case 'À faire':
+      return '● '
+    case 'Terminée':
+      return '✓ '
+    case 'Bloquée':
+      return '⊗ '
+    default:
+      return ''
+  }
+}
+
+function getPriorityPrefix(priority) {
+  switch (priority) {
+    case 'Critique':
+      return '⚠️ '
+    case 'Haute':
+      return '↗ '
+    case 'Moyenne':
+      return '– '
+    case 'Basse':
+      return '↘ '
+    default:
+      return ''
+  }
+}
+
 function MissionTableInner(props, ref) {
   const {
     missions: missionsProp,
@@ -447,6 +476,26 @@ function MissionTableInner(props, ref) {
     setViewMission(null)
   }
 
+  const handleDeleteMission = async (mission) => {
+    if (typeof onRequestDelete === 'function') {
+      onRequestDelete(mission)
+      return
+    }
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette mission ?')) return
+    try {
+      const response = await apiFetch(`/missions/${mission.id}`, {
+        method: 'DELETE',
+        auth: true,
+      })
+      if (response.ok) {
+        if (typeof onMissionsChanged === 'function') onMissionsChanged()
+        else fetchMissions()
+      }
+    } catch (error) {
+      console.error('Error deleting mission:', error)
+    }
+  }
+
   return (
     <div className="relative bg-slate-50 lg:bg-white lg:rounded-lg lg:border lg:border-gray-200 lg:overflow-hidden">
       {/* Mobile / tablet cards */}
@@ -556,25 +605,7 @@ function MissionTableInner(props, ref) {
                     <button
                       type="button"
                       className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-red-50 text-red-600 text-xs font-semibold hover:bg-red-100 transition-colors"
-                      onClick={async () => {
-                        if (typeof onRequestDelete === 'function') {
-                          onRequestDelete(mission)
-                          return
-                        }
-                        if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette mission ?')) return
-                        try {
-                          const response = await apiFetch(`/missions/${mission.id}`, {
-                            method: 'DELETE',
-                            auth: true,
-                          })
-                          if (response.ok) {
-                            if (typeof onMissionsChanged === 'function') onMissionsChanged()
-                            else fetchMissions()
-                          }
-                        } catch (error) {
-                          console.error('Error deleting mission:', error)
-                        }
-                      }}
+                      onClick={() => handleDeleteMission(mission)}
                     >
                       <Trash2 size={14} /> Suppr.
                     </button>
@@ -660,11 +691,7 @@ function MissionTableInner(props, ref) {
                 </td>
                 <td className="px-4 sm:px-6 py-4">
                   <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${priorityColors[priorityColor]}`}>
-                    {mission.priority === 'Critique' && '⚠️ '}
-                    {mission.priority === 'Haute' && '↗ '}
-                    {mission.priority === 'Moyenne' && '– '}
-                    {mission.priority === 'Basse' && '↘ '}
-                    {mission.priority}
+                    {getPriorityPrefix(mission.priority)}{mission.priority}
                   </span>
                 </td>
                 <td className="px-4 sm:px-6 py-4">
@@ -676,24 +703,14 @@ function MissionTableInner(props, ref) {
                         <div key={`${mission.id}_${entry.name}`} className="flex items-center justify-between gap-2">
                           <span className="text-xs text-gray-700 font-medium truncate">{entry.name}</span>
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${statusColors[entryStatusColor]}`}>
-                            {entry.status === 'En cours' && '●'}
-                            {entry.status === 'À faire' && '●'}
-                            {entry.status === 'Terminée' && '✓'}
-                            {entry.status === 'Bloquée' && '⊗'}
-                            {' '}
-                            {entry.status}
+                            {getStatusIcon(entry.status)}{entry.status}
                           </span>
                         </div>
                       )})}
                     </div>
                   ) : (
                     <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${statusColors[statusColor]}`}>
-                      {mission.status === 'En cours' && '●'}
-                      {mission.status === 'À faire' && '●'}
-                      {mission.status === 'Terminée' && '✓'}
-                      {mission.status === 'Bloquée' && '⊗'}
-                      {' '}
-                      {mission.status}
+                      {getStatusIcon(mission.status)}{mission.status}
                     </span>
                   )}
                 </td>
@@ -733,25 +750,7 @@ function MissionTableInner(props, ref) {
                     <button
                       type="button"
                       className="p-1 text-gray-500 hover:text-red-700 hover:bg-red-50 rounded"
-                      onClick={async () => {
-                        if (typeof onRequestDelete === 'function') {
-                          onRequestDelete(mission)
-                          return
-                        }
-                        if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette mission ?')) return
-                        try {
-                          const response = await apiFetch(`/missions/${mission.id}`, {
-                            method: 'DELETE',
-                            auth: true,
-                          })
-                          if (response.ok) {
-                            if (typeof onMissionsChanged === 'function') onMissionsChanged()
-                            else fetchMissions()
-                          }
-                        } catch (error) {
-                          console.error('Error deleting mission:', error)
-                        }
-                      }}
+                      onClick={() => handleDeleteMission(mission)}
                     >
                       <Trash2 size={18} />
                     </button>
@@ -1344,11 +1343,7 @@ function MissionTableInner(props, ref) {
                     <span
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${priorityColors[viewMission.priorityColor]}`}
                     >
-                      {viewMission.priority === 'Critique' && '⚠️ '}
-                      {viewMission.priority === 'Haute' && '↗ '}
-                      {viewMission.priority === 'Moyenne' && '– '}
-                      {viewMission.priority === 'Basse' && '↘ '}
-                      {viewMission.priority}
+                      {getPriorityPrefix(viewMission.priority)}{viewMission.priority}
                     </span>
                   </div>
                   <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
@@ -1361,11 +1356,7 @@ function MissionTableInner(props, ref) {
                             <div key={`${viewMission.id}_${entry.name}`} className="flex items-center justify-between gap-2">
                               <span className="text-xs text-gray-700 font-medium truncate">{entry.name}</span>
                               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap ${statusColors[entryStatusColor]}`}>
-                                {entry.status === 'En cours' && '● '}
-                                {entry.status === 'À faire' && '● '}
-                                {entry.status === 'Terminée' && '✓ '}
-                                {entry.status === 'Bloquée' && '⊗ '}
-                                {entry.status}
+                                {getStatusIcon(entry.status)}{entry.status}
                               </span>
                             </div>
                           )
@@ -1375,11 +1366,7 @@ function MissionTableInner(props, ref) {
                       <span
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusColors[viewMission.statusColor]}`}
                       >
-                        {viewMission.status === 'En cours' && '● '}
-                        {viewMission.status === 'À faire' && '● '}
-                        {viewMission.status === 'Terminée' && '✓ '}
-                        {viewMission.status === 'Bloquée' && '⊗ '}
-                        {viewMission.status}
+                        {getStatusIcon(viewMission.status)}{viewMission.status}
                       </span>
                     )}
                   </div>
