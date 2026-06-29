@@ -781,7 +781,9 @@ export default function InterventionDetails() {
         if (!cancelled && data) {
           setDbEntry(data)
         }
-      } catch {}
+      } catch {
+        // Intervention reload is optional; keep existing entry on failure.
+      }
     })()
     return () => {
       cancelled = true
@@ -798,7 +800,9 @@ export default function InterventionDetails() {
         if (!cancelled) {
           setSignatures(Array.isArray(data) ? data : [])
         }
-      } catch {}
+      } catch {
+        // Signature list is optional; keep current signatures on failure.
+      }
     })()
     return () => {
       cancelled = true
@@ -819,7 +823,9 @@ export default function InterventionDetails() {
           setClients(Array.isArray(clientsJson) ? clientsJson : [])
           setMachines(Array.isArray(machinesJson) ? machinesJson : [])
         }
-      } catch {}
+      } catch {
+        // Client and machine lookup data is optional for this view.
+      }
     })()
     return () => {
       cancelled = true
@@ -984,7 +990,13 @@ export default function InterventionDetails() {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;')
 
-  const buildFichePrintHtml_UNUSED = () => {
+  const _buildFichePrintHtml_UNUSED = () => {
+    const logoSrc = ''
+    const dateDisplay = ''
+    const typeCheckboxes = ''
+    const yes = false
+    const no = false
+    const partRows = ''
     return `<!doctype html>
 <html lang="fr">
 <head>
@@ -1739,7 +1751,9 @@ export default function InterventionDetails() {
             next.push(id)
             window.localStorage.setItem('intervention_modified_ids', JSON.stringify(next))
           }
-        } catch {}
+        } catch {
+          // Modified intervention marker is optional local UI state.
+        }
         navigate(options.returnTo)
         return
       }
@@ -1754,7 +1768,7 @@ export default function InterventionDetails() {
           })
         }
       }
-    } catch (error) {
+    } catch {
       alert('Impossible de joindre le serveur.')
     } finally {
       setIsSaving(false)

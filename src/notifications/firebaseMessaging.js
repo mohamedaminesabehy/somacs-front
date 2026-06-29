@@ -63,7 +63,9 @@ export async function registerFcmToken() {
   }).catch((err) => {
     try {
       console.error('FCM getToken failed', err)
-    } catch {}
+    } catch {
+      // Console logging is best-effort in restricted browser contexts.
+    }
     return null
   })
   if (!token) return { ok: false, reason: 'token-failed' }
@@ -75,7 +77,9 @@ export async function registerFcmToken() {
   }).catch((err) => {
     try {
       console.error('FCM register token backend call failed', err)
-    } catch {}
+    } catch {
+      // Console logging is best-effort in restricted browser contexts.
+    }
     return null
   })
   if (!res) return { ok: false, reason: 'backend-failed' }
@@ -98,7 +102,9 @@ export async function onForegroundMessage(handler) {
   const unsubscribe = onMessage(messaging, (payload) => {
     try {
       handler(payload)
-    } catch {}
+    } catch {
+      // Foreground notification handlers are user-provided and optional.
+    }
   })
   return unsubscribe
 }

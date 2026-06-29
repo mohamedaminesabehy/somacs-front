@@ -111,8 +111,12 @@ const DevisList = () => {
     return () => {
       isMountedRef.current = false
       // Annule toutes les requêtes en vol au démontage
-      try { fetchAbortRef.current?.abort() } catch {}
-      try { suiviAbortRef.current?.abort() } catch {}
+      try { fetchAbortRef.current?.abort() } catch {
+        // Abort cleanup is best-effort during unmount.
+      }
+      try { suiviAbortRef.current?.abort() } catch {
+        // Abort cleanup is best-effort during unmount.
+      }
     }
   }, [])
 
@@ -133,7 +137,9 @@ const DevisList = () => {
   // After loading a page of devis, fetch their CRM statuses in one batch call
   const loadSuiviStatuses = useCallback(async (rows) => {
     // Annule un précédent batch encore en vol
-    try { suiviAbortRef.current?.abort() } catch {}
+    try { suiviAbortRef.current?.abort() } catch {
+      // Previous status request may already be closed.
+    }
     if (!rows?.length) {
       if (isMountedRef.current) setSuiviStatuses({})
       return
@@ -154,7 +160,9 @@ const DevisList = () => {
 
   const fetchDevis = useCallback(async (page) => {
     // Annule la requête précédente pour éviter les races
-    try { fetchAbortRef.current?.abort() } catch {}
+    try { fetchAbortRef.current?.abort() } catch {
+      // Previous list request may already be closed.
+    }
     const controller = new AbortController()
     fetchAbortRef.current = controller
 
@@ -321,7 +329,7 @@ const DevisList = () => {
       document.body.removeChild(a)
       setExportSuccess('Fichier Excel téléchargé avec succès.')
       setTimeout(() => { setExportSuccess(''); setExportModalOpen(false) }, 2000)
-    } catch (err) {
+    } catch {
       setExportError('Impossible de télécharger le fichier. Vérifiez votre connexion.')
     } finally {
       setExportLoading(false)

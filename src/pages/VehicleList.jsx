@@ -52,11 +52,12 @@ const KPI_CONFIG = [
   { key: 'horsService',label: 'Hors service',   bg: 'bg-red-50',     border: 'border-red-100',     icon_bg: 'bg-red-100 text-red-600',       icon: XCircle },
 ]
 
-function KpiCard({ label, value, icon: Icon, bg, border, icon_bg }) {
+function KpiCard({ label, value, icon, bg, border, icon_bg }) {
+  const KpiIcon = icon
   return (
     <div className={`rounded-2xl border ${border} ${bg} p-4 sm:p-5 flex items-center gap-4`}>
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${icon_bg}`}>
-        <Icon size={18} />
+        <KpiIcon size={18} />
       </div>
       <div>
         <p className="text-2xl font-black text-slate-900">{value}</p>

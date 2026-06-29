@@ -64,7 +64,8 @@ function SelectField({ label, name, value, onChange, options, required }) {
   )
 }
 
-function Section({ icon: Icon, title, description, accent, children }) {
+function Section({ icon, title, description, accent, children }) {
+  const SectionIcon = icon
   const a = accent || "blue"
   const map = {
     blue:  ["from-blue-50/80 border-blue-200",   "bg-blue-100 text-blue-600",   "text-blue-800"],
@@ -72,12 +73,12 @@ function Section({ icon: Icon, title, description, accent, children }) {
     amber: ["from-amber-50/80 border-amber-200", "bg-amber-100 text-amber-600", "text-amber-800"],
     slate: ["from-slate-50/80 border-slate-200", "bg-slate-100 text-slate-600", "text-slate-700"],
   }
-  const [wrap, icon, titleCls] = map[a] || map.blue
+  const [wrap, iconClass, titleCls] = map[a] || map.blue
   return (
     <div className={"bg-gradient-to-br " + wrap + " to-white border rounded-3xl p-5 sm:p-6 space-y-4"}>
       <div className="flex items-start gap-3 pb-1">
-        <div className={"w-9 h-9 rounded-xl flex items-center justify-center shrink-0 " + icon}>
-          <Icon size={17} />
+        <div className={"w-9 h-9 rounded-xl flex items-center justify-center shrink-0 " + iconClass}>
+          <SectionIcon size={17} />
         </div>
         <div>
           <h2 className={"text-[11px] font-black uppercase tracking-[0.22em] " + titleCls}>{title}</h2>

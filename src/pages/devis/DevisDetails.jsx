@@ -26,7 +26,6 @@ import {
   Clock,
   ArrowRight
 } from 'lucide-react'
-import logo from '../../assets/logo.jpg'
 import DevisSuiviSection, { DevisSuiviTimeline, HorizontalStatusTimeline } from '../../components/devis/DevisSuiviSection.jsx'
 
 // --- Helper Functions ---
@@ -423,14 +422,18 @@ export default function DevisDetails() {
     isMountedRef.current = true
     return () => {
       isMountedRef.current = false
-      try { abortRef.current?.abort() } catch {}
+      try { abortRef.current?.abort() } catch {
+        // Abort cleanup is best-effort during unmount.
+      }
     }
   }, [])
 
   const fetchDevisDetails = useCallback(async () => {
     if (!numero) return
     // Annule un précédent fetch en vol pour éviter les races (Strict Mode, double-clic…)
-    try { abortRef.current?.abort() } catch {}
+    try { abortRef.current?.abort() } catch {
+      // Previous request may already be closed.
+    }
     const controller = new AbortController()
     abortRef.current = controller
 
@@ -461,7 +464,9 @@ export default function DevisDetails() {
               const parsed = JSON.parse(raw)
               if (Array.isArray(parsed) && parsed.length > 0) setSharedStatuses(parsed)
             }
-          } catch {}
+          } catch {
+            // Local suivi status cache is optional.
+          }
         }
       } else if (response.status === 401) {
         if (!isMountedRef.current) return

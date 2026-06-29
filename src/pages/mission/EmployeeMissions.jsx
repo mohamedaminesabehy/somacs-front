@@ -129,10 +129,7 @@ function StatusBadge({ status, spin }) {
 }
 
 // ── Composant : carte liste ───────────────────────────────────────────────────
-function MissionRow({ mission, interventions, onStatusChange, onOpen }) {
-  const intervention = mission.interventionId
-    ? interventions.find((i) => i.id === mission.interventionId)
-    : null
+function MissionRow({ mission, onStatusChange, onOpen }) {
   const cfg = STATUS_CONFIG[mission.status] || STATUS_CONFIG['À faire']
 
   return (
@@ -212,7 +209,7 @@ const MONTHS_LABEL = [
   'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
 ]
 
-function MissionCalendar({ missions, interventions = [], onOpen, onStatusChange }) {
+function MissionCalendar({ missions, interventions = [], onOpen }) {
   const today = new Date()
   const [calYear,  setCalYear]  = useState(today.getFullYear())
   const [calMonth, setCalMonth] = useState(today.getMonth())
@@ -465,7 +462,6 @@ function MissionCalendar({ missions, interventions = [], onOpen, onStatusChange 
               ) : (
                 <div className="p-3 space-y-2">
                   {selectedMissions.map((m) => {
-                    const cfg = STATUS_CONFIG[m.status] || STATUS_CONFIG['À faire']
                     const intervention = m.interventionId
                       ? interventions.find((iv) => iv.id === m.interventionId)
                       : null
@@ -609,11 +605,13 @@ export default function EmployeeMissions() {
         ]
         return merged
       })
-    } catch {}
+    } catch {
+      // Mission refresh is best-effort; keep the current list.
+    }
   }, [currentUser])
 
   useEffect(() => {
-    void refreshMissions()
+    refreshMissions()
   }, [refreshMissions])
 
   // Keep local missions list in sync when a mission is updated elsewhere
@@ -639,11 +637,11 @@ export default function EmployeeMissions() {
 
   useEffect(() => {
     const onFocus = () => {
-      void refreshMissions()
+      refreshMissions()
     }
     window.addEventListener('focus', onFocus)
     const timerId = window.setInterval(() => {
-      void refreshMissions()
+      refreshMissions()
     }, 5000)
     return () => {
       window.removeEventListener('focus', onFocus)
@@ -673,7 +671,9 @@ export default function EmployeeMissions() {
           assignedTo: i.assignedTo || i.assignee || i.technicianName || null,
         }))
         setInterventions(normalized)
-      } catch {}
+      } catch {
+        // Intervention metadata is optional for employee mission cards.
+      }
     })()
   }, [])
 
@@ -700,9 +700,11 @@ export default function EmployeeMissions() {
           auth: true,
         })
         if (response.ok) {
-          void refreshMissions()
+          refreshMissions()
         }
-      } catch {}
+      } catch {
+        // The optimistic status update remains visible if refresh fails.
+      }
     })()
   }
 
@@ -809,7 +811,6 @@ export default function EmployeeMissions() {
               missions={missions}
               interventions={interventions}
               onOpen={(id) => navigate('/missions/' + id)}
-              onStatusChange={handleStatusChange}
             />
           </div>
         </div>
@@ -874,7 +875,6 @@ export default function EmployeeMissions() {
                 <MissionRow
                   key={m.id}
                   mission={m}
-                  interventions={interventions}
                   onStatusChange={handleStatusChange}
                   onOpen={(id) => navigate('/missions/' + id)}
                 />

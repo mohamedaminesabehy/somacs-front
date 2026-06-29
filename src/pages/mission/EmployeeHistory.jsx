@@ -430,7 +430,9 @@ function InterventionPreview({ intervention }) {
         const client = findActive('CLIENT_SIGNATURE_STAMP', 'CLIENT_SIGNATURE', 'CLIENT_STAMP')
         setTechnicianSignatureUrl(tech?.url || '')
         setClientSignatureUrl(client?.url || '')
-      } catch {}
+      } catch {
+        // Signature previews are optional in the printable fiche.
+      }
     })()
     return () => {
       cancelled = true

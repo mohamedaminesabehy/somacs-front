@@ -185,7 +185,9 @@ export default function AssignMission() {
             }))
           : []
         setInterventionsList(normalized)
-      } catch {}
+      } catch {
+        // Intervention options are optional; keep the selector empty on failure.
+      }
     })()
   }, [])
 
@@ -206,7 +208,9 @@ export default function AssignMission() {
             active: 0,
           }))
         setEmployeeList(normalized)
-      } catch {}
+      } catch {
+        // Employee options are optional; keep the selector empty on failure.
+      }
     })()
   }, [])
 

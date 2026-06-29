@@ -44,7 +44,7 @@ function normalizeTypeKey(value) {
 }
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
-const mockInterventions = [
+const _mockInterventions = [
   { id: 'INT-001', client: 'Total Energies',    machine: 'Compresseur C-12',  type: 'REPARATION',   status: 'PENDING',     date: '2025-05-01', assignee: null, priority: 'Haute' },
   { id: 'INT-002', client: 'Sonatrach',         machine: 'Turbine T-04',      type: 'GARANTIE',     status: 'ASSIGNED',    date: '2025-05-02', assignee: 'Ali Boumediene', priority: 'Critique' },
   { id: 'INT-003', client: 'Air Liquide',       machine: 'Pompe P-07',        type: 'INSTALLATION', status: 'IN_PROGRESS', date: '2025-05-03', assignee: 'Sara Meziane', priority: 'Moyenne' },
@@ -59,7 +59,8 @@ const mockInterventions = [
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function StatCard({ label, count, total, icon: Icon, active, onClick, colorClass }) {
+function StatCard({ label, count, total, icon, active, onClick, colorClass }) {
+  const StatIcon = icon
   const pct = total > 0 ? Math.round((count / total) * 100) : 0
   return (
     <button
@@ -70,7 +71,7 @@ function StatCard({ label, count, total, icon: Icon, active, onClick, colorClass
       <div className={`absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 rounded-full opacity-[0.05] transition-transform group-hover:scale-110 ${colorClass}`} />
       <div className="flex items-center justify-between mb-2 sm:mb-4 relative z-10">
         <div className={`p-2 sm:p-2.5 rounded-xl shadow-sm ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-blue-600 transition-colors'}`}>
-          <Icon size={18} className="sm:w-5 sm:h-5" />
+          <StatIcon size={18} className="sm:w-5 sm:h-5" />
         </div>
         <div className="flex flex-col items-end min-w-0">
           <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider sm:tracking-widest text-slate-400 truncate">{label}</span>

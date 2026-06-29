@@ -158,32 +158,35 @@ function DonutChart({ segments, size = 160, thickness = 16 }) {
   const total = safeSegments.reduce((sum, s) => sum + (Number(s.value) || 0), 0)
   const r = (size - thickness) / 2
   const c = 2 * Math.PI * r
-  let offset = 0
+  const renderedSegments = safeSegments.reduce((acc, seg) => {
+    const v = Number(seg.value) || 0
+    const portion = total > 0 ? v / total : 0
+    const dash = Math.max(0, Math.min(c, portion * c))
+    const dashOffset = acc.offset
+    return {
+      offset: acc.offset + dash,
+      items: dash
+        ? [...acc.items, { ...seg, dash, dashOffset }]
+        : acc.items,
+    }
+  }, { offset: 0, items: [] }).items
 
   return (
     <div className="relative inline-flex items-center justify-center">
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90" aria-hidden="true">
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgb(226 232 240)" strokeWidth={thickness} />
-        {safeSegments.map((seg) => {
-          const v = Number(seg.value) || 0
-          const portion = total > 0 ? v / total : 0
-          const dash = Math.max(0, Math.min(c, portion * c))
-          const dashOffset = offset
-          offset += dash
-          if (!dash) return null
-          return (
-            <circle
-              key={seg.key || seg.label}
-              cx={size / 2} cy={size / 2} r={r}
-              fill="none"
-              stroke={seg.color}
-              strokeWidth={thickness}
-              strokeDasharray={`${dash} ${c - dash}`}
-              strokeDashoffset={-dashOffset}
-              strokeLinecap="round"
-            />
-          )
-        })}
+        {renderedSegments.map((seg) => (
+          <circle
+            key={seg.key || seg.label}
+            cx={size / 2} cy={size / 2} r={r}
+            fill="none"
+            stroke={seg.color}
+            strokeWidth={thickness}
+            strokeDasharray={`${seg.dash} ${c - seg.dash}`}
+            strokeDashoffset={-seg.dashOffset}
+            strokeLinecap="round"
+          />
+        ))}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
         <p className="text-2xl font-bold text-slate-900 leading-none">{total}</p>
@@ -278,14 +281,15 @@ const kpiToneMap = {
   red:     { icon: 'bg-red-50 border-red-100 text-red-600',        value: 'text-red-700' },
 }
 
-function KpiCard({ title, value, subtitle, icon: Icon, tone = 'blue' }) {
+function KpiCard({ title, value, subtitle, icon, tone = 'blue' }) {
+  const KpiIcon = icon
   const colors = kpiToneMap[tone] || kpiToneMap.blue
   return (
     <article className="rounded-lg border border-slate-200 bg-white p-4 flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
         <p className="text-xs font-medium text-slate-500 leading-snug">{title}</p>
         <div className={`h-8 w-8 rounded-md border flex items-center justify-center shrink-0 ${colors.icon}`}>
-          <Icon size={16} />
+          <KpiIcon size={16} />
         </div>
       </div>
       <p className={`text-2xl font-bold tracking-tight ${colors.value}`}>{value}</p>
@@ -324,7 +328,8 @@ function AlertBanner({ alerts }) {
 /*  Card wrapper                                                              */
 /* -------------------------------------------------------------------------- */
 
-function Card({ title, subtitle, icon: Icon, children, className = '' }) {
+function Card({ title, subtitle, icon, children, className = '' }) {
+  const CardIcon = icon
   return (
     <article className={`rounded-lg border border-slate-200 bg-white overflow-hidden ${className}`}>
       <header className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100">
@@ -332,9 +337,9 @@ function Card({ title, subtitle, icon: Icon, children, className = '' }) {
           <h2 className="text-sm font-semibold text-slate-800 truncate">{title}</h2>
           {subtitle && <p className="mt-0.5 text-xs text-slate-500 truncate">{subtitle}</p>}
         </div>
-        {Icon && (
+        {CardIcon && (
           <div className="h-8 w-8 shrink-0 flex items-center justify-center rounded-md bg-slate-100 text-slate-500 border border-slate-200">
-            <Icon size={15} />
+            <CardIcon size={15} />
           </div>
         )}
       </header>
@@ -460,11 +465,6 @@ export default function OperationsDashboard({ currentUser }) {
   const filteredMachines = useMemo(() =>
     machines.filter((m) => isSameMonthYear(parseDateLike(m?.updatedAt || m?.createdAt || m?.receptionDate), selectedMonth, selectedYear)),
     [machines, selectedMonth, selectedYear],
-  )
-
-  const filteredDevis = useMemo(() =>
-    devis.filter((d) => isSameMonthYear(parseDateLike(d?.DOCDATE || d?.DATEDOC || d?.DateDoc || d?.createdAt), selectedMonth, selectedYear)),
-    [devis, selectedMonth, selectedYear],
   )
 
   /* ── Analytics ── */

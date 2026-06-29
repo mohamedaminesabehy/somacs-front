@@ -34,12 +34,13 @@ const ACTIONS_SECTION_ACCENT = {
   'Bloquée': 'border-red-200',
 }
 
-function SectionHeader({ icon: Icon, title, children }) {
+function SectionHeader({ icon, title, children }) {
+  const SectionIcon = icon
   return (
     <div className="flex items-center justify-between mb-4">
       <div className="flex items-center gap-2">
         <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500">
-          <Icon size={18} />
+          <SectionIcon size={18} />
         </div>
         <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">{title}</h3>
       </div>
@@ -48,11 +49,12 @@ function SectionHeader({ icon: Icon, title, children }) {
   )
 }
 
-function InfoItem({ label, value, icon: Icon, colorClass = "text-slate-500" }) {
+function InfoItem({ label, value, icon, colorClass = "text-slate-500" }) {
+  const ItemIcon = icon
   return (
     <div className="flex items-start gap-3 py-3 border-b border-slate-50 last:border-0">
       <div className={`mt-0.5 ${colorClass}`}>
-        <Icon size={16} />
+        <ItemIcon size={16} />
       </div>
       <div>
         <p className="text-[11px] font-bold text-slate-400 uppercase tracking-tight mb-0.5">{label}</p>
@@ -219,7 +221,9 @@ export default function MissionDetails() {
         if (!response.ok) return
         const data = await response.json()
         setIntervention(data)
-      } catch {}
+      } catch {
+        // Linked intervention details are optional on this view.
+      }
     })()
   }, [mission?.interventionId])
 
@@ -229,10 +233,8 @@ export default function MissionDetails() {
     const refresh = async () => {
       try {
         const missionRes = await apiFetch(`/missions/${mission.id}`, { auth: true, cache: 'no-store' })
-        let nextMission = null
         if (missionRes.ok) {
           const data = await missionRes.json()
-          nextMission = data
           const nextStatus = data?.status || 'À faire'
           setMission((prev) => (prev ? { ...prev, ...data, status: nextStatus } : data))
           setStatus((prev) => (prev !== nextStatus ? nextStatus : prev))
@@ -251,7 +253,9 @@ export default function MissionDetails() {
             setIntervention(iv)
           }
         }
-      } catch {}
+      } catch {
+        // Background refresh is best-effort; keep current mission state.
+      }
     }
 
     const onFocus = () => refresh()
@@ -403,7 +407,9 @@ export default function MissionDetails() {
             syncVehicleMileageState(setVehicleKilometrageDepart, setVehicleKilometrageRetour, latestMission)
             try {
               window.dispatchEvent(new CustomEvent('mission:updated', { detail: latestMission }))
-            } catch {}
+            } catch {
+              // Ignore malformed attachment metadata.
+            }
           }
         }
         refreshTimerRef.current = window.setInterval(async () => {
@@ -418,7 +424,9 @@ export default function MissionDetails() {
             if (!mileageEditingRef.current) {
               syncVehicleMileageState(setVehicleKilometrageDepart, setVehicleKilometrageRetour, pollData)
             }
-          } catch {}
+          } catch {
+            // Ignore malformed attachment metadata.
+          }
         }, 5000)
         setShowSaveToast(`Cette mission est ${newStatus}`)
         setTimeout(() => setShowSaveToast(false), 3000)
@@ -457,13 +465,17 @@ export default function MissionDetails() {
               setStatus(full?.status || nextStatus)
               setNotes(full?.notes || nextNotes)
               setGroupedEmployeesDisplay(buildGroupedEmployeesDisplay(full))
-                try { window.dispatchEvent(new CustomEvent('mission:updated', { detail: full })) } catch {}
+                try { window.dispatchEvent(new CustomEvent('mission:updated', { detail: full })) } catch {
+                  // Mission update events are best-effort.
+                }
             }
           }
         }
         setShowSaveToast(true)
         setTimeout(() => setShowSaveToast(false), 3000)
-      } catch {}
+      } catch {
+        // Status update errors are handled by preserving the current view.
+      }
       setIsSaving(false)
     })()
   }

@@ -257,7 +257,8 @@ function PriorityPill({ priority }) {
   )
 }
 
-function InfoCard({ icon: Icon, label, value, mono = false, accent = 'slate' }) {
+function InfoCard({ icon, label, value, mono = false, accent = 'slate' }) {
+  const InfoIcon = icon
   const accents = {
     slate:   'bg-slate-50 text-slate-500',
     blue:    'bg-blue-50 text-blue-600',
@@ -268,7 +269,7 @@ function InfoCard({ icon: Icon, label, value, mono = false, accent = 'slate' }) 
   return (
     <div className="flex items-start gap-3 p-3.5 bg-white border border-slate-100 rounded-xl hover:border-slate-200 transition-colors">
       <div className={`w-9 h-9 rounded-lg ${accents[accent]} flex items-center justify-center shrink-0`}>
-        <Icon size={15} />
+        <InfoIcon size={15} />
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.12em]">{label}</p>
@@ -638,7 +639,9 @@ export default function ClientDetails360() {
         try {
           const errorBody = await response.json()
           message = errorBody?.message || message
-        } catch {}
+        } catch {
+          // Error response body is optional.
+        }
         throw new Error(message)
       }
 
@@ -988,19 +991,10 @@ export default function ClientDetails360() {
     </div>
   )
 }
-// Role-based visibility
-const __authUser = (() => {
-  try { return JSON.parse(window.localStorage.getItem('auth_user') || 'null') } catch { return null }
-})()
-const __userRole = String(__authUser?.role || '').trim().toLowerCase()
-const isCommercial = __userRole === 'commerciale' || __userRole === 'commercial'
-const isTechnicien = __userRole === 'technicien'
-const canEdit = !isTechnicien && !isCommercial
-
-
 // ─── Modal détail intervention ─────────────────────────────────────────────
 
-function ModalSection({ icon: Icon, title, children, accent = 'slate' }) {
+function ModalSection({ icon, title, children, accent = 'slate' }) {
+  const SectionIcon = icon
   const accents = {
     slate:   'bg-slate-50 text-slate-500',
     blue:    'bg-blue-50 text-blue-600',
@@ -1013,7 +1007,7 @@ function ModalSection({ icon: Icon, title, children, accent = 'slate' }) {
     <section className="bg-white border border-slate-100 rounded-2xl overflow-hidden">
       <header className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
         <div className={`w-7 h-7 rounded-lg ${accents[accent]} flex items-center justify-center`}>
-          <Icon size={13} />
+          <SectionIcon size={13} />
         </div>
         <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">{title}</h3>
       </header>

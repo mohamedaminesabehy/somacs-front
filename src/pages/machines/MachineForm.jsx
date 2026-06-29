@@ -57,11 +57,19 @@ export default function MachineForm() {
           try {
             const imgs = JSON.parse(data.imagesJson)
             if (Array.isArray(imgs)) setExistingImages(imgs)
-          } catch (e) {}
+          } catch {
+            // Existing image metadata is optional.
+          }
         } else if (data.imageUrl) {
           setExistingImages([{ publicId: data.imagePublicId || null, url: data.imageUrl, name: 'Image machine' }])
         }
-        if (data.documentsJson) { try { setExistingDocs(JSON.parse(data.documentsJson)) } catch (e) {} }
+        if (data.documentsJson) {
+          try {
+            setExistingDocs(JSON.parse(data.documentsJson))
+          } catch {
+            // Existing document metadata is optional.
+          }
+        }
       })
       .catch(() => setError('Impossible de charger la machine.'))
       .finally(() => setLoading(false))
@@ -553,7 +561,8 @@ function Nav({ activeStep, setActiveStep, saving }) {
 }
 
 /* ─── Section Header ─── */
-function SectionHeader({ icon: Icon, color, title, desc }) {
+function SectionHeader({ icon, color, title, desc }) {
+  const SectionIcon = icon
   const colors = {
     blue: 'from-blue-500 to-blue-600',
     indigo: 'from-indigo-500 to-indigo-600',
@@ -563,7 +572,7 @@ function SectionHeader({ icon: Icon, color, title, desc }) {
   return (
     <div className="flex items-center gap-4">
       <div className={`w-12 h-12 bg-gradient-to-br ${colors[color] || colors.blue} text-white rounded-2xl flex items-center justify-center shadow-lg`}>
-        <Icon size={24} />
+        <SectionIcon size={24} />
       </div>
       <div>
         <h2 className="text-xl sm:text-2xl font-black text-slate-900">{title}</h2>
