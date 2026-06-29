@@ -24,9 +24,10 @@ export async function fetchDevisTotals(month, year) {
   return readJsonResponse(response, 'Impossible de charger les totaux devis.')
 }
 
-export async function fetchDevisSuiviList(params = {}, signal) {
-  const query = buildQuery(params)
-  const response = await apiFetch(`/devis-suivi${query ? `?${query}` : ''}`, { auth: true, signal })
+export async function fetchDevisSuiviList(params, signal) {
+  const query = buildQuery(params ?? {})
+  const path = query ? `/devis-suivi?${query}` : '/devis-suivi'
+  const response = await apiFetch(path, { auth: true, signal })
   return readJsonResponse(response, 'Impossible de charger la liste de suivi.')
 }
 
@@ -122,9 +123,10 @@ export async function fetchDevisSuiviById(id) {
 }
 
 
-export async function fetchDevisSuiviStatuses(numeros = [], signal) {
-  if (!numeros.length) return {}
-  const query = numeros.join(',')
+export async function fetchDevisSuiviStatuses(numeros, signal) {
+  const safeNumeros = numeros ?? []
+  if (!safeNumeros.length) return {}
+  const query = safeNumeros.join(',')
   const response = await apiFetch(`/devis-suivi/statuses?numeros=${encodeURIComponent(query)}`, { auth: true, signal })
   return readJsonResponse(response, 'Impossible de charger les statuts.')
 }

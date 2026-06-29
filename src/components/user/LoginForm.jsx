@@ -4,6 +4,36 @@ import { Eye, EyeOff, AlertCircle, ArrowRight } from 'lucide-react'
 import logo from '../../assets/logo.jpg'
 import machines from '../../assets/login.jpg'
 
+const LOGIN_ERROR_MESSAGES = {
+  invalidCredentials: 'Identifiants incorrects. Veuillez réessayer.',
+  invalidResponse: 'Réponse du serveur invalide.',
+  serverUnavailable: 'Impossible de joindre le serveur.',
+}
+
+function getLoginApiUrl() {
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+  return baseUrl + '/auth/login'
+}
+
+async function loginRequest(username, password) {
+  const response = await fetch(getLoginApiUrl(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  })
+
+  if (!response.ok) {
+    return { error: LOGIN_ERROR_MESSAGES.invalidCredentials }
+  }
+
+  const data = await response.json()
+  if (!data?.accessToken || !data?.user) {
+    return { error: LOGIN_ERROR_MESSAGES.invalidResponse }
+  }
+
+  return { data }
+}
+
 export default function LoginForm({ onLoginSuccess }) {
   const [showPassword, setShowPassword] = useState(false)
   const [username, setUsername] = useState('')
@@ -17,25 +47,16 @@ export default function LoginForm({ onLoginSuccess }) {
     setError('')
     setIsLoading(true)
     try {
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000'
-      const response = await fetch(baseUrl + '/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      })
-      if (!response.ok) {
-        setError('Identifiants incorrects. Veuillez réessayer.')
-      } else {
-        const data = await response.json()
-        if (data && data.accessToken && data.user) {
-          if (onLoginSuccess) onLoginSuccess(data.accessToken, data.user)
-          navigate('/', { replace: true })
-        } else {
-          setError('Réponse du serveur invalide.')
-        }
+      const result = await loginRequest(username, password)
+      if (result.error) {
+        setError(result.error)
+        return
       }
+
+      if (onLoginSuccess) onLoginSuccess(result.data.accessToken, result.data.user)
+      navigate('/', { replace: true })
     } catch {
-      setError('Impossible de joindre le serveur.')
+      setError(LOGIN_ERROR_MESSAGES.serverUnavailable)
     } finally {
       setIsLoading(false)
     }

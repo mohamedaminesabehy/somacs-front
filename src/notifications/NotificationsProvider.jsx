@@ -29,9 +29,13 @@ function playNotificationSound() {
     osc.onended = () => {
       try {
         ctx.close()
-      } catch {}
+      } catch {
+        // Ignore audio context cleanup failures.
+      }
     }
-  } catch {}
+  } catch {
+    // Notification sound is optional.
+  }
 }
 
 export function NotificationsProvider({ children }) {
@@ -71,8 +75,7 @@ export function NotificationsProvider({ children }) {
   }, [refresh])
 
   const enablePushNotifications = useCallback(async () => {
-    const res = await registerFcmToken()
-    return res
+    return registerFcmToken()
   }, [])
 
   useEffect(() => {
@@ -82,12 +85,14 @@ export function NotificationsProvider({ children }) {
       if (typeof window !== 'undefined') {
         try {
           window.dispatchEvent(new CustomEvent('auth:invalid', { detail: { reason: 'expired-token' } }))
-        } catch {}
+        } catch {
+          // Ignore event dispatch failures in constrained browsers.
+        }
       }
       return
     }
 
-    void refresh()
+    refresh()
     
     // Demander les permissions de notification dès la connexion
     if (typeof window !== 'undefined' && typeof window.Notification !== 'undefined') {
@@ -95,13 +100,13 @@ export function NotificationsProvider({ children }) {
         // Demander la permission automatiquement
         window.Notification.requestPermission().then((permission) => {
           if (permission === 'granted') {
-            void registerFcmToken()
+            registerFcmToken()
           }
         }).catch(() => {
           // Permission refusée, on continue sans notifications push
         })
       } else if (window.Notification.permission === 'granted') {
-        void registerFcmToken()
+        registerFcmToken()
       }
     }
 
@@ -116,10 +121,10 @@ export function NotificationsProvider({ children }) {
     socketRef.current = socket
 
     socket.on('connect', () => {
-      void refresh()
+      refresh()
     })
     socket.on('reconnect', () => {
-      void refresh()
+      refresh()
     })
     socket.on('connect_error', (error) => {
       const message = String(error?.message || error?.data?.message || '').toLowerCase()
@@ -127,11 +132,15 @@ export function NotificationsProvider({ children }) {
         if (typeof window !== 'undefined') {
           try {
             window.dispatchEvent(new CustomEvent('auth:invalid', { detail: { reason: 'socket-unauthorized' } }))
-          } catch {}
+          } catch {
+            // Ignore event dispatch failures in constrained browsers.
+          }
         }
         try {
           socket.disconnect()
-        } catch {}
+        } catch {
+          // Socket may already be closed.
+        }
       }
     })
 
@@ -200,11 +209,11 @@ export function NotificationsProvider({ children }) {
       const id = payload && typeof payload.id === 'number' ? payload.id : null
       if (id == null) return
       // Archived notifications leave the active bell list; reconcile counts.
-      void refresh()
+      refresh()
     })
 
     let unsubscribeMessaging = () => {}
-    void (async () => {
+    ;(async () => {
       unsubscribeMessaging = await onForegroundMessage(async (payload) => {
         const id = Number(payload?.data?.notificationId)
         if (id && !Number.isNaN(id)) {
@@ -217,13 +226,19 @@ export function NotificationsProvider({ children }) {
     return () => {
       try {
         unsubscribeMessaging()
-      } catch {}
+      } catch {
+        // Messaging listener cleanup is best-effort.
+      }
       try {
         if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
-      } catch {}
+      } catch {
+        // Timer cleanup is best-effort during teardown.
+      }
       try {
         socket.disconnect()
-      } catch {}
+      } catch {
+        // Socket may already be closed.
+      }
       socketRef.current = null
     }
   }, [refresh])

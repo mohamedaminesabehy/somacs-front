@@ -9,6 +9,25 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url,
 ).toString()
 
+function getWrapperClass(embedded) {
+  return embedded
+    ? 'bg-white rounded-2xl border border-slate-200 w-full h-[76vh] flex flex-col overflow-hidden'
+    : 'bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden'
+}
+
+function getContainerClass(embedded) {
+  return embedded ? 'w-full' : 'fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4'
+}
+
+async function resolveOutlineDestination(pdfInstance, item) {
+  if (!pdfInstance || !item?.dest) return null
+  const destination = typeof item.dest === 'string'
+    ? await pdfInstance.getDestination(item.dest)
+    : item.dest
+  if (!Array.isArray(destination) || !destination[0]) return null
+  return pdfInstance.getPageIndex(destination[0])
+}
+
 export default function PdfViewer({ url, name, onClose, embedded = false }) {
   const [numPages, setNumPages] = useState(null)
   const [pageNumber, setPageNumber] = useState(1)
@@ -34,25 +53,24 @@ export default function PdfViewer({ url, name, onClose, embedded = false }) {
     }
   }, [])
 
-  useEffect(() => {
+  const resetViewerState = useCallback(() => {
     setShowOutline(false)
     setHasOutline(false)
     setOutlineItems([])
     setPdfInstance(null)
     setPageNumber(1)
-  }, [url])
+  }, [])
+
+  useEffect(() => {
+    resetViewerState()
+  }, [resetViewerState, url])
 
   const onOutlineItemClick = useCallback(async (item) => {
     if (!pdfInstance || !item?.dest) return
 
     try {
-      let destination = item.dest
-      if (typeof destination === 'string') {
-        destination = await pdfInstance.getDestination(destination)
-      }
-
-      if (Array.isArray(destination) && destination[0]) {
-        const targetIndex = await pdfInstance.getPageIndex(destination[0])
+      const targetIndex = await resolveOutlineDestination(pdfInstance, item)
+      if (targetIndex !== null) {
         setPageNumber(targetIndex + 1)
       }
     } catch {
@@ -68,12 +86,10 @@ export default function PdfViewer({ url, name, onClose, embedded = false }) {
     )
   }
 
-  const wrapperClass = embedded
-    ? 'bg-white rounded-2xl border border-slate-200 w-full h-[76vh] flex flex-col overflow-hidden'
-    : 'bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden'
+  const wrapperClass = getWrapperClass(embedded)
 
   return (
-    <div className={embedded ? 'w-full' : 'fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4'}>
+    <div className={getContainerClass(embedded)}>
       <div className={wrapperClass}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 shrink-0">
           <div className="flex items-center gap-3">

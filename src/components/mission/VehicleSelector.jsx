@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { AlertCircle, Truck } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { AlertCircle } from 'lucide-react'
 import { apiFetch } from '../api/apiClient'
 
 /**

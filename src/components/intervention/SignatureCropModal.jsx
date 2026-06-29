@@ -15,6 +15,75 @@ import { loadImageFromFile, processSignatureImage } from '../../utils/signatureI
 const MIN_ZOOM = 1
 const MAX_ZOOM = 5
 
+function getNaturalSize(image) {
+  return {
+    natW: image ? image.naturalWidth || image.width : 0,
+    natH: image ? image.naturalHeight || image.height : 0,
+  }
+}
+
+function getCenteredOffset(viewportWidth, viewportHeight, imageWidth, imageHeight) {
+  return {
+    x: (viewportWidth - imageWidth) / 2,
+    y: (viewportHeight - imageHeight) / 2,
+  }
+}
+
+function clampImageOffset(next, scale, viewport, natW, natH) {
+  const imgW = natW * scale
+  const imgH = natH * scale
+  let { x, y } = next
+
+  x = imgW <= viewport.w
+    ? (viewport.w - imgW) / 2
+    : Math.min(0, Math.max(viewport.w - imgW, x))
+  y = imgH <= viewport.h
+    ? (viewport.h - imgH) / 2
+    : Math.min(0, Math.max(viewport.h - imgH, y))
+
+  return { x, y }
+}
+
+function getCropRegion({ baseScale, zoom, offset, viewport, natW, natH }) {
+  const scale = baseScale * zoom
+  const srcX = -offset.x / scale
+  const srcY = -offset.y / scale
+  const srcW = viewport.w / scale
+  const srcH = viewport.h / scale
+  const x = Math.max(0, srcX)
+  const y = Math.max(0, srcY)
+  const width = Math.min(natW - x, srcW - (x - srcX))
+  const height = Math.min(natH - y, srcH - (y - srcY))
+
+  return {
+    x,
+    y,
+    width: Math.max(1, width),
+    height: Math.max(1, height),
+  }
+}
+
+function getPointFromEvent(event) {
+  const e = event.touches ? event.touches[0] : event
+  return { x: e.clientX, y: e.clientY }
+}
+
+function getImageStyle(image, natW, natH, displayScale, offset) {
+  if (!image) return {}
+  return {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    width: `${natW * displayScale}px`,
+    height: `${natH * displayScale}px`,
+    transform: `translate(${offset.x}px, ${offset.y}px)`,
+    transformOrigin: 'top left',
+    userSelect: 'none',
+    pointerEvents: 'none',
+    maxWidth: 'none',
+  }
+}
+
 export default function SignatureCropModal({ file, title, onCancel, onValidate }) {
   const viewportRef = useRef(null)
   const [image, setImage] = useState(null)
@@ -45,27 +114,13 @@ export default function SignatureCropModal({ file, title, onCancel, onValidate }
     }
   }, [file])
 
-  const natW = image ? image.naturalWidth || image.width : 0
-  const natH = image ? image.naturalHeight || image.height : 0
+  const { natW, natH } = getNaturalSize(image)
   const displayScale = baseScale * zoom
 
   // Keep the image covering the viewport when possible; clamp panning.
   const clampOffset = useCallback(
     (next, scale = displayScale, vp = viewport) => {
-      const imgW = natW * scale
-      const imgH = natH * scale
-      let { x, y } = next
-      if (imgW <= vp.w) {
-        x = (vp.w - imgW) / 2 // centre horizontally if smaller than frame
-      } else {
-        x = Math.min(0, Math.max(vp.w - imgW, x))
-      }
-      if (imgH <= vp.h) {
-        y = (vp.h - imgH) / 2
-      } else {
-        y = Math.min(0, Math.max(vp.h - imgH, y))
-      }
-      return { x, y }
+      return clampImageOffset(next, scale, vp, natW, natH)
     },
     [displayScale, viewport, natW, natH],
   )
@@ -81,7 +136,7 @@ export default function SignatureCropModal({ file, title, onCancel, onValidate }
     setZoom(1)
     const imgW = natW * fit
     const imgH = natH * fit
-    setOffset({ x: (w - imgW) / 2, y: (h - imgH) / 2 })
+    setOffset(getCenteredOffset(w, h, imgW, imgH))
   }, [image, natW, natH])
 
   useEffect(() => {
@@ -112,14 +167,9 @@ export default function SignatureCropModal({ file, title, onCancel, onValidate }
   )
 
   // ── Pan (mouse + touch) ──
-  const pointFromEvent = (event) => {
-    const e = event.touches ? event.touches[0] : event
-    return { x: e.clientX, y: e.clientY }
-  }
-
   const onDragStart = (event) => {
     if (!image) return
-    const p = pointFromEvent(event)
+    const p = getPointFromEvent(event)
     dragRef.current = { start: p, origin: { ...offset } }
   }
 
@@ -127,7 +177,7 @@ export default function SignatureCropModal({ file, title, onCancel, onValidate }
     (event) => {
       if (!dragRef.current) return
       if (event.cancelable) event.preventDefault()
-      const p = pointFromEvent(event)
+      const p = getPointFromEvent(event)
       const dx = p.x - dragRef.current.start.x
       const dy = p.y - dragRef.current.start.y
       const next = {
@@ -160,24 +210,7 @@ export default function SignatureCropModal({ file, title, onCancel, onValidate }
     setProcessing(true)
     try {
       // Map the viewport (the crop frame) back to source-image pixels.
-      const scale = baseScale * zoom
-      const srcX = -offset.x / scale
-      const srcY = -offset.y / scale
-      const srcW = viewport.w / scale
-      const srcH = viewport.h / scale
-
-      // Clamp to image bounds so we never sample outside the bitmap.
-      const x = Math.max(0, srcX)
-      const y = Math.max(0, srcY)
-      const width = Math.min(natW - x, srcW - (x - srcX))
-      const height = Math.min(natH - y, srcH - (y - srcY))
-
-      const region = {
-        x,
-        y,
-        width: Math.max(1, width),
-        height: Math.max(1, height),
-      }
+      const region = getCropRegion({ baseScale, zoom, offset, viewport, natW, natH })
       const result = await processSignatureImage(image, region)
       if (!result?.blob) {
         throw new Error('Traitement échoué')
@@ -189,20 +222,7 @@ export default function SignatureCropModal({ file, title, onCancel, onValidate }
     }
   }
 
-  const imgStyle = image
-    ? {
-        position: 'absolute',
-        left: 0,
-        top: 0,
-        width: `${natW * displayScale}px`,
-        height: `${natH * displayScale}px`,
-        transform: `translate(${offset.x}px, ${offset.y}px)`,
-        transformOrigin: 'top left',
-        userSelect: 'none',
-        pointerEvents: 'none',
-        maxWidth: 'none',
-      }
-    : {}
+  const imgStyle = getImageStyle(image, natW, natH, displayScale, offset)
 
   return (
     <div className="fixed inset-0 z-[120] bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 animate-in fade-in duration-200">

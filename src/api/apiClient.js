@@ -57,6 +57,53 @@ function createUnauthorizedResponse(message = 'Unauthorized') {
   })
 }
 
+function applyAuthHeader(finalHeaders) {
+  const token = getAuthToken()
+  if (!token) {
+    return createUnauthorizedResponse('Missing authorization token')
+  }
+  if (!isAuthTokenUsable(token)) {
+    clearStoredAuth()
+    dispatchAuthInvalid('expired-token')
+    return createUnauthorizedResponse('Expired authorization token')
+  }
+  finalHeaders.Authorization = `Bearer ${token}`
+  return null
+}
+
+function prepareRequestBody(body, finalHeaders) {
+  if (body === undefined || body === null || typeof body !== 'object' || body instanceof FormData) {
+    return body
+  }
+  finalHeaders['Content-Type'] = finalHeaders['Content-Type'] || 'application/json'
+  return JSON.stringify(body)
+}
+
+function createTimeoutSignal(signal, timeoutMs) {
+  const timeoutController = new AbortController()
+  const timeoutId = timeoutMs > 0
+    ? setTimeout(() => timeoutController.abort(new DOMException('Request timeout', 'TimeoutError')), timeoutMs)
+    : null
+  let externalAbortHandler = null
+
+  if (signal?.aborted) {
+    timeoutController.abort(signal.reason)
+  } else if (signal) {
+    externalAbortHandler = () => timeoutController.abort(signal.reason)
+    signal.addEventListener('abort', externalAbortHandler, { once: true })
+  }
+
+  return {
+    signal: timeoutController.signal,
+    cleanup() {
+      if (timeoutId) clearTimeout(timeoutId)
+      if (signal && externalAbortHandler) {
+        signal.removeEventListener('abort', externalAbortHandler)
+      }
+    },
+  }
+}
+
 export async function apiFetch(path, options = {}) {
   const {
     method = 'GET',
@@ -70,49 +117,24 @@ export async function apiFetch(path, options = {}) {
 
   const finalHeaders = { ...headers }
   if (auth) {
-    const token = getAuthToken()
-    if (!token) {
-      return createUnauthorizedResponse('Missing authorization token')
-    }
-    if (!isAuthTokenUsable(token)) {
-      clearStoredAuth()
-      dispatchAuthInvalid('expired-token')
-      return createUnauthorizedResponse('Expired authorization token')
-    }
-    finalHeaders.Authorization = `Bearer ${token}`
+    const unauthorizedResponse = applyAuthHeader(finalHeaders)
+    if (unauthorizedResponse) return unauthorizedResponse
   }
 
-  let finalBody = body
-  if (body !== undefined && body !== null && typeof body === 'object' && !(body instanceof FormData)) {
-    finalHeaders['Content-Type'] = finalHeaders['Content-Type'] || 'application/json'
-    finalBody = JSON.stringify(body)
-  }
+  const finalBody = prepareRequestBody(body, finalHeaders)
 
   // Timeout client : si le backend met plus de N ms, on annule la requête
   // pour ne JAMAIS laisser un loader bloqué côté UI.
-  const timeoutController = new AbortController()
-  const timeoutId = timeoutMs > 0
-    ? setTimeout(() => timeoutController.abort(new DOMException('Request timeout', 'TimeoutError')), timeoutMs)
-    : null
+  const timeoutSignal = createTimeoutSignal(signal, timeoutMs)
 
   // On compose le signal externe (si fourni) avec le signal de timeout.
-  let composedSignal = timeoutController.signal
-  let externalAbortHandler = null
-  if (signal) {
-    if (signal.aborted) {
-      timeoutController.abort(signal.reason)
-    } else {
-      externalAbortHandler = () => timeoutController.abort(signal.reason)
-      signal.addEventListener('abort', externalAbortHandler, { once: true })
-    }
-  }
 
   try {
     const response = await fetch(API_BASE_URL + path, {
       method,
       headers: finalHeaders,
       body: finalBody,
-      signal: composedSignal,
+      signal: timeoutSignal.signal,
       ...rest,
     })
 
@@ -123,10 +145,7 @@ export async function apiFetch(path, options = {}) {
 
     return response
   } finally {
-    if (timeoutId) clearTimeout(timeoutId)
-    if (signal && externalAbortHandler) {
-      signal.removeEventListener('abort', externalAbortHandler)
-    }
+    timeoutSignal.cleanup()
   }
 }
 

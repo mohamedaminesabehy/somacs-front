@@ -1,19 +1,18 @@
 ﻿import { useEffect, useMemo, useState, useCallback } from 'react'
 import {
   AlertTriangle, BadgeCheck, Loader2, Save, MessageSquareText,
-  PhoneCall, RefreshCw, XCircle, Clock, TrendingUp, Edit3, Plus,
-  ShoppingCart, ThumbsDown, ChevronDown, ChevronUp, Bell, Zap,
+  PhoneCall, XCircle, Clock,
+  ShoppingCart, ThumbsDown, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { createDevisSuivi, fetchDevisSuivi, markDevisPurchased, markDevisLost } from '../../api/devisSuiviApi'
 import { apiFetch } from '../../api/apiClient'
 import {
   STATUS_META, TERMINAL_STATUSES,
-  REFUSAL_REASON_META, REFUSAL_REASON_CODE,
+  REFUSAL_REASON_META,
   AUTO_REMINDER_DAYS, TIMELINE_ACTION_META,
 } from '../../constants/devisSuiviConstants'
 
-import { StatusBadge, PriorityBadge } from './DevisSuiviBadges'
-import { TimelineContainer, PremiumAuditTimeline } from './TimelineSystem'
+import { TimelineContainer } from './TimelineSystem'
 
 const STATUS_OPTIONS = ['CREATED','SENT','CONTACTED','WAITING','NEGOTIATION','HOT_LEAD','COLD_LEAD','NO_RESPONSE','ACCEPTED','REFUSED','PURCHASED','EXPIRED']
 
@@ -89,6 +88,11 @@ function buildStatusDateMap(logs, selectedStatuses, createdAt, storedStatusDates
   }
 
   return statusDates
+}
+
+function getLocalStatusNodeClass(item, meta) {
+  if (item.isAuto) return 'bg-slate-100 border-slate-300'
+  return `border-2 ${meta?.tone}`
 }
 
 // ─── Multi-Status Selector ────────────────────────────────────────────────────
@@ -250,7 +254,7 @@ function LocalStatusTimeline({ selectedStatuses, createdAt, statusDates = {} }) 
           <div key={item.status} className="flex gap-3">
             {/* Connector */}
             <div className="flex flex-col items-center">
-              <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 ${item.isAuto ? 'bg-slate-100 border-slate-300' : `border-2 ${meta?.tone}`}`}>
+              <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 ${getLocalStatusNodeClass(item, meta)}`}>
                 <span className={`w-2.5 h-2.5 rounded-full ${meta?.dot}`} />
               </div>
               {!isLast && <div className="w-0.5 flex-1 bg-slate-200 my-1 min-h-[20px]" />}
@@ -321,7 +325,9 @@ function AdvancedAuditTimeline({ suiviId }) {
     apiFetch('/devis-suivi/' + suiviId + '/history', { auth: true })
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (mounted) setLogs(Array.isArray(d?.items) ? d.items : []) })
-      .catch(() => {})
+      .catch(() => {
+        // History is optional; keep the timeline empty when loading fails.
+      })
       .finally(() => { if (mounted) setLoading(false) })
     return () => { mounted = false }
   }, [suiviId])

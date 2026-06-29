@@ -14,6 +14,12 @@ const statusColors = {
   gray: 'bg-gray-100 text-gray-700',
 }
 
+function getRoleColorKey(role) {
+  if (role === 'Administrateur') return 'purple'
+  if (role === 'Commerciale' || role === 'Coordinateur' || role === 'Responsable technicien') return 'blue'
+  return 'gray'
+}
+
 export default function UserTable({
   users,
   isLoading,
@@ -125,12 +131,7 @@ export default function UserTable({
 
       const updated = await response.json()
 
-      const nextRoleColor =
-        updated.role === 'Administrateur'
-          ? 'purple'
-          : updated.role === 'Commerciale' || updated.role === 'Coordinateur' || updated.role === 'Responsable technicien'
-            ? 'blue'
-            : 'gray'
+      const nextRoleColor = getRoleColorKey(updated.role)
       const nextStatusText = updated.isActive ? 'Actif' : 'Inactif'
       const nextStatusColor = updated.isActive ? 'green' : 'gray'
 

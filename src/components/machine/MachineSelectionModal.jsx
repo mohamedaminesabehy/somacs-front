@@ -6,7 +6,6 @@ import {
   Plus, 
   Edit2, 
   Trash2, 
-  CheckCircle, 
   ChevronLeft,
   ChevronRight,
   Settings,
@@ -20,6 +19,15 @@ import {
   DollarSign,
   Activity
 } from 'lucide-react'
+
+function getMachineModalTitle(view, editingMachine) {
+  if (view === 'list') return 'Sélectionner une Machine'
+  return editingMachine ? 'Modifier la Machine' : 'Ajouter une Nouvelle Machine'
+}
+
+function getMachineModalSubtitle(view) {
+  return view === 'list' ? 'Gestion du parc machines et fiches techniques' : 'Informations détaillées de l\'équipement'
+}
 
 const MachineSelectionModal = ({ isOpen, onClose, onSelect }) => {
   const [view, setView] = useState('list') // 'list' or 'form'
@@ -191,10 +199,10 @@ const MachineSelectionModal = ({ isOpen, onClose, onSelect }) => {
             </div>
             <div>
               <h3 className="text-base sm:text-xl font-black text-slate-900 tracking-tight leading-tight">
-                {view === 'list' ? 'Sélectionner une Machine' : editingMachine ? 'Modifier la Machine' : 'Ajouter une Nouvelle Machine'}
+                {getMachineModalTitle(view, editingMachine)}
               </h3>
               <p className="hidden sm:block text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                {view === 'list' ? 'Gestion du parc machines et fiches techniques' : 'Informations détaillées de l\'équipement'}
+                {getMachineModalSubtitle(view)}
               </p>
             </div>
           </div>

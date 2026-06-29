@@ -5,6 +5,10 @@ import './index.css'
 import App from './App.jsx'
 import Preloader from './components/layout/Preloader.jsx'
 
+function ignoreServiceWorkerRegistrationError() {
+  // Push notifications are optional; the app still works if SW registration fails.
+}
+
 export function Root() {
   const [isLoading, setIsLoading] = useState(true)
   const [showPreloader, setShowPreloader] = useState(true)
@@ -22,7 +26,7 @@ export function Root() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     if (!('serviceWorker' in navigator)) return
-    navigator.serviceWorker.register('/firebase-messaging-sw.js').catch(() => {})
+    navigator.serviceWorker.register('/firebase-messaging-sw.js').catch(ignoreServiceWorkerRegistrationError)
 
     const onMessage = (event) => {
       const data = event?.data

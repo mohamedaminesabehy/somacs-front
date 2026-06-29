@@ -6,7 +6,6 @@ import {
   Plus, 
   Edit2, 
   Trash2, 
-  CheckCircle, 
   ChevronLeft,
   ChevronRight,
   User,
@@ -16,11 +15,18 @@ import {
   MapPin,
   Globe,
   FileText,
-  Tag,
   Hash,
-  Map,
   Users
 } from 'lucide-react'
+
+function getClientModalTitle(view, editingClient) {
+  if (view === 'list') return 'Sélectionner un Client'
+  return editingClient ? 'Modifier le Client' : 'Ajouter un Nouveau Client'
+}
+
+function getClientModalSubtitle(view) {
+  return view === 'list' ? 'Gestion de la base de données clients' : 'Informations détaillées du client'
+}
 
 const ClientSelectionModal = ({ isOpen, onClose, onSelect }) => {
   const [view, setView] = useState('list') // 'list' or 'form'
@@ -175,10 +181,10 @@ const ClientSelectionModal = ({ isOpen, onClose, onSelect }) => {
             </div>
             <div>
               <h3 className="text-base sm:text-xl font-black text-slate-900 tracking-tight leading-tight">
-                {view === 'list' ? 'Sélectionner un Client' : editingClient ? 'Modifier le Client' : 'Ajouter un Nouveau Client'}
+                {getClientModalTitle(view, editingClient)}
               </h3>
               <p className="hidden sm:block text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                {view === 'list' ? 'Gestion de la base de données clients' : 'Informations détaillées du client'}
+                {getClientModalSubtitle(view)}
               </p>
             </div>
           </div>

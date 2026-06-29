@@ -1,5 +1,5 @@
 import { forwardRef, useImperativeHandle, useState, useEffect, useCallback, useRef } from 'react'
-import { AlertCircle, Package, ClipboardList, Users, Eye, Edit, Trash2, MapPin, Building2, Phone, Calendar, Wrench, Paperclip, FileText, Clock, UserCheck, Hourglass, Link2, Settings, Download, Truck } from 'lucide-react'
+import { AlertCircle, ClipboardList, Users, Eye, Edit, Trash2, MapPin, Building2, Phone, Calendar, Wrench, Paperclip, FileText, Clock, UserCheck, Hourglass, Link2, Download, Truck } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 import { getAvatarFromName } from '../../utils/format'
 import { getStatusColorKey } from '../../utils/status'
@@ -64,6 +64,13 @@ function truncateText(value, max = 70) {
   if (!text) return ''
   if (text.length <= max) return text
   return `${text.slice(0, max)}....`
+}
+
+function getPriorityColor(priority) {
+  if (priority === 'Critique') return 'red'
+  if (priority === 'Haute') return 'orange'
+  if (priority === 'Moyenne') return 'yellow'
+  return 'gray'
 }
 
 function MissionTableInner(props, ref) {
@@ -155,10 +162,10 @@ function MissionTableInner(props, ref) {
     if (typeof window === 'undefined') return
     const t = window.setTimeout(() => {
       if (!Array.isArray(missionsProp)) {
-        void fetchMissions()
+        fetchMissions()
       }
-      void fetchInterventions()
-      void fetchEmployees()
+      fetchInterventions()
+      fetchEmployees()
     }, 0)
     return () => window.clearTimeout(t)
   }, [fetchMissions, fetchInterventions, fetchEmployees, missionsProp])
@@ -310,7 +317,7 @@ function MissionTableInner(props, ref) {
 
     // CAS 1: PLUSIEURS employés
     if (hasMultipleEmployees) {
-      const baseMission = {
+      const groupMissionPayload = {
         title: formTitle,
         description: formDescription,
         priority: formPriority,
@@ -328,7 +335,7 @@ function MissionTableInner(props, ref) {
       try {
         const response = await apiFetch('/missions', {
           method: 'POST',
-          body: baseMission,
+          body: groupMissionPayload,
           auth: true,
         })
 
@@ -347,7 +354,7 @@ function MissionTableInner(props, ref) {
     const selectedEmployee = employeeUsers.find((u) => String(u.id) === String(formEmployee)) || null
     const selectedEmployeeName = selectedEmployee?.name || ''
 
-    const baseMission = {
+    const singleMissionPayload = {
       title: formTitle,
       description: formDescription,
       employee: selectedEmployeeName,
@@ -375,7 +382,7 @@ function MissionTableInner(props, ref) {
         modalMode === 'create' ? '/missions' : `/missions/${formMissionId}`,
         {
           method: modalMode === 'create' ? 'POST' : 'PATCH',
-          body: modalMode === 'edit' ? { ...baseMission, attachments: existingAttachments } : baseMission,
+          body: modalMode === 'edit' ? { ...singleMissionPayload, attachments: existingAttachments } : singleMissionPayload,
           auth: true,
         },
       )
@@ -422,14 +429,7 @@ function MissionTableInner(props, ref) {
   }))
 
   const handleOpenViewModal = (mission) => {
-    const priorityColor =
-      mission.priority === 'Critique'
-        ? 'red'
-        : mission.priority === 'Haute'
-          ? 'orange'
-          : mission.priority === 'Moyenne'
-            ? 'yellow'
-            : 'gray'
+    const priorityColor = getPriorityColor(mission.priority)
     const statusColor =
       mission.status === 'En cours'
         ? 'yellow'
@@ -466,7 +466,7 @@ function MissionTableInner(props, ref) {
           <div className="space-y-4 sm:space-y-5">
             {paginatedMissions.map((mission) => {
               const IconComponent = mission.type === 'Intervention' ? Wrench : ClipboardList
-              const priorityColor = mission.priority === 'Critique' ? 'red' : mission.priority === 'Haute' ? 'orange' : mission.priority === 'Moyenne' ? 'yellow' : 'gray'
+              const priorityColor = getPriorityColor(mission.priority)
               const statusColor = getStatusColorKey(mission.status)
               const employeeDisplay = mission.employeeDisplay || mission.employee
               const groupedStatuses = getGroupedEmployeeStatuses(mission)
@@ -616,7 +616,7 @@ function MissionTableInner(props, ref) {
           ) : null}
           {paginatedMissions.map((mission) => {
             const IconComponent = mission.type === 'Intervention' ? Wrench : ClipboardList
-            const priorityColor = mission.priority === 'Critique' ? 'red' : mission.priority === 'Haute' ? 'orange' : mission.priority === 'Moyenne' ? 'yellow' : 'gray'
+            const priorityColor = getPriorityColor(mission.priority)
             const statusColor = getStatusColorKey(mission.status)
             const employeeDisplay = mission.employeeDisplay || mission.employee
             const groupedStatuses = getGroupedEmployeeStatuses(mission)

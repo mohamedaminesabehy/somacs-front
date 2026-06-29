@@ -10,6 +10,41 @@ const colorByRole = {
   'Responsable technicien': 'bg-[#0052CC]',
 }
 
+function getRolesPagination(totalRoles, currentPage, itemsPerPage) {
+  const totalPages = totalRoles === 0 ? 1 : Math.ceil(totalRoles / itemsPerPage)
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const startIndex = totalRoles === 0 ? 0 : (safeCurrentPage - 1) * itemsPerPage
+  const endIndex = totalRoles === 0 ? 0 : Math.min(startIndex + itemsPerPage, totalRoles)
+  const firstVisibleRole = totalRoles === 0 ? 0 : startIndex + 1
+  return { totalPages, safeCurrentPage, startIndex, endIndex, firstVisibleRole }
+}
+
+function RoleCard({ role }) {
+  return (
+    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+      <div className="flex items-center gap-3 flex-1">
+        <div
+          className={`w-2.5 h-2.5 rounded-full ${
+            colorByRole[role.name] || 'bg-slate-500'
+          }`}
+        ></div>
+        <div>
+          <p className="font-medium text-gray-900">{role.name}</p>
+          <p className="text-sm text-gray-600">{role.description}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-4">
+        <span className="text-sm text-gray-600">
+          {role.usersCount} utilisateur{role.usersCount > 1 ? 's' : ''}
+        </span>
+        <button className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition">
+          <MoreVertical size={18} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function RoleManagement() {
   const [roles, setRoles] = useState([])
   const [isLoading, setIsLoading] = useState(false)
@@ -45,10 +80,11 @@ export default function RoleManagement() {
     [roles],
   )
 
-  const totalPages = totalRoles === 0 ? 1 : Math.ceil(totalRoles / itemsPerPage)
-  const safeCurrentPage = Math.min(currentPage, totalPages)
-  const startIndex = totalRoles === 0 ? 0 : (safeCurrentPage - 1) * itemsPerPage
-  const endIndex = totalRoles === 0 ? 0 : Math.min(startIndex + itemsPerPage, totalRoles)
+  const { totalPages, safeCurrentPage, startIndex, endIndex, firstVisibleRole } = getRolesPagination(
+    totalRoles,
+    currentPage,
+    itemsPerPage,
+  )
   const paginatedRoles = roles.slice(startIndex, endIndex)
 
   const handlePreviousPage = () => {
@@ -96,38 +132,13 @@ export default function RoleManagement() {
             Aucun rôle configuré pour le moment.
           </div>
         ) : (
-          paginatedRoles.map((role) => (
-            <div
-              key={role.name}
-              className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
-            >
-              <div className="flex items-center gap-3 flex-1">
-                <div
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    colorByRole[role.name] || 'bg-slate-500'
-                  }`}
-                ></div>
-                <div>
-                  <p className="font-medium text-gray-900">{role.name}</p>
-                  <p className="text-sm text-gray-600">{role.description}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-600">
-                  {role.usersCount} utilisateur{role.usersCount > 1 ? 's' : ''}
-                </span>
-                <button className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition">
-                  <MoreVertical size={18} />
-                </button>
-              </div>
-            </div>
-          ))
+          paginatedRoles.map((role) => <RoleCard key={role.name} role={role} />)
         )}
       </div>
       {totalRoles > 0 && (
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mt-4 text-xs sm:text-sm text-gray-600">
           <span>
-            {`Affichage de ${totalRoles === 0 ? 0 : startIndex + 1} à ${endIndex} sur ${totalRoles} rôles`}
+            {`Affichage de ${firstVisibleRole} à ${endIndex} sur ${totalRoles} rôles`}
           </span>
           <div className="flex gap-2">
             <button

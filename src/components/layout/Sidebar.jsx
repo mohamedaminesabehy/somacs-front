@@ -21,6 +21,33 @@ import {
 } from 'lucide-react'
 import logo from '../../assets/logo.jpg'
 
+function getSidebarRoleFlags(currentUser) {
+  const normalizedRole = String(currentUser?.role || '').trim().toLowerCase()
+  const isTechnicien = normalizedRole === 'technicien'
+  const isCommerciale = normalizedRole === 'commerciale' || normalizedRole === 'commercial'
+  const isResponsable = normalizedRole === 'responsable technicien' || normalizedRole.includes('responsable')
+  const isCoordinateur = normalizedRole === 'coordinateur'
+  return {
+    isTechnicien,
+    isCommerciale,
+    isResponsable,
+    isCoordinateur,
+    canAccessDevisSuivi: normalizedRole === 'administrateur' || isCommerciale,
+    canAccessAdminMenu: !isCommerciale && !isTechnicien && !isResponsable && !isCoordinateur,
+    canAccessOperationsDashboard: isResponsable || isCoordinateur,
+  }
+}
+
+function getUserInitials(currentUser) {
+  if (!currentUser?.name) return 'US'
+  return currentUser.name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('')
+}
+
 function SubMenu({ icon, label, children, matchPaths }) {
   const location = useLocation()
   const MenuIcon = icon
@@ -83,13 +110,13 @@ function SidebarContent({ onClose, currentUser, onLogout }) {
     navigate('/login')
   }
 
-  const normalizedRole = String(currentUser?.role || '').trim().toLowerCase()
-  const isTechnicien = normalizedRole === 'technicien'
-
-  const isCommerciale = normalizedRole === 'commerciale' || normalizedRole === 'commercial'
-  const isResponsable = normalizedRole === 'responsable technicien' || normalizedRole.includes('responsable')
-  const isCoordinateur = normalizedRole === 'coordinateur'
-  const canAccessDevisSuivi = normalizedRole === 'administrateur' || isCommerciale
+  const {
+    isTechnicien,
+    isCommerciale,
+    canAccessDevisSuivi,
+    canAccessAdminMenu,
+    canAccessOperationsDashboard,
+  } = getSidebarRoleFlags(currentUser)
 
   const menuLinkClass = ({ isActive }) =>
     `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
@@ -212,7 +239,7 @@ function SidebarContent({ onClose, currentUser, onLogout }) {
           </div>
         )}
 
-        {(isResponsable || isCoordinateur) && (
+        {canAccessOperationsDashboard && (
           <>
             <div className="mb-8">
               <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] px-4 mb-4 opacity-80">
@@ -227,7 +254,7 @@ function SidebarContent({ onClose, currentUser, onLogout }) {
           </>
         )}
 
-        {!isCommerciale && !isTechnicien && !isResponsable && !isCoordinateur && (
+        {canAccessAdminMenu && (
           <>
             <div className="mb-8">
               <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.15em] px-4 mb-4 opacity-80">
@@ -259,14 +286,7 @@ function SidebarContent({ onClose, currentUser, onLogout }) {
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="relative shrink-0">
               <div className="w-10 h-10 bg-gradient-to-br from-[#0052CC] to-blue-600 rounded-xl flex items-center justify-center font-bold text-sm text-white border border-white/10 shadow-lg">
-                {currentUser && currentUser.name
-                  ? currentUser.name
-                      .split(' ')
-                      .filter(Boolean)
-                      .slice(0, 2)
-                      .map((part) => part[0]?.toUpperCase())
-                      .join('')
-                  : 'US'}
+                {getUserInitials(currentUser)}
               </div>
               <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-green-500 border-2 border-slate-900 rounded-full" />
             </div>
