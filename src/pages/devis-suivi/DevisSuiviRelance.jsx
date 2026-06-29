@@ -11,19 +11,13 @@ import {
   updateDevisSuiviStatus,
 } from '../../api/devisSuiviApi'
 import { StatusBadge, PriorityBadge } from '../../components/devis/DevisSuiviBadges'
+import { formatDateTime } from '../../utils/date'
+import { formatMoney } from '../../utils/format'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function fmt(v) {
-  if (!v) return '-'
-  const d = v instanceof Date ? v : new Date(v)
-  if (Number.isNaN(d.getTime())) return '-'
-  return d.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-
-function fmtMoney(v) {
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'TND' }).format(Number(v || 0))
-}
+const fmt = formatDateTime
+const fmtMoney = formatMoney
 
 function getOverdueInfo(reminderDate) {
   if (!reminderDate) return null

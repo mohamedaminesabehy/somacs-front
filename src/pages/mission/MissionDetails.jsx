@@ -10,22 +10,11 @@ import {
   Download, Eye, Truck
 } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
-
-const PRIORITY_CONFIG = {
-  Critique: { label: 'Critique', bar: 'bg-red-500',    badge: 'bg-red-50 text-red-700 border-red-100',      dot: 'bg-red-500',    color: 'text-red-600' },
-  Haute:    { label: 'Haute',    bar: 'bg-orange-500',  badge: 'bg-orange-50 text-orange-700 border-orange-100', dot: 'bg-orange-500', color: 'text-orange-600' },
-  Moyenne:  { label: 'Moyenne',  bar: 'bg-blue-500',    badge: 'bg-blue-50 text-blue-700 border-blue-100',    dot: 'bg-blue-500',   color: 'text-blue-600' },
-  Basse:    { label: 'Basse',    bar: 'bg-slate-400',   badge: 'bg-slate-50 text-slate-600 border-slate-100', dot: 'bg-slate-400',  color: 'text-slate-500' },
-}
-
-const STATUS_STEPS = ['À faire', 'En cours', 'Terminée']
-
-const STATUS_CONFIG = {
-  'À faire':  { icon: ClipboardList, color: 'text-blue-600',   bg: 'bg-blue-50',   border: 'border-blue-200',    badge: 'bg-blue-50 text-blue-700 border border-blue-200' },
-  'En cours': { icon: Loader2,       color: 'text-amber-600', bg: 'bg-amber-50',  border: 'border-amber-300',   badge: 'bg-amber-50 text-amber-700 border border-amber-200' },
-  'Terminée': { icon: CheckCircle2,  color: 'text-green-600', bg: 'bg-green-50',  border: 'border-green-200',   badge: 'bg-green-50 text-green-700 border border-green-200' },
-  'Bloquée':  { icon: XCircle,       color: 'text-red-600',   bg: 'bg-red-50',    border: 'border-red-200',     badge: 'bg-red-50 text-red-700 border border-red-200' },
-}
+import {
+  MISSION_PRIORITY_CONFIG as PRIORITY_CONFIG,
+  MISSION_STATUS_CONFIG as STATUS_CONFIG,
+  MISSION_STATUS_STEPS as STATUS_STEPS,
+} from '../../constants/missionConstants'
 
 const ACTIONS_SECTION_ACCENT = {
   'À faire': 'border-blue-200',

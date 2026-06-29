@@ -172,6 +172,80 @@ function EntityRowActions({
   )
 }
 
+function FormField({ field, formData, onChange }) {
+  const Icon = field.icon
+  const value = formData[field.name] ?? ''
+
+  if (field.type === 'select') {
+    return (
+      <div className={field.className || ''}>
+        <label className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">{field.label}</label>
+        <select
+          name={field.name}
+          value={value}
+          onChange={onChange}
+          className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-xl outline-none transition-all text-sm font-bold"
+          required={field.required}
+        >
+          {(field.options || []).map((option) => (
+            <option key={option.value ?? option} value={option.value ?? option}>
+              {option.label ?? option}
+            </option>
+          ))}
+        </select>
+      </div>
+    )
+  }
+
+  return (
+    <div className={field.className || ''}>
+      <label className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">{field.label}</label>
+      <div className="relative">
+        {Icon && <Icon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />}
+        <input
+          type={field.type || 'text'}
+          name={field.name}
+          value={value}
+          onChange={onChange}
+          placeholder={field.placeholder || ''}
+          className={`${Icon ? 'pl-11' : 'pl-4'} w-full pr-4 py-3 bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-xl outline-none transition-all text-sm font-bold`}
+          required={field.required}
+        />
+      </div>
+    </div>
+  )
+}
+
+function EntityFormSections({ formSections, formData, handleInputChange }) {
+  return (
+    <>
+      {formSections.map((section) => {
+        const SectionIcon = section.icon
+        return (
+          <section key={section.title} className="bg-white border border-slate-100 rounded-2xl p-4 sm:p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-4">
+              {SectionIcon && (
+                <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-500 flex items-center justify-center">
+                  <SectionIcon size={18} />
+                </div>
+              )}
+              <div>
+                <h4 className="text-sm sm:text-base font-black text-slate-900">{section.title}</h4>
+                {section.subtitle && <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest">{section.subtitle}</p>}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {section.fields.map((field) => (
+                <FormField key={field.name} field={field} formData={formData} onChange={handleInputChange} />
+              ))}
+            </div>
+          </section>
+        )
+      })}
+    </>
+  )
+}
+
 export default function EntitySelectionModal({
   isOpen,
   onClose,
@@ -190,7 +264,8 @@ export default function EntitySelectionModal({
   filterFn,
   customForm,
   formSections = [],
-  actions
+  actions,
+  maxWidthClass = 'max-w-6xl'
 }) {
   const [view, setView] = useState('list') // 'list' or 'form'
   const [editingEntity, setEditingEntity] = useState(null)
@@ -292,10 +367,7 @@ export default function EntitySelectionModal({
         editingEntity ? `${fetchEndpoint}/${editingEntity.id}` : fetchEndpoint,
         {
           method: editingEntity ? 'PATCH' : 'POST',
-          body: JSON.stringify(formData),
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          body: formData,
           auth: true,
         },
       )
@@ -326,7 +398,7 @@ export default function EntitySelectionModal({
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300" onClick={onClose} />
       
       {/* Modal Content */}
-      <div className="relative bg-white w-full max-w-6xl h-[90vh] sm:h-[85vh] rounded-2xl sm:rounded-3xl overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-300">
+      <div className={`relative bg-white w-full ${maxWidthClass} h-[90vh] sm:h-[85vh] rounded-2xl sm:rounded-3xl overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-300`}>
         
         {/* Header */}
         <div className="px-4 py-4 sm:px-6 sm:py-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
@@ -398,6 +470,7 @@ export default function EntitySelectionModal({
                             {col.label}
                           </th>
                         ))}
+                        <th className="hidden md:table-cell px-4 py-3 sm:px-6 sm:py-4 text-[10px] sm:text-[11px] font-black text-slate-600 uppercase tracking-wider text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -449,7 +522,7 @@ export default function EntitySelectionModal({
           ) : (
             customForm ? customForm({ formData, handleInputChange, handleSaveEntity, setView, editingEntity, primaryColor, loading }) : (
               <form onSubmit={handleSaveEntity} className="max-w-5xl mx-auto space-y-4 sm:space-y-6 pb-8">
-                {/* Form sections would go here, but Client & Machine forms are custom */}
+                <EntityFormSections formSections={formSections} formData={formData} handleInputChange={handleInputChange} />
                 <div className="flex flex-col sm:flex-row items-center justify-end gap-3 sm:gap-4 pt-6 sm:pt-8 border-t border-slate-100 mt-4 sm:mt-8">
                   <button 
                     type="button"

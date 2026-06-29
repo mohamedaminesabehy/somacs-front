@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 import { fetchDevisTotals } from '../../api/devisSuiviApi'
+import { isSameMonthYear, parseDateLike, relativeDateLabel } from '../../utils/date'
 
 /* -------------------------------------------------------------------------- */
 /*  Constants                                                                 */
@@ -64,41 +65,6 @@ const statusTone = {
 /* -------------------------------------------------------------------------- */
 /*  Utilities                                                                 */
 /* -------------------------------------------------------------------------- */
-
-function parseDateLike(value) {
-  if (!value) return null
-  if (value instanceof Date && !Number.isNaN(value.getTime())) return value
-  const raw = String(value).trim()
-  if (!raw) return null
-  if (raw.toLowerCase() === "aujourd'hui") return new Date()
-  const parsed = new Date(raw)
-  if (!Number.isNaN(parsed.getTime())) return parsed
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
-    const [d, m, y] = raw.split('/').map(Number)
-    const built = new Date(y, m - 1, d)
-    if (!Number.isNaN(built.getTime())) return built
-  }
-  return null
-}
-
-function relativeDateLabel(value) {
-  const date = parseDateLike(value)
-  if (!date) return 'Date non précisée'
-  const today = new Date()
-  const a = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  const b = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  const diff = Math.round((a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24))
-  if (diff === 0) return "Aujourd'hui"
-  if (diff === 1) return 'Hier'
-  if (diff > 1 && diff <= 30) return `Il y a ${diff} jours`
-  if (diff < 0 && Math.abs(diff) <= 30) return `Dans ${Math.abs(diff)} jours`
-  return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
-
-function isSameMonthYear(date, month, year) {
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return false
-  return date.getMonth() === month && date.getFullYear() === year
-}
 
 /* -------------------------------------------------------------------------- */
 /*  Primitive UI components                                                   */

@@ -1,4 +1,10 @@
 import { AlertCircle, Package, ClipboardList, Wrench } from 'lucide-react'
+import {
+  MISSION_PRIORITY_COLORS,
+  MISSION_STATUS_COLORS,
+  MISSION_STATUS_LIST,
+  getMissionStatusColorKey,
+} from '../constants/missionConstants'
 
 // ─── Interventions ────────────────────────────────────────────────────────────
 export const interventionsList = [
@@ -89,30 +95,10 @@ export const interventionsList = [
 ]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-export const statusList = ['À faire', 'En cours', 'Terminée', 'Bloquée']
-
-export const priorityColors = {
-  red:    'bg-red-100 text-red-700',
-  orange: 'bg-orange-100 text-orange-700',
-  yellow: 'bg-yellow-100 text-yellow-700',
-  green:  'bg-green-100 text-green-700',
-  blue:   'bg-blue-100 text-blue-700',
-  gray:   'bg-gray-100 text-gray-700',
-}
-
-export const statusColors = {
-  'À faire':  'bg-blue-100 text-blue-700',
-  'En cours': 'bg-yellow-100 text-yellow-700',
-  'Terminée': 'bg-green-100 text-green-700',
-  'Bloquée':  'bg-red-100 text-red-700',
-}
-
-export function getStatusColor(status) {
-  if (status === 'En cours')  return 'yellow'
-  if (status === 'Terminée')  return 'green'
-  if (status === 'Bloquée')   return 'red'
-  return 'blue'
-}
+export const statusList = MISSION_STATUS_LIST
+export const priorityColors = MISSION_PRIORITY_COLORS
+export const statusColors = MISSION_STATUS_COLORS
+export const getStatusColor = getMissionStatusColorKey
 
 // ─── Shared mission store (single source of truth for all pages) ──────────────
 const _initialMissions = [

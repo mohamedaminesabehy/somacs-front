@@ -27,32 +27,10 @@ import {
   ArrowRight
 } from 'lucide-react'
 import DevisSuiviSection, { DevisSuiviTimeline, HorizontalStatusTimeline } from '../../components/devis/DevisSuiviSection.jsx'
+import { formatDate } from '../../utils/date'
+import { formatPrice, formatPrice as formatCurrency } from '../../utils/format'
 
 // --- Helper Functions ---
-const formatDate = (dateString) => {
-  if (!dateString) return '-'
-  return new Date(dateString).toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  })
-}
-
-const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'decimal',
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3
-  }).format(amount || 0)
-}
-
-const formatPrice = (amount) => {
-  return new Intl.NumberFormat('fr-FR', {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3
-  }).format(amount || 0)
-}
-
 const toNumber = (value, fallback = 0) => {
   if (value === null || value === undefined || value === '') {
     return fallback

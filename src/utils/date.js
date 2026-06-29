@@ -55,6 +55,25 @@ export function parseDateLike(value) {
   return null
 }
 
+export function relativeDateLabel(value, emptyLabel = 'Date non prÃ©cisÃ©e') {
+  const date = parseDateLike(value)
+  if (!date) return emptyLabel
+  const today = new Date()
+  const a = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const b = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const diff = Math.round((a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24))
+  if (diff === 0) return "Aujourd'hui"
+  if (diff === 1) return 'Hier'
+  if (diff > 1 && diff <= 30) return `Il y a ${diff} jours`
+  if (diff < 0 && Math.abs(diff) <= 30) return `Dans ${Math.abs(diff)} jours`
+  return formatDate(date)
+}
+
+export function isSameMonthYear(date, month, year) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return false
+  return date.getMonth() === month && date.getFullYear() === year
+}
+
 /** Date du jour au format input HTML (yyyy-MM-dd), en heure locale. */
 export function todayInputDate() {
   return new Date().toLocaleDateString('en-CA')

@@ -20,15 +20,9 @@ import {
 } from 'lucide-react'
 import ArticleSelectionModal from '../../components/devis/ArticleSelectionModal'
 import ArticleRecommendations from '../../components/devis/ArticleRecommendations'
+import { formatPrice as formatCurrency } from '../../utils/format'
 
 // --- Helpers ---
-const formatCurrency = (amount) =>
-  new Intl.NumberFormat('fr-FR', {
-    style: 'decimal',
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
-  }).format(amount || 0)
-
 const toNumber = (value, fallback = 0) => {
   if (value === null || value === undefined || value === '') return fallback
   const parsed = Number(value)

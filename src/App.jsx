@@ -125,32 +125,43 @@ export default function App() {
 
   const isLoggedIn = isAuthenticated
   const normalizedRole = String(currentUser?.role || '').trim().toLowerCase()
+  const layoutProps = {
+    isSidebarOpen,
+    onToggleSidebar: handleToggleSidebar,
+    onCloseSidebar: handleCloseSidebar,
+    currentUser,
+    onLogout: handleLogout,
+  }
+  const isCommercialRole = normalizedRole === 'commerciale' || normalizedRole === 'commercial'
+  const canAccessDevisSuivi = normalizedRole === 'administrateur' || isCommercialRole
+
+  const renderInLayout = (children) => (
+    <AppLayout {...layoutProps}>
+      {children}
+    </AppLayout>
+  )
+
+  const renderProtectedPage = (children) => (
+    isLoggedIn ? renderInLayout(children) : <Navigate to="/" replace />
+  )
+
+  const renderHomePage = (loginFallback = false) => {
+    if (!isLoggedIn) return loginFallback ? <LoginForm onLoginSuccess={handleLoginSuccess} /> : <Navigate to="/" replace />
+    if (normalizedRole === 'technicien') return <Navigate to="/missions/my" replace />
+    if (normalizedRole === 'commerciale') return <Navigate to="/devis" replace />
+    return renderInLayout(<OperationsDashboard currentUser={currentUser} />)
+  }
+
+  const renderDevisSuiviPage = (children) => {
+    if (!isLoggedIn) return <Navigate to="/" replace />
+    return canAccessDevisSuivi ? renderInLayout(children) : <Navigate to="/dashboard" replace />
+  }
 
   return (
     <Routes>
       <Route
         path="/"
-        element={
-          isLoggedIn ? (
-            normalizedRole === 'technicien' ? (
-              <Navigate to="/missions/my" replace />
-            ) : normalizedRole === 'commerciale' ? (
-              <Navigate to="/devis" replace />
-            ) : (
-              <AppLayout
-                isSidebarOpen={isSidebarOpen}
-                onToggleSidebar={handleToggleSidebar}
-                onCloseSidebar={handleCloseSidebar}
-                currentUser={currentUser}
-                onLogout={handleLogout}
-              >
-                <OperationsDashboard currentUser={currentUser} />
-              </AppLayout>
-            )
-          ) : (
-            <LoginForm onLoginSuccess={handleLoginSuccess} />
-          )
-        }
+        element={renderHomePage(true)}
       />
       <Route
         path="/login"
@@ -158,191 +169,18 @@ export default function App() {
       />
       <Route
         path="/dashboard"
-        element={
-          isLoggedIn ? (
-            normalizedRole === 'technicien' ? (
-              <Navigate to="/missions/my" replace />
-            ) : normalizedRole === 'commerciale' ? (
-              <Navigate to="/devis" replace />
-            ) : (
-              <AppLayout
-                isSidebarOpen={isSidebarOpen}
-                onToggleSidebar={handleToggleSidebar}
-                onCloseSidebar={handleCloseSidebar}
-                currentUser={currentUser}
-                onLogout={handleLogout}
-              >
-                <OperationsDashboard currentUser={currentUser} />
-              </AppLayout>
-            )
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
+        element={renderHomePage()}
       />
       {/* DashboardTechnicien removed; no dedicated route for technicien */}
-      <Route
-        path="/users"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <UserManagement currentUser={currentUser} />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route
-        path="/users/:id/details"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <UserDetails currentUser={currentUser} />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route
-        path="/missions"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <ListMission />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route
-        path="/missions/my"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <EmployeeMissions />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route
-        path="/missions/assign"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <AssignMission />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route
-        path="/missions/:id"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <MissionDetails />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route
-        path="/interventions"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <InterventionList />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route
-        path="/interventions/create"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <CreateIntervention />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route
-        path="/interventions/:id"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <InterventionDetails />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
+      <Route path="/users" element={renderProtectedPage(<UserManagement currentUser={currentUser} />)} />
+      <Route path="/users/:id/details" element={renderProtectedPage(<UserDetails currentUser={currentUser} />)} />
+      <Route path="/missions" element={renderProtectedPage(<ListMission />)} />
+      <Route path="/missions/my" element={renderProtectedPage(<EmployeeMissions />)} />
+      <Route path="/missions/assign" element={renderProtectedPage(<AssignMission />)} />
+      <Route path="/missions/:id" element={renderProtectedPage(<MissionDetails />)} />
+      <Route path="/interventions" element={renderProtectedPage(<InterventionList />)} />
+      <Route path="/interventions/create" element={renderProtectedPage(<CreateIntervention />)} />
+      <Route path="/interventions/:id" element={renderProtectedPage(<InterventionDetails />)} />
       <Route
         path="/interventions/history"
         element={
@@ -353,302 +191,28 @@ export default function App() {
           )
         }
       />
-      <Route
-        path="/devis"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <DevisList />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route
-        path="/devis/create"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <CreateDevis />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
+      <Route path="/devis" element={renderProtectedPage(<DevisList />)} />
+      <Route path="/devis/create" element={renderProtectedPage(<CreateDevis />)} />
       <Route
         path="/devis-suivi"
-        element={
-          isLoggedIn ? (
-            (normalizedRole === 'administrateur' || normalizedRole === 'commerciale' || normalizedRole === 'commercial') ? (
-              <AppLayout
-                isSidebarOpen={isSidebarOpen}
-                onToggleSidebar={handleToggleSidebar}
-                onCloseSidebar={handleCloseSidebar}
-                currentUser={currentUser}
-                onLogout={handleLogout}
-              >
-                <DevisSuiviDashboard />
-              </AppLayout>
-            ) : (
-              <Navigate to="/dashboard" replace />
-            )
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
+        element={renderDevisSuiviPage(<DevisSuiviDashboard />)}
       />
       <Route
         path="/devis-suivi/relance"
-        element={
-          isLoggedIn ? (
-            (normalizedRole === 'administrateur' || normalizedRole === 'commerciale' || normalizedRole === 'commercial') ? (
-              <AppLayout
-                isSidebarOpen={isSidebarOpen}
-                onToggleSidebar={handleToggleSidebar}
-                onCloseSidebar={handleCloseSidebar}
-                currentUser={currentUser}
-                onLogout={handleLogout}
-              >
-                <DevisSuiviRelance />
-              </AppLayout>
-            ) : (
-              <Navigate to="/dashboard" replace />
-            )
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
+        element={renderDevisSuiviPage(<DevisSuiviRelance />)}
       />
-      <Route
-        path="/devis/*"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <DevisDetails />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route
-        path="/machines"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <MachineList currentUser={currentUser} />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route
-        path="/machines/create"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <MachineForm />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route
-        path="/machines/:id/edit"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <MachineForm />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route
-        path="/machines/:id"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <MachineDetails currentUser={currentUser} />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route
-        path="/vehicles"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <VehicleList />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route
-        path="/vehicles/create"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <CreateVehicle />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route
-        path="/vehicles/:id"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <VehicleDetails />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route
-        path="/vehicles/:id/edit"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <EditVehicle />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route
-        path="/employees/:employeeId/history"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <EmployeeHistory />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route
-        path="/clients"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <ClientsList />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
-      <Route
-        path="/clients/:id/360"
-        element={
-          isLoggedIn ? (
-            <AppLayout
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={handleToggleSidebar}
-              onCloseSidebar={handleCloseSidebar}
-              currentUser={currentUser}
-              onLogout={handleLogout}
-            >
-              <ClientDetails360 />
-            </AppLayout>
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
-      />
+      <Route path="/devis/*" element={renderProtectedPage(<DevisDetails />)} />
+      <Route path="/machines" element={renderProtectedPage(<MachineList currentUser={currentUser} />)} />
+      <Route path="/machines/create" element={renderProtectedPage(<MachineForm />)} />
+      <Route path="/machines/:id/edit" element={renderProtectedPage(<MachineForm />)} />
+      <Route path="/machines/:id" element={renderProtectedPage(<MachineDetails currentUser={currentUser} />)} />
+      <Route path="/vehicles" element={renderProtectedPage(<VehicleList />)} />
+      <Route path="/vehicles/create" element={renderProtectedPage(<CreateVehicle />)} />
+      <Route path="/vehicles/:id" element={renderProtectedPage(<VehicleDetails />)} />
+      <Route path="/vehicles/:id/edit" element={renderProtectedPage(<EditVehicle />)} />
+      <Route path="/employees/:employeeId/history" element={renderProtectedPage(<EmployeeHistory />)} />
+      <Route path="/clients" element={renderProtectedPage(<ClientsList />)} />
+      <Route path="/clients/:id/360" element={renderProtectedPage(<ClientDetails360 />)} />
       <Route
         path="*"
         element={

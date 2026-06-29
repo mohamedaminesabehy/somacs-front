@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { apiFetch } from '../../api/apiClient'
+import CompactPagination from '../../components/common/CompactPagination'
 import {
   Search, Plus, Eye, Edit2, Trash2, Settings, RefreshCw,
   LayoutGrid, LayoutList, Building2, MapPin, Tag, AlertCircle,
-  MoreHorizontal, X, Cpu, ChevronLeft, ChevronRight, FileText,
+  MoreHorizontal, X, Cpu, FileText,
   CheckCircle2,
   Truck, CalendarDays,
 } from 'lucide-react'
@@ -438,27 +439,13 @@ export default function MachineList({ currentUser }) {
               </table>
             </div>
             {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="px-4 sm:px-6 py-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <p className="text-xs text-slate-500 font-medium">
-                  {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)} sur {filtered.length}
-                </p>
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-30 transition-all">
-                    <ChevronLeft size={16} />
-                  </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1).map((p, i, arr) => (
-                    <span key={p}>
-                      {i > 0 && arr[i - 1] !== p - 1 && <span className="text-slate-300 px-1">…</span>}
-                      <button onClick={() => setCurrentPage(p)} className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${p === currentPage ? 'bg-blue-600 text-white' : 'hover:bg-slate-100 text-slate-600'}`}>{p}</button>
-                    </span>
-                  ))}
-                  <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-30 transition-all">
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-              </div>
-            )}
+            <CompactPagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={ITEMS_PER_PAGE}
+              totalItems={filtered.length}
+              onPageChange={setCurrentPage}
+            />
           </div>
         )}
       </main>

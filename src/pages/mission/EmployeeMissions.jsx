@@ -2,37 +2,22 @@ import { useCallback, useMemo, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import {
-  ClipboardList, Wrench, CheckCircle2,
+  Wrench,
   ChevronRight, Link2, Building2,
-  Calendar, XCircle, Loader2, User,
+  Calendar, User,
   ChevronLeft, LayoutList, CalendarDays,
   Zap,
 } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
-
-const PRIORITY_ORDER = { Critique: 1, Haute: 2, Moyenne: 3, Basse: 4 }
-
-const PRIORITY_BAR = {
-  red: 'bg-red-500', orange: 'bg-orange-500', yellow: 'bg-yellow-400', gray: 'bg-slate-300',
-}
-
-const STATUS_CONFIG = {
-  'À faire':  { icon: ClipboardList, badge: 'bg-blue-50 text-blue-700 border border-blue-200',     dot: 'bg-blue-500',   color: 'text-blue-600',   calBg: 'bg-blue-100 border-blue-300 text-blue-800' },
-  'En cours': { icon: Loader2,       badge: 'bg-amber-50 text-amber-700 border border-amber-200',  dot: 'bg-amber-500',  color: 'text-amber-600',  calBg: 'bg-amber-100 border-amber-300 text-amber-800' },
-  'Terminée': { icon: CheckCircle2,  badge: 'bg-green-50 text-green-700 border border-green-200',  dot: 'bg-green-500',  color: 'text-green-600',  calBg: 'bg-green-100 border-green-300 text-green-800' },
-  'Bloquée':  { icon: XCircle,       badge: 'bg-red-50 text-red-700 border border-red-200',        dot: 'bg-red-500',    color: 'text-red-600',    calBg: 'bg-red-100 border-red-300 text-red-800' },
-}
-
-const statusList = ['À faire', 'En cours', 'Terminée', 'Bloquée']
-
-const priorityColors = {
-  red: 'bg-red-100 text-red-700',
-  orange: 'bg-orange-100 text-orange-700',
-  yellow: 'bg-yellow-100 text-yellow-700',
-  green: 'bg-green-100 text-green-700',
-  blue: 'bg-blue-100 text-blue-700',
-  gray: 'bg-gray-100 text-gray-700',
-}
+import {
+  MISSION_PRIORITY_BAR as PRIORITY_BAR,
+  MISSION_PRIORITY_COLORS as priorityColors,
+  MISSION_PRIORITY_ORDER as PRIORITY_ORDER,
+  MISSION_STATUS_CONFIG as STATUS_CONFIG,
+  MISSION_STATUS_LIST as statusList,
+  getMissionPriorityColor as getPriorityColor,
+  getMissionStatusColorKey as getStatusColorKey,
+} from '../../constants/missionConstants'
 
 function getAvatarFromName(name) {
   if (!name) return ''
@@ -42,19 +27,6 @@ function getAvatarFromName(name) {
   return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase()
 }
 
-function getPriorityColor(priority) {
-  if (priority === 'Critique') return 'red'
-  if (priority === 'Haute') return 'orange'
-  if (priority === 'Moyenne') return 'yellow'
-  return 'gray'
-}
-
-function getStatusColorKey(status) {
-  if (status === 'En cours') return 'yellow'
-  if (status === 'Terminée') return 'green'
-  if (status === 'Bloquée') return 'red'
-  return 'blue'
-}
 
 function synchronizeGroupedMissionStatuses(rows) {
   const missions = Array.isArray(rows) ? rows : []
