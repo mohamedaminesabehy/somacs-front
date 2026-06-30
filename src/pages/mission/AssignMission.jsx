@@ -28,6 +28,11 @@ import {
   Truck,
 } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
+import {
+  INTERVENTION_STATUS_BADGE as statusColors,
+  formatClientAddress,
+  getInterventionStatusLabel as getStatusLabel,
+} from '../../utils/intervention'
 
 const createSafeRandomId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -44,24 +49,6 @@ function getAvatarFromName(name) {
   return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase()
 }
 
-function getStatusLabel(status) {
-  if (status === 'PENDING') return 'En attente'
-  if (status === 'ASSIGNED') return 'Affectée'
-  if (status === 'IN_PROGRESS') return 'En cours'
-  if (status === 'TESTING') return 'En test'
-  if (status === 'CLOSED') return 'Clôturé'
-  return status || ''
-}
-
-function formatClientAddress(client) {
-  if (!client) return ''
-  if (client.address) return String(client.address)
-  const city = client.city ? String(client.city).trim() : ''
-  const zone = client.zone ? String(client.zone).trim() : ''
-  if (!city && !zone) return ''
-  return zone ? `${city}, ${zone}` : city
-}
-
 // ── Steps definition ──────────────────────────────────────────────────────────
 const steps = [
   { id: 1, title: 'Type',        description: 'Nature de la mission', icon: Target },
@@ -69,14 +56,6 @@ const steps = [
   { id: 3, title: 'Affectation', description: 'Technicien & delai',   icon: Users },
   { id: 4, title: 'Validation',  description: 'Confirmation',          icon: CheckCircle2 },
 ]
-
-const statusColors = {
-  PENDING:     'bg-amber-50 text-amber-700 border border-amber-200',
-  ASSIGNED:    'bg-blue-50 text-blue-700 border border-blue-200',
-  IN_PROGRESS: 'bg-orange-50 text-orange-700 border border-orange-200',
-  TESTING:     'bg-purple-50 text-purple-700 border border-purple-200',
-  CLOSED:      'bg-green-50 text-green-700 border border-green-200',
-}
 
 export default function AssignMission() {
   const navigate = useNavigate()

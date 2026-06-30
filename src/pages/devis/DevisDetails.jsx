@@ -28,33 +28,10 @@ import {
 } from 'lucide-react'
 import DevisSuiviSection, { DevisSuiviTimeline, HorizontalStatusTimeline } from '../../components/devis/DevisSuiviSection.jsx'
 import { formatDate } from '../../utils/date'
+import { normalizeRate, resolveTVA, toNumber } from '../../utils/devis'
 import { formatPrice, formatPrice as formatCurrency } from '../../utils/format'
 
 // --- Helper Functions ---
-const toNumber = (value, fallback = 0) => {
-  if (value === null || value === undefined || value === '') {
-    return fallback
-  }
-
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : fallback
-}
-
-const normalizeRate = (value) => Math.max(0, toNumber(value, 0))
-
-const extractTauxFromCode = (codeTva) => {
-  if (!codeTva) return 0
-  const match = String(codeTva).match(/(\d+(?:\.\d+)?)/)
-  if (match) return parseFloat(match[1])
-  return 0
-}
-
-const resolveTVA = (line) => {
-  const taux = normalizeRate(line?.TVA)
-  if (taux > 0) return taux
-  return extractTauxFromCode(line?.CodeTVA)
-}
-
 const getLineNetHT = (line) => {
   const fromApi = toNumber(line?.Total_HT, NaN)
   if (Number.isFinite(fromApi) && fromApi >= 0) return fromApi

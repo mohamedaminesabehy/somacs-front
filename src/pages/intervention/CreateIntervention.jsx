@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../api/apiClient'
 import { 
@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import logo from '../../assets/logo.jpg'
 import FicheContent from '../../components/intervention/FicheContent'
+import MobileFichePreviewModal from '../../components/intervention/MobileFichePreviewModal'
 import ClientSelectionModal from '../../components/client/ClientSelectionModal'
 import MachineSelectionModal from '../../components/machine/MachineSelectionModal'
 
@@ -53,82 +54,6 @@ function generateFicheNumber() {
 }
 
 // ── Shared fiche content (identical layout for both desktop preview and mobile modal) ──
-function MobilePreviewModal({ onClose, interventionData, parts, laborPrice, logo }) {
-  const FICHE_WIDTH = 560 // intrinsic width of the fiche card (matches desktop px-7 padding)
-  const wrapperRef = useRef(null)
-  const [scale, setScale] = useState(1)
-
-  const computeScale = useCallback(() => {
-    if (wrapperRef.current) {
-      const available = wrapperRef.current.clientWidth
-      setScale(Math.min(1, available / FICHE_WIDTH))
-    }
-  }, [])
-
-  useEffect(() => {
-    computeScale()
-    window.addEventListener('resize', computeScale)
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', computeScale)
-    }
-    return () => {
-      window.removeEventListener('resize', computeScale)
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', computeScale)
-      }
-    }
-  }, [computeScale])
-
-  return (
-    <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 xl:hidden animate-in fade-in duration-300">
-      <div className="bg-white w-[min(100%,42rem)] h-[92dvh] max-h-[92dvh] rounded-3xl overflow-hidden flex flex-col shadow-2xl">
-        {/* Header */}
-        <div className="px-5 py-4 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center">
-              <Eye size={18} />
-            </div>
-            <h3 className="font-black text-slate-900 uppercase tracking-wider text-xs sm:text-sm">Aperçu de la fiche officielle</h3>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center bg-slate-100 text-slate-400 rounded-full hover:bg-slate-200 transition-colors"
-          >
-            <Plus size={20} className="rotate-45" />
-          </button>
-        </div>
-
-        {/* Scrollable fiche area */}
-        <div ref={wrapperRef} className="flex-1 overflow-y-auto bg-slate-100 no-scrollbar p-3">
-          <div style={{ width: `${FICHE_WIDTH * scale}px`, height: `${Math.round(FICHE_WIDTH * scale * 1.414)}px`, margin: '0 auto' }}>
-            <div
-              style={{
-                width: `${FICHE_WIDTH}px`,
-                transformOrigin: 'top left',
-                transform: `scale(${scale})`,
-              }}
-            >
-              <div className="bg-white shadow-2xl px-7 pt-5 pb-8 relative overflow-hidden border border-slate-300 text-slate-900 leading-none" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-                <FicheContent interventionData={interventionData} parts={parts} laborPrice={laborPrice} logo={logo} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 bg-slate-50 border-t border-slate-100 shrink-0">
-          <button
-            onClick={onClose}
-            className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-transform"
-          >
-            Fermer l'aperçu
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function CreateIntervention() {
   const navigate = useNavigate()
   const [currentStep, setCurrentStep] = useState(1)
@@ -920,7 +845,7 @@ export default function CreateIntervention() {
 
       {/* ── Mobile preview modal ── */}
       {showMobilePreview && (
-        <MobilePreviewModal
+        <MobileFichePreviewModal
           onClose={() => setShowMobilePreview(false)}
           interventionData={previewInterventionData}
           parts={previewParts}

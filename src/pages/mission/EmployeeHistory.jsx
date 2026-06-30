@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { AlertCircle, Building2, Calendar, CheckCircle2, Edit3, Eye, FileText, Hash, History, Search, User, Wrench, X } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 import logo from '../../assets/logo.jpg'
-import FicheContent from '../../components/intervention/FicheContent'
-
-const statusBadgeByStatus = {
-  CLOSED: 'bg-green-50 text-green-700 border-green-200',
-}
+import FichePreviewFrame from '../../components/intervention/FichePreviewFrame'
+import {
+  INTERVENTION_STATUS_BADGE as statusBadgeByStatus,
+  buildAssignedEmployeesDisplay,
+  mapRawToInterventionData,
+} from '../../utils/intervention'
 
 function getAuthUser() {
   if (typeof window === 'undefined') return null
@@ -58,93 +59,22 @@ function normalizeIntervention(row) {
   }
 }
 
-function formatClientAddress(client) {
-  if (!client) return ''
-  if (client.address) return String(client.address)
-  const city = client.city ? String(client.city).trim() : ''
-  const zone = client.zone ? String(client.zone).trim() : ''
-  if (!city && !zone) return ''
-  return zone ? `${city}, ${zone}` : city
-}
-
-function buildAssignedEmployeesDisplay(missionLike, fallback = '') {
-  const primary = String(missionLike?.employee || '').trim()
-  const fromArray = Array.isArray(missionLike?.groupedEmployees)
-    ? missionLike.groupedEmployees.map((name) => String(name || '').trim()).filter(Boolean)
-    : []
-  const fromDisplay = String(missionLike?.employeeDisplay || '')
-    .split(',')
-    .map((name) => name.trim())
-    .filter(Boolean)
-  const fallbackName = String(fallback || '').trim()
-  const names = Array.from(new Set([primary, ...fromArray, ...fromDisplay, fallbackName].filter(Boolean)))
-  return names.join(', ')
-}
-
-function mapRawToInterventionData(raw) {
-  const clientEntity = raw?.clientEntity || null
-  const machineEntity = raw?.machineEntity || null
-
-  return {
-    interventionDate: raw?.interventionDate || raw?.date || '',
-    startTime: raw?.startTime || '',
-    endTime: raw?.endTime || '',
-    totalTime: raw?.totalTime || '',
-    technicianName: raw?.assignedEmployeesDisplay || raw?.technicianName || raw?.assignedTo || raw?.assignee || raw?.technician || '',
-    ficheNumber: raw?.ficheNumber || '',
-    siteName: raw?.siteName || raw?.site || machineEntity?.site || '',
-    clientName: raw?.clientName || raw?.client || clientEntity?.name || '',
-    clientCode: raw?.clientCode || clientEntity?.code || '',
-    clientPhone: raw?.clientPhone || raw?.phone || clientEntity?.phone || '',
-    clientEmail: raw?.clientEmail || clientEntity?.email || '',
-    clientAddress: raw?.clientAddress || formatClientAddress(clientEntity) || '',
-    requestorName: raw?.requestorName || '',
-    machineType: raw?.machineType || raw?.machine || machineEntity?.designation || '',
-    machineBrand: raw?.machineBrand || machineEntity?.brand || '',
-    machineModel: raw?.machineModel || machineEntity?.year || '',
-    serialNumber: raw?.serialNumber || machineEntity?.serialNumber || '',
-    problemDescription: raw?.problemDescription || raw?.request || '',
-    telephoneDiagnostic: raw?.telephoneDiagnostic || '',
-    interventionType: raw?.interventionType || raw?.type || '',
-    interventionDetail: raw?.interventionDetail || '',
-    numEssai: raw?.numEssai || '',
-    essaiConcluant: raw?.essaiConcluant ?? null,
-  }
-}
-
 function InterventionPreview({ intervention }) {
   const data = intervention?.raw || {}
   const parts = Array.isArray(data.parts) ? data.parts : []
   const laborPrice = typeof data.laborPrice === 'number' ? data.laborPrice : Number(data.laborPrice) || 0
   const interventionData = mapRawToInterventionData(data)
-
-  const FICHE_WIDTH = 560
-  const wrapperRef = useRef(null)
-  const [scale, setScale] = useState(1)
   const [technicianSignatureUrl, setTechnicianSignatureUrl] = useState('')
   const [clientSignatureUrl, setClientSignatureUrl] = useState('')
 
-  const computeScale = useCallback(() => {
-    if (wrapperRef.current) {
-      const available = wrapperRef.current.clientWidth
-      setScale(Math.min(1, available / FICHE_WIDTH))
-    }
-  }, [])
-
-  useEffect(() => {
-    computeScale()
-    window.addEventListener('resize', computeScale)
-    return () => window.removeEventListener('resize', computeScale)
-  }, [computeScale])
-
-  // Load the signatures linked to this intervention so the official sheet
-  // preview shows them exactly like a real signed document.
   useEffect(() => {
     const interventionId = intervention?.id || data.id
     if (!interventionId) {
-      setTechnicianSignatureUrl('')
-      setClientSignatureUrl('')
-      return undefined
+      const resetTimer = window.setTimeout(() => {
+        setTechnicianSignatureUrl('')
+        setClientSignatureUrl('')
+      }, 0)
+      return () => window.clearTimeout(resetTimer)
     }
     let cancelled = false
     ;(async () => {
@@ -169,25 +99,17 @@ function InterventionPreview({ intervention }) {
   }, [intervention?.id, data.id])
 
   return (
-    <div ref={wrapperRef} className="flex-1 overflow-y-auto bg-slate-100 no-scrollbar p-3">
-      <div style={{ width: `${FICHE_WIDTH * scale}px`, height: `${Math.round(FICHE_WIDTH * scale * 1.414)}px`, margin: '0 auto' }}>
-        <div style={{ width: `${FICHE_WIDTH}px`, transformOrigin: 'top left', transform: `scale(${scale})` }}>
-          <div className="bg-white shadow-2xl rounded-none px-7 pt-5 pb-8 relative transition-all duration-700 overflow-hidden border border-slate-300 text-slate-900 leading-none" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-            <FicheContent
-              interventionData={interventionData}
-              parts={parts}
-              laborPrice={laborPrice}
-              logo={logo}
-              technicianSignatureUrl={technicianSignatureUrl}
-              clientSignatureUrl={clientSignatureUrl}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
+    <FichePreviewFrame
+      interventionData={interventionData}
+      parts={parts}
+      laborPrice={laborPrice}
+      logo={logo}
+      technicianSignatureUrl={technicianSignatureUrl}
+      clientSignatureUrl={clientSignatureUrl}
+      rounded
+    />
   )
 }
-
 export default function EmployeeHistory() {
   const { employeeId } = useParams()
   const navigate = useNavigate()

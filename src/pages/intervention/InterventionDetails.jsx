@@ -27,7 +27,15 @@ import {
 } from 'lucide-react'
 import logo from '../../assets/logo.jpg'
 import FicheContent from '../../components/intervention/FicheContent'
+import MobileFichePreviewModal from '../../components/intervention/MobileFichePreviewModal'
 import SignatureCropModal from '../../components/intervention/SignatureCropModal'
+import {
+  INTERVENTION_STATUS_CONFIG as statusConfig,
+  INTERVENTION_STATUS_TO_SECTION as statusToSection,
+  buildAssignedEmployeesDisplay,
+  formatClientAddress,
+  mapRawToInterventionData,
+} from '../../utils/intervention'
 
 // ── Per-intervention mock data (keyed by intervention ID) ──
 // Each entry has: status, completedUpToSection (1-4), and the fields filled.
@@ -247,23 +255,6 @@ const interventionsDB = {
   },
 }
 
-// Map workflow status → which section to open when entering the dossier
-const statusToSection = {
-  PENDING:     1,
-  ASSIGNED:    2,
-  IN_PROGRESS: 2,
-  TESTING:     3,
-  CLOSED:      4,
-}
-
-const statusConfig = {
-  PENDING:     { label: 'En attente',     color: 'bg-amber-50 text-amber-700 border border-amber-200',    dot: 'bg-amber-500'   },
-  ASSIGNED:    { label: 'Affectée',       color: 'bg-blue-50 text-blue-700 border border-blue-200',       dot: 'bg-blue-500'    },
-  IN_PROGRESS: { label: 'En cours',       color: 'bg-orange-50 text-orange-700 border border-orange-200', dot: 'bg-orange-500'  },
-  TESTING:     { label: 'En test',        color: 'bg-purple-50 text-purple-700 border border-purple-200', dot: 'bg-purple-500'  },
-  CLOSED:      { label: 'Clôturé',        color: 'bg-green-50 text-green-700 border border-green-200',    dot: 'bg-green-500'   },
-}
-
 const SIGNATURE_TYPES = {
   technician: 'TECHNICIAN_SIGNATURE',
   client: 'CLIENT_SIGNATURE_STAMP',
@@ -282,62 +273,6 @@ function formatSignatureDate(value) {
   })
 }
 
-function formatClientAddress(client) {
-  if (!client) return ''
-  if (client.address) return String(client.address)
-  const city = client.city ? String(client.city).trim() : ''
-  const zone = client.zone ? String(client.zone).trim() : ''
-  if (!city && !zone) return ''
-  return zone ? `${city}, ${zone}` : city
-}
-
-function buildAssignedEmployeesDisplay(missionLike, fallback = '') {
-  const primary = String(missionLike?.employee || '').trim()
-  const fromArray = Array.isArray(missionLike?.groupedEmployees)
-    ? missionLike.groupedEmployees.map((name) => String(name || '').trim()).filter(Boolean)
-    : []
-  const fromDisplay = String(missionLike?.employeeDisplay || '')
-    .split(',')
-    .map((name) => name.trim())
-    .filter(Boolean)
-  const fallbackName = String(fallback || '').trim()
-  const names = Array.from(new Set([primary, ...fromArray, ...fromDisplay, fallbackName].filter(Boolean)))
-  return names.join(', ')
-}
-
-function mapEntryToInterventionData(entry, assignedTechnicianName) {
-  const clientEntity = entry?.clientEntity || null
-  const machineEntity = entry?.machineEntity || null
-
-  return {
-    clientId: entry?.clientId || clientEntity?.id || '',
-    machineId: entry?.machineId || machineEntity?.id || '',
-    interventionDate: entry?.interventionDate || entry?.date || '',
-    ficheNumber: entry?.ficheNumber || '',
-    startTime: entry?.startTime || '',
-    endTime: entry?.endTime || '',
-    totalTime: entry?.totalTime || '',
-    siteName: entry?.siteName || machineEntity?.site || '',
-    clientName: entry?.clientName || entry?.client || clientEntity?.name || '',
-    clientCode: entry?.clientCode || clientEntity?.code || '',
-    clientPhone: entry?.clientPhone || entry?.phone || clientEntity?.phone || '',
-    clientEmail: entry?.clientEmail || clientEntity?.email || '',
-    clientAddress: entry?.clientAddress || formatClientAddress(clientEntity) || '',
-    requestorName: entry?.requestorName || '',
-    machineType: entry?.machineType || entry?.machine || machineEntity?.designation || '',
-    machineBrand: entry?.machineBrand || machineEntity?.brand || '',
-    machineModel: entry?.machineModel || machineEntity?.year || '',
-    serialNumber: entry?.serialNumber || machineEntity?.serialNumber || '',
-    problemDescription: entry?.problemDescription || entry?.request || '',
-    telephoneDiagnostic: entry?.telephoneDiagnostic || '',
-    interventionType: entry?.interventionType || entry?.type || '',
-    interventionDetail: entry?.interventionDetail || '',
-    numEssai: entry?.numEssai || '',
-    essaiConcluant: entry?.essaiConcluant ?? null,
-    technicianName: assignedTechnicianName || entry?.technicianName || entry?.assignedTo || entry?.assignee || '',
-  }
-}
-
 const sections = [
   { id: 1, title: 'Informations', description: 'Client & Équipement', icon: Building2 },
   { id: 2, title: 'Diagnostic', description: 'Analyse & Expertise', icon: AlertCircle },
@@ -346,91 +281,6 @@ const sections = [
 ]
 
 // ── Shared fiche content (identical layout for both desktop preview and mobile modal) ──
-function MobilePreviewModal({ onClose, interventionData, parts, laborPrice, logo, technicianSignatureUrl, clientSignatureUrl }) {
-  const FICHE_WIDTH = 560 // intrinsic width of the fiche card (matches desktop px-7 padding)
-  const wrapperRef = useRef(null)
-  const [scale, setScale] = useState(1)
-
-  const computeScale = useCallback(() => {
-    if (wrapperRef.current) {
-      const available = wrapperRef.current.clientWidth
-      setScale(Math.min(1, available / FICHE_WIDTH))
-    }
-  }, [])
-
-  useEffect(() => {
-    computeScale()
-    window.addEventListener('resize', computeScale)
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', computeScale)
-    }
-    return () => {
-      window.removeEventListener('resize', computeScale)
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', computeScale)
-      }
-    }
-  }, [computeScale])
-
-  return (
-    <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 xl:hidden animate-in fade-in duration-300">
-      <div className="bg-white w-[min(100%,42rem)] h-[92dvh] max-h-[92dvh] rounded-3xl overflow-hidden flex flex-col shadow-2xl">
-        {/* Header */}
-        <div className="px-5 py-4 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center">
-              <Eye size={18} />
-            </div>
-            <h3 className="font-black text-slate-900 uppercase tracking-wider text-xs sm:text-sm">Aperçu de la fiche officielle</h3>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center bg-slate-100 text-slate-400 rounded-full hover:bg-slate-200 transition-colors"
-          >
-            <Plus size={20} className="rotate-45" />
-          </button>
-        </div>
-
-        {/* Scrollable fiche area */}
-        <div ref={wrapperRef} className="flex-1 overflow-y-auto bg-slate-100 no-scrollbar p-3">
-          {/* Outer container sized to scaled height so scrolling works correctly */}
-          <div style={{ width: `${FICHE_WIDTH * scale}px`, height: `${Math.round(FICHE_WIDTH * scale * 1.414)}px`, margin: '0 auto' }}>
-            {/* The fiche itself rendered at intrinsic width, then scaled down */}
-            <div
-              style={{
-                width: `${FICHE_WIDTH}px`,
-                transformOrigin: 'top left',
-                transform: `scale(${scale})`,
-              }}
-            >
-              <div className="bg-white shadow-2xl px-7 pt-5 pb-8 relative overflow-hidden border border-slate-300 text-slate-900 leading-none" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-                <FicheContent
-                  interventionData={interventionData}
-                  parts={parts}
-                  laborPrice={laborPrice}
-                  logo={logo}
-                  technicianSignatureUrl={technicianSignatureUrl}
-                  clientSignatureUrl={clientSignatureUrl}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 bg-slate-50 border-t border-slate-100 shrink-0">
-          <button
-            onClick={onClose}
-            className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-transform"
-          >
-            Fermer l'aperçu
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function InterventionDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -458,7 +308,7 @@ export default function InterventionDetails() {
   const [uploadingSignatureType, setUploadingSignatureType] = useState(null)
   const [cropState, setCropState] = useState(null) // { file, type, title }
   const [assignedMissionEmployees, setAssignedMissionEmployees] = useState(() => assignedTechnicianName)
-  const [interventionData, setInterventionData] = useState(() => mapEntryToInterventionData(dbEntry, assignedMissionEmployees || assignedTechnicianName))
+  const [interventionData, setInterventionData] = useState(() => mapRawToInterventionData(dbEntry, assignedMissionEmployees || assignedTechnicianName))
   const baseDprRef = useRef(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
   const signatureInputRefs = useRef({})
 
@@ -611,7 +461,7 @@ export default function InterventionDetails() {
     setStatus(dbEntry?.status || 'PENDING')
     setLaborPrice(dbEntry?.laborPrice || 0)
     setParts(Array.isArray(dbEntry?.parts) ? dbEntry.parts : [])
-    setInterventionData(mapEntryToInterventionData(dbEntry, assignedMissionEmployees || assignedTechnicianName))
+    setInterventionData(mapRawToInterventionData(dbEntry, assignedMissionEmployees || assignedTechnicianName))
   }, [dbEntry, assignedMissionEmployees, assignedTechnicianName])
 
   useEffect(() => {
@@ -2481,7 +2331,7 @@ export default function InterventionDetails() {
 
       {/* --- MOBILE PREVIEW MODAL --- */}
       {showMobilePreview && (
-        <MobilePreviewModal
+        <MobileFichePreviewModal
           onClose={() => setShowMobilePreview(false)}
           interventionData={interventionData}
           parts={parts}

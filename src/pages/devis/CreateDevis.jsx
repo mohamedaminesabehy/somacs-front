@@ -20,17 +20,10 @@ import {
 } from 'lucide-react'
 import ArticleSelectionModal from '../../components/devis/ArticleSelectionModal'
 import ArticleRecommendations from '../../components/devis/ArticleRecommendations'
+import { extractTauxFromCode, normalizeRate, resolveTVA, toNumber } from '../../utils/devis'
 import { formatPrice as formatCurrency } from '../../utils/format'
 
 // --- Helpers ---
-const toNumber = (value, fallback = 0) => {
-  if (value === null || value === undefined || value === '') return fallback
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : fallback
-}
-
-const normalizeRate = (value) => Math.max(0, toNumber(value, 0))
-
 const createLineId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
@@ -47,22 +40,6 @@ const getAuthUser = () => {
   } catch {
     return null
   }
-}
-
-// Extrait le taux numérique depuis le CodeTVA si TVA n'est pas renseigné
-// Ex: "19  " → 19, "TVA7" → 7, "7" → 7
-const extractTauxFromCode = (codeTva) => {
-  if (!codeTva) return 0
-  const match = String(codeTva).match(/(\d+(?:\.\d+)?)/)
-  if (match) return parseFloat(match[1])
-  return 0
-}
-
-// Résout le taux TVA effectif d'une ligne
-const resolveTVA = (line) => {
-  const taux = normalizeRate(line.TVA)
-  if (taux > 0) return taux
-  return extractTauxFromCode(line.CodeTVA)
 }
 
 const createEmptyLine = () => ({
