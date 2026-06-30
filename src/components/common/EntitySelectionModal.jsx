@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { apiFetch } from '../../api/apiClient'
 import {
   X,
@@ -290,9 +290,9 @@ export default function EntitySelectionModal({
       } else {
         throw new Error(`Erreur lors du chargement des ${entityName}s`)
       }
-    } catch (error) {
-      console.error(`Error fetching ${entityName}s:`, error)
-      setError(error.message)
+    } catch (fetchErr) {
+      console.error(`Error fetching ${entityName}s:`, fetchErr)
+      setError(fetchErr.message)
     } finally {
       setLoading(false)
     }
@@ -346,9 +346,9 @@ export default function EntitySelectionModal({
         } else {
           throw new Error(`Erreur lors de la suppression de la ${entityName}`)
         }
-      } catch (error) {
-        console.error(`Error deleting ${entityName}:`, error)
-        setError(error.message)
+      } catch (deleteErr) {
+        console.error(`Error deleting ${entityName}:`, deleteErr)
+        setError(deleteErr.message)
       }
     }
   }
@@ -377,9 +377,9 @@ export default function EntitySelectionModal({
       } else {
         throw new Error(`Erreur lors de l'enregistrement de la ${entityName}`)
       }
-    } catch (error) {
-      console.error(`Error saving ${entityName}:`, error)
-      setError(error.message)
+    } catch (saveErr) {
+      console.error(`Error saving ${entityName}:`, saveErr)
+      setError(saveErr.message)
     } finally {
       setLoading(false)
     }

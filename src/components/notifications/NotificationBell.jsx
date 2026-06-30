@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bell } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useNotifications } from '../../notifications/NotificationsProvider'
@@ -139,7 +139,7 @@ export default function NotificationBell() {
             <div className="px-4 py-3 border-b border-gray-100 bg-amber-50/40">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-xs font-semibold text-amber-900">
-                  Activez les notifications push pour recevoir les missions en arrière-plan.
+                  Activez les notifications push pour recevoir les missions en arriÃ¨re-plan.
                   {pushState.status === 'error' && (
                     <div className="mt-1 text-[11px] font-bold text-red-700">{pushState.message}</div>
                   )}
@@ -147,7 +147,7 @@ export default function NotificationBell() {
                     <div className="mt-1 text-[11px] font-bold text-emerald-700">{pushState.message}</div>
                   )}
                   {pushState.status === 'loading' && (
-                    <div className="mt-1 text-[11px] font-bold text-amber-900">Activation en cours…</div>
+                    <div className="mt-1 text-[11px] font-bold text-amber-900">Activation en coursâ€¦</div>
                   )}
                 </div>
                 <button
@@ -158,27 +158,21 @@ export default function NotificationBell() {
                     if (res && res.ok) {
                       setPushState({
                         status: 'enabled',
-                        message: 'Notifications activées.',
+                        message: 'Notifications activÃ©es.',
                       })
                       return
                     }
                     const reason = res?.reason || 'unknown'
-                    const msg =
-                      reason === 'unsupported'
-                        ? "Votre navigateur ne supporte pas les notifications push."
-                        : reason === 'permission-denied'
-                          ? "Autorisation refusée. Activez-la dans les réglages du navigateur."
-                          : reason === 'missing-vapid'
-                            ? "Configuration VAPID manquante côté frontend."
-                            : reason === 'missing-config'
-                              ? "Configuration Firebase manquante côté frontend."
-                              : reason === 'sw-failed'
-                                ? "Service Worker non installé (HTTPS requis, ou blocage navigateur)."
-                                : reason === 'token-failed'
-                                  ? "Impossible d'obtenir le token push (Firebase)."
-                                  : reason === 'unauthorized'
-                                    ? "Session expirée. Reconnectez-vous puis réessayez."
-                                    : "Échec d’activation. Ouvrez la console pour plus de détails."
+                    const reasonMessages = {
+                      unsupported: "Votre navigateur ne supporte pas les notifications push.",
+                      'permission-denied': "Autorisation refus\u00e9e. Activez-la dans les r\u00e9glages du navigateur.",
+                      'missing-vapid': "Configuration VAPID manquante c\u00f4t\u00e9 frontend.",
+                      'missing-config': "Configuration Firebase manquante c\u00f4t\u00e9 frontend.",
+                      'sw-failed': "Service Worker non install\u00e9 (HTTPS requis, ou blocage navigateur).",
+                      'token-failed': "Impossible d'obtenir le token push (Firebase).",
+                      unauthorized: "Session expir\u00e9e. Reconnectez-vous puis r\u00e9essayez.",
+                    }
+                    const msg = reasonMessages[reason] || "\u00c9chec d'activation. Ouvrez la console pour plus de d\u00e9tails."
                     setPushState({ status: 'error', message: msg })
                   }}
                   disabled={pushState.status === 'loading'}

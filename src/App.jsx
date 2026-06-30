@@ -14,7 +14,6 @@ import InterventionDetails from './pages/intervention/InterventionDetails'
 import AssignMission from './pages/mission/AssignMission'
 import LoginForm from './components/user/LoginForm'
 import OperationsDashboard from './pages/dashboard/OperationsDashboard'
-// DashboardTechnicien removed; techniciens redirected to EmployeeMissions
 import DevisList from './pages/devis/DevisList'
 import DevisDetails from './pages/devis/DevisDetails'
 import CreateDevis from './pages/devis/CreateDevis'
@@ -171,7 +170,6 @@ export default function App() {
         path="/dashboard"
         element={renderHomePage()}
       />
-      {/* DashboardTechnicien removed; no dedicated route for technicien */}
       <Route path="/users" element={renderProtectedPage(<UserManagement currentUser={currentUser} />)} />
       <Route path="/users/:id/details" element={renderProtectedPage(<UserDetails currentUser={currentUser} />)} />
       <Route path="/missions" element={renderProtectedPage(<ListMission />)} />
@@ -215,19 +213,12 @@ export default function App() {
       <Route path="/clients/:id/360" element={renderProtectedPage(<ClientDetails360 />)} />
       <Route
         path="*"
-        element={
-          isLoggedIn ? (
-            normalizedRole === 'technicien' ? (
-              <Navigate to="/missions/my" replace />
-            ) : normalizedRole === 'commerciale' ? (
-              <Navigate to="/devis" replace />
-            ) : (
-              <Navigate to="/dashboard" replace />
-            )
-          ) : (
-            <Navigate to="/" replace />
-          )
-        }
+        element={(() => {
+          if (!isLoggedIn) return <Navigate to="/" replace />
+          if (normalizedRole === 'technicien') return <Navigate to="/missions/my" replace />
+          if (normalizedRole === 'commerciale') return <Navigate to="/devis" replace />
+          return <Navigate to="/dashboard" replace />
+        })()}
       />
     </Routes>
   )

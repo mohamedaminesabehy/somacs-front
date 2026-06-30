@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import {
-  ChevronLeft, Save, Loader2, Truck, AlertCircle, X, RefreshCw
+  ChevronLeft, Save, Loader2, Truck, RefreshCw
 } from "lucide-react"
 import { apiFetch } from "../api/apiClient"
 import VehicleForm, { EMPTY_FORM, buildMatricule } from "../components/vehicle/VehicleForm"
@@ -50,8 +50,8 @@ export default function CreateVehicle() {
       if (data.carteGriseFile) fd.append("carteGrise", data.carteGriseFile)
       const res = await apiFetch("/vehicles", { method: "POST", auth: true, body: fd })
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(Array.isArray(data.message) ? data.message.join(" | ") : data.message || "Erreur lors de la creation")
+        const errBody = await res.json().catch(() => ({}))
+        throw new Error(Array.isArray(errBody.message) ? errBody.message.join(" | ") : errBody.message || "Erreur lors de la creation")
       }
       navigate("/vehicles", { state: { toast: { type: "success", message: "Vehicule cree avec succes." } } })
     } catch (err) {
@@ -77,7 +77,7 @@ export default function CreateVehicle() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => {}}
+          <button type="button" onClick={() => navigate(0)}
             className="hidden sm:flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all">
             <RefreshCw size={14} /> Reinitialiser
           </button>

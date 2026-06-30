@@ -260,7 +260,7 @@ function LocalStatusTimeline({ selectedStatuses, createdAt, statusDates = {} }) 
               {!isLast && <div className="w-0.5 flex-1 bg-slate-200 my-1 min-h-[20px]" />}
             </div>
             {/* Content */}
-            <div className={`pb-4 flex-1 ${isLast ? '' : ''}`}>
+            <div className="pb-4 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide ${meta?.tone}`}>
                   {meta?.label || item.status}

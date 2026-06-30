@@ -192,7 +192,6 @@ export default function VehicleForm({
   setError,
   formId,
   additionalSidebarContent,
-  vehicleId,
 }) {
   const fileInputRef = useRef(null)
   const [matricule, setMatricule] = useState(initialMatricule)

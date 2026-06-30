@@ -66,7 +66,7 @@ function truncateText(value, max = 70) {
   return `${text.slice(0, max)}....`
 }
 
-function getMissionDisplayData(mission, employeeUsers) {
+function getMissionDisplayData(mission) {
   const IconComponent = mission.type === 'Intervention' ? Wrench : ClipboardList
   const priorityColor = getPriorityColor(mission.priority)
   const statusColor = getStatusColorKey(mission.status)

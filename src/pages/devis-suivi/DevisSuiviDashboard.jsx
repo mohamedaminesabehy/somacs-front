@@ -10,9 +10,7 @@ import {
   Loader2,
   RefreshCw,
   Search,
-  ShoppingCart,
   Target,
-  UserCog,
   XCircle,
   Zap,
 } from 'lucide-react'

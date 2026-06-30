@@ -132,8 +132,8 @@ export default function VehicleList() {
         toastRef.current = setTimeout(() => setToast(null), 3000)
         fetchData()
       } else {
-        const data = await res.json().catch(() => ({}))
-        setToast({ type: 'error', message: data.message || 'Erreur lors de la suppression.' })
+        const errBody = await res.json().catch(() => ({}))
+        setToast({ type: 'error', message: errBody.message || 'Erreur lors de la suppression.' })
         if (toastRef.current) clearTimeout(toastRef.current)
         toastRef.current = setTimeout(() => setToast(null), 4000)
       }

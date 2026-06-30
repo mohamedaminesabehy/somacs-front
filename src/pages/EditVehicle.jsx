@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import {
-  ChevronLeft, Save, Loader2, Truck, AlertCircle, X
+  ChevronLeft, Save, Loader2, Truck, AlertCircle
 } from "lucide-react"
 import { apiFetch } from "../api/apiClient"
 import VehicleForm, {
@@ -75,8 +75,8 @@ export default function EditVehicle() {
       if (data.removeCarteGrise) fd.append("removeCarteGrise", "true")
       const res = await apiFetch("/vehicles/" + id, { method: "PATCH", auth: true, body: fd })
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(Array.isArray(data.message) ? data.message.join(" | ") : data.message || "Erreur lors de la mise a jour")
+        const errBody = await res.json().catch(() => ({}))
+        throw new Error(Array.isArray(errBody.message) ? errBody.message.join(" | ") : errBody.message || "Erreur lors de la mise a jour")
       }
       navigate("/vehicles/" + id, { state: { toast: { type: "success", message: "Vehicule mis a jour avec succes." } } })
     } catch (err) {
@@ -163,7 +163,6 @@ export default function EditVehicle() {
         setError={setError}
         formId="vehicle-edit-form"
         onCancel={() => navigate("/vehicles/" + id)}
-        vehicleId={id}
         additionalSidebarContent={additionalSidebarContent}
       />
     </div>

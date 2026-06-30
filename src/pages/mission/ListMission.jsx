@@ -206,7 +206,7 @@ export default function ListMission() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     const t = window.setTimeout(() => {
-      void refreshMissions()
+      refreshMissions()
     }, 0)
     return () => window.clearTimeout(t)
   }, [])

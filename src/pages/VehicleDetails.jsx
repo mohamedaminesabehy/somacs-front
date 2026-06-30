@@ -85,8 +85,8 @@ export default function VehicleDetails() {
     try {
       const res = await apiFetch("/vehicles/" + vehicle.id, { method: "DELETE", auth: true })
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.message || "Suppression impossible.")
+        const errBody = await res.json().catch(() => ({}))
+        throw new Error(errBody.message || "Suppression impossible.")
       }
       navigate("/vehicles", { replace: true, state: { toast: { type: "success", message: "Vehicule supprime avec succes." } } })
     } catch (err) {

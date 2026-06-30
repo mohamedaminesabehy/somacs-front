@@ -372,7 +372,7 @@ export default function OperationsDashboard({ currentUser }) {
       setDevis(nextDevis)
       setIsLoading(false)
     }
-    void loadAll()
+    loadAll()
     return () => { cancelled = true }
   }, [])
 

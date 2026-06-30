@@ -17,8 +17,7 @@ export async function fetchUnreadCount() {
   })
   if (!res.ok) return 0
   const data = await res.json().catch(() => null)
-  const count = data && typeof data.count === 'number' ? data.count : 0
-  return count
+  return data && typeof data.count === 'number' ? data.count : 0
 }
 
 export async function markNotificationRead(id) {
