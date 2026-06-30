@@ -261,6 +261,8 @@ export default function VehicleForm({
     { label: "Annee", ok: !!form.annee },
   ]
 
+  const submitButtonLabel = loading ? "Creation..." : (saving ? "Enregistrement..." : "Enregistrer")
+
   return (
     <div className="min-h-screen bg-[#F6F9FC]">
       <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
@@ -432,7 +434,7 @@ export default function VehicleForm({
               ) : (
                 <Save size={14} />
               )}
-              {loading ? "Creation..." : (saving ? "Enregistrement..." : "Enregistrer")}
+              {submitButtonLabel}
             </button>
           </div>
         </form>

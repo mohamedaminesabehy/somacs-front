@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+﻿import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../api/apiClient'
 import { 
@@ -34,6 +34,7 @@ import FicheContent from '../../components/intervention/FicheContent'
 import MobileFichePreviewModal from '../../components/intervention/MobileFichePreviewModal'
 import ClientSelectionModal from '../../components/client/ClientSelectionModal'
 import MachineSelectionModal from '../../components/machine/MachineSelectionModal'
+import { getStepLabelColor } from '../../utils/stepStyles'
 
 const steps = [
   { id: 1, title: 'Client', description: 'Identification', icon: User },
@@ -213,10 +214,7 @@ export default function CreateIntervention() {
     }
   }
 
-  const renderStepContent = () => {
-    switch (currentStep) {
-      case 1:
-        return (
+  const renderStep1 = () => (
           <div className="space-y-10 animate-in fade-in zoom-in-95 duration-500">
             <div className="pb-6 border-b-2 border-slate-100 flex flex-col items-start gap-4">
               <div>
@@ -363,9 +361,9 @@ export default function CreateIntervention() {
               </div>
             </div>
           </div>
-        )
-      case 2:
-        return (
+  )
+
+  const renderStep2 = () => (
           <div className="space-y-10 animate-in fade-in zoom-in-95 duration-500">
             <div className="pb-6 border-b-2 border-slate-100 flex flex-col items-start gap-4">
               <div>
@@ -470,9 +468,9 @@ export default function CreateIntervention() {
               </div>
             </div>
           </div>
-        )
-      case 3:
-        return (
+  )
+
+  const renderStep3 = () => (
           <div className="space-y-10 animate-in fade-in zoom-in-95 duration-500">
             <div className="pb-6 border-b-2 border-slate-100">
               <h2 className="text-2xl font-black text-slate-900 mb-2 flex items-center gap-3">
@@ -526,9 +524,9 @@ export default function CreateIntervention() {
               </div>
             </div>
           </div>
-        )
-      case 4:
-        return (
+  )
+
+  const renderStep4 = () => (
           <div className="space-y-10 animate-in fade-in zoom-in-95 duration-500">
             <div className="pb-6 border-b-2 border-slate-100">
               <div className="flex items-center gap-4">
@@ -646,11 +644,20 @@ export default function CreateIntervention() {
               </div>
             </div>
           </div>
-        )
-      default:
-        return null
-    }
+  )
+
+  const stepRenderers = {
+    1: renderStep1,
+    2: renderStep2,
+    3: renderStep3,
+    4: renderStep4,
   }
+
+  const renderStepContent = () => {
+    const renderer = stepRenderers[currentStep]
+    return renderer ? renderer() : null
+  }
+
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 overflow-x-hidden">
@@ -702,7 +709,7 @@ export default function CreateIntervention() {
                   }`}>
                     {isCompleted ? <Check size={16} strokeWidth={3} /> : <Icon size={16} />}
                   </div>
-                  <span className={`text-[9px] font-black uppercase tracking-wide ${isActive ? 'text-[#0052CC]' : isCompleted ? 'text-green-500' : 'text-slate-400'}`}>
+                  <span className={`text-[9px] font-black uppercase tracking-wide ${getStepLabelColor(isActive, isCompleted)}`}>
                     {step.title}
                   </span>
                 </div>

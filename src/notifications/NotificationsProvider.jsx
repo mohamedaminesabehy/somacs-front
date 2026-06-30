@@ -10,6 +10,7 @@ import {
 import { onForegroundMessage, registerFcmToken } from './firebaseMessaging'
 
 const NotificationsContext = createContext(null)
+const noop = () => { /* no-op */ }
 
 function playNotificationSound() {
   if (typeof window === 'undefined') return
@@ -212,7 +213,7 @@ export function NotificationsProvider({ children }) {
       refresh()
     })
 
-    let unsubscribeMessaging = () => {}
+    let unsubscribeMessaging = noop
     ;(async () => {
       unsubscribeMessaging = await onForegroundMessage(async (payload) => {
         const id = Number(payload?.data?.notificationId)
@@ -277,9 +278,9 @@ export function useNotifications() {
     return {
       notifications: [],
       unreadCount: 0,
-      refresh: async () => {},
-      markRead: async () => {},
-      markAllRead: async () => {},
+      refresh: async () => { /* no provider */ },
+      markRead: async () => { /* no provider */ },
+      markAllRead: async () => { /* no provider */ },
       enablePushNotifications: async () => ({ ok: false }),
     }
   }

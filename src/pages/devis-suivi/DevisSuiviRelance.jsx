@@ -308,7 +308,7 @@ export default function DevisSuiviRelance() {
               </p>
             </div>
             <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.25em] text-slate-500 md:flex">
-              {loading ? 'Chargement...' : filtered.length + ' relance' + (filtered.length > 1 ? 's' : '')}
+              {loading ? 'Chargement...' : `${filtered.length} relance${filtered.length > 1 ? 's' : ''}`}
             </div>
           </div>
 

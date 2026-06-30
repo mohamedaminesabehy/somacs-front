@@ -171,7 +171,8 @@ export default function DevisSuiviDashboard() {
         dateFrom,
         dateTo,
       }, signal)
-      setRows(Array.isArray(payload?.items) ? payload.items : Array.isArray(payload) ? payload : [])
+      const items = Array.isArray(payload?.items) ? payload.items : (Array.isArray(payload) ? payload : [])
+      setRows(items)
       setPageInfo({
         total: Number(payload?.total || payload?.meta?.total || 0),
         totalPages: Number(payload?.totalPages || payload?.meta?.totalPages || 1),

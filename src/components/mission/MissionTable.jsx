@@ -547,7 +547,7 @@ function MissionTableInner(props, ref) {
                 groupedStatuses,
                 isGroupedMission,
                 avatar
-              } = getMissionDisplayData(mission, employeeUsers)
+              } = getMissionDisplayData(mission)
               const isHighlighted =
                 (activeHighlightMissionId && String(mission?.id) === activeHighlightMissionId) ||
                 (activeHighlightGroupId && String(mission?.assignmentGroupId || '').trim() === activeHighlightGroupId)
@@ -674,7 +674,7 @@ function MissionTableInner(props, ref) {
               groupedStatuses,
               isGroupedMission,
               avatar
-            } = getMissionDisplayData(mission, employeeUsers)
+            } = getMissionDisplayData(mission)
             const isHighlighted =
               (activeHighlightMissionId && String(mission?.id) === activeHighlightMissionId) ||
               (activeHighlightGroupId && String(mission?.assignmentGroupId || '').trim() === activeHighlightGroupId)

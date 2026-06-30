@@ -2,6 +2,8 @@ import { initializeApp, getApps } from 'firebase/app'
 import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging'
 import { apiFetch } from '../api/apiClient'
 
+const noop = () => { /* no-op unsubscribe */ }
+
 function getFirebaseConfig() {
   const apiKey = import.meta.env.VITE_FIREBASE_API_KEY
   const authDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN
@@ -93,10 +95,10 @@ export async function registerFcmToken() {
 
 export async function onForegroundMessage(handler) {
   const supported = await isSupported().catch(() => false)
-  if (!supported) return () => {}
+  if (!supported) return noop
 
   const app = getOrInitFirebaseApp()
-  if (!app) return () => {}
+  if (!app) return noop
 
   const messaging = getMessaging(app)
   const unsubscribe = onMessage(messaging, (payload) => {

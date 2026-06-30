@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   ChevronRight,
@@ -33,6 +33,7 @@ import {
   formatClientAddress,
   getInterventionStatusLabel as getStatusLabel,
 } from '../../utils/intervention'
+import { getStepTextColor, getStepTitleColor, getStepDescColor } from '../../utils/stepStyles'
 
 const createSafeRandomId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -56,6 +57,30 @@ const steps = [
   { id: 3, title: 'Affectation', description: 'Technicien & delai',   icon: Users },
   { id: 4, title: 'Validation',  description: 'Confirmation',          icon: CheckCircle2 },
 ]
+
+function getEmployeeAvailabilityLabel(active) {
+  if (active === 0) return 'Disponible'
+  const plural = active > 1 ? 's' : ''
+  return `${active} mission${plural} active${plural}`
+}
+
+function getStepLabel(step) {
+  if (step === 2) return 'Details'
+  if (step === 3) return 'Affectation'
+  return 'Validation'
+}
+
+function getEmployeeActivityColor(active) {
+  if (active === 0) return 'bg-green-500'
+  if (active <= 1) return 'bg-yellow-400'
+  return 'bg-red-400'
+}
+
+function getEmployeeActivityTextColor(active) {
+  if (active === 0) return 'text-green-500'
+  if (active <= 1) return 'text-yellow-500'
+  return 'text-red-400'
+}
 
 export default function AssignMission() {
   const navigate = useNavigate()
@@ -482,11 +507,7 @@ export default function AssignMission() {
   }
 
   // ── Render step content ───────────────────────────────────────────────────
-  const renderStep = () => {
-    switch (currentStep) {
-      // ─────────────────────────────────────────────────────────────────────
-      case 1:
-        return (
+  const renderStep1 = () => (
           <div className="space-y-6 sm:space-y-10 animate-in fade-in zoom-in-95 duration-500">
             <div className="pb-4 sm:pb-6 border-b-2 border-slate-100">
               <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-2 flex items-center gap-3">
@@ -586,11 +607,9 @@ export default function AssignMission() {
               </div>
             </div>
           </div>
-        )
+  )
 
-      // ─────────────────────────────────────────────────────────────────────
-      case 2:
-        return (
+  const renderStep2 = () => (
           <div className="space-y-6 sm:space-y-10 animate-in fade-in zoom-in-95 duration-500">
             <div className="pb-4 sm:pb-6 border-b-2 border-slate-100">
               <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-2 flex items-center gap-3">
@@ -835,11 +854,9 @@ export default function AssignMission() {
               </div>
             </div>
           </div>
-        )
+  )
 
-      // ─────────────────────────────────────────────────────────────────────
-      case 3:
-        return (
+  const renderStep3 = () => (
           <div className="space-y-6 sm:space-y-10 animate-in fade-in zoom-in-95 duration-500">
             <div className="pb-4 sm:pb-6 border-b-2 border-slate-100">
               <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-2 flex items-center gap-3">
@@ -878,16 +895,16 @@ export default function AssignMission() {
                           {emp.avatar}
                         </div>
                         <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
-                          emp.active === 0 ? 'bg-green-500' : emp.active <= 1 ? 'bg-yellow-400' : 'bg-red-400'
+                          getEmployeeActivityColor(emp.active)
                         }`} title={`${emp.active} mission(s) en cours`}></div>
                       </div>
                       <div className="overflow-hidden">
                         <p className={`text-sm font-black truncate ${isSelected ? 'text-[#0052CC]' : 'text-slate-900'}`}>{emp.name}</p>
                         <p className="text-[11px] font-semibold text-slate-400 truncate">{emp.role}</p>
                         <p className={`text-[10px] font-bold mt-0.5 ${
-                          emp.active === 0 ? 'text-green-500' : emp.active <= 1 ? 'text-yellow-500' : 'text-red-400'
+                          getEmployeeActivityTextColor(emp.active)
                         }`}>
-                          {emp.active === 0 ? 'Disponible' : `${emp.active} mission${emp.active > 1 ? 's' : ''} active${emp.active > 1 ? 's' : ''}`}
+                          {getEmployeeAvailabilityLabel(emp.active)}
                         </p>
                       </div>
                       {isSelected && (
@@ -1004,11 +1021,9 @@ export default function AssignMission() {
               )}
             </div>
           </div>
-        )
+  )
 
-      // ─────────────────────────────────────────────────────────────────────
-      case 4:
-        return (
+  const renderStep4 = () => (
           <div className="space-y-6 sm:space-y-10 animate-in fade-in zoom-in-95 duration-500">
             <div className="pb-4 sm:pb-6 border-b-2 border-slate-100">
               <div className="flex items-center gap-3 sm:gap-4">
@@ -1153,12 +1168,20 @@ export default function AssignMission() {
               </div>
             </div>
           </div>
-        )
+  )
 
-      default:
-        return null
-    }
+  const stepRenderers = {
+    1: renderStep1,
+    2: renderStep2,
+    3: renderStep3,
+    4: renderStep4,
   }
+
+  const renderStep = () => {
+    const renderer = stepRenderers[currentStep]
+    return renderer ? renderer() : null
+  }
+
 
   // ── Main render ───────────────────────────────────────────────────────────
   return (
@@ -1191,8 +1214,8 @@ export default function AssignMission() {
                 <h1 className="text-base sm:text-2xl font-black text-slate-900 tracking-tight truncate">Affecter une mission</h1>
                 <p className="hidden sm:block text-xs text-slate-500 font-semibold">
                   {missionType === '' && 'Etape 1 sur 4 — Choisissez le type de mission'}
-                  {missionType === 'Normal' && currentStep > 1 && 'Mission normale — ' + (currentStep === 2 ? 'Details' : currentStep === 3 ? 'Affectation' : 'Validation')}
-                  {missionType === 'Intervention' && currentStep > 1 && 'Intervention SAV — ' + (currentStep === 2 ? 'Details' : currentStep === 3 ? 'Affectation' : 'Validation')}
+                  {missionType === 'Normal' && currentStep > 1 && ('Mission normale — ' + getStepLabel(currentStep))}
+                  {missionType === 'Intervention' && currentStep > 1 && ('Intervention SAV — ' + getStepLabel(currentStep))}
                 </p>
               </div>
             </div>
@@ -1223,7 +1246,7 @@ export default function AssignMission() {
                     {isDone ? <Check size={14} strokeWidth={3} /> : <Icon size={14} className={isActive ? 'stroke-[3px]' : 'stroke-[2px]'} />}
                   </div>
                   <span className={`text-[9px] font-black uppercase tracking-wide leading-none ${
-                    isActive ? 'text-[#0052CC]' : isDone ? 'text-green-500' : 'text-slate-300'
+                    getStepTextColor(isActive, isDone)
                   }`}>{step.title}</span>
                 </div>
                 {idx < steps.length - 1 && (
@@ -1268,13 +1291,13 @@ export default function AssignMission() {
                       {isDone ? <Check size={20} className="stroke-[4px]" /> : <Icon size={20} className={isActive ? 'stroke-[3px]' : 'stroke-[2px]'} />}
                     </div>
                     <div className="pt-1">
-                      <p className={`text-[10px] font-black uppercase tracking-widest leading-none mb-1 ${isActive ? 'text-[#0052CC]' : isDone ? 'text-green-500' : 'text-slate-300'}`}>
+                      <p className={`text-[10px] font-black uppercase tracking-widest leading-none mb-1 ${getStepTextColor(isActive, isDone)}`}>
                         Etape 0{step.id}
                       </p>
-                      <p className={`text-base font-black tracking-tight ${isActive ? 'text-slate-900' : isDone ? 'text-slate-600' : 'text-slate-400'}`}>
+                      <p className={`text-base font-black tracking-tight ${getStepTitleColor(isActive, isDone)}`}>
                         {step.title}
                       </p>
-                      <p className={`text-[11px] font-bold mt-0.5 ${isActive ? 'text-slate-500' : isDone ? 'text-slate-400' : 'text-slate-300'}`}>
+                      <p className={`text-[11px] font-bold mt-0.5 ${getStepDescColor(isActive, isDone)}`}>
                         {step.description}
                       </p>
                       {isDone && <span className="text-[9px] font-black text-green-500 uppercase tracking-wider">Termine</span>}

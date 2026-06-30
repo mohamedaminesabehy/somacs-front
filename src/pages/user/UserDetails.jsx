@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -483,63 +483,54 @@ export default function UserDetails() {
         title: 'Parc Machines',
         value: counts.machineCreate + counts.machineUpdate + counts.machineDelete,
         lines: [
-          counts.machineCreate === 0
-            ? "Aucune creation de machine n'a ete enregistree durant cette periode."
-            : counts.machineCreate === 1
-              ? 'Une nouvelle machine a ete creee par cet utilisateur.'
-              : `${counts.machineCreate} creations de machines ont ete enregistrees durant cette periode.`,
-          counts.machineUpdate === 0
-            ? "Aucune modification de machine n'a ete enregistree durant cette periode."
-            : counts.machineUpdate === 1
-              ? 'Une machine a ete modifiee par cet utilisateur.'
-              : `${counts.machineUpdate} modifications de machines ont ete enregistrees durant cette periode.`,
-          counts.machineDelete === 0
-            ? "Aucune suppression de machine n'a ete enregistree durant cette periode."
-            : counts.machineDelete === 1
-              ? 'Une machine a ete supprimee par cet utilisateur.'
-              : `${counts.machineDelete} suppressions de machines ont ete enregistrees durant cette periode.`,
+          formatCountMessage(counts.machineCreate,
+            "Aucune creation de machine n'a ete enregistree durant cette periode.",
+            'Une nouvelle machine a ete creee par cet utilisateur.',
+            '{n} creations de machines ont ete enregistrees durant cette periode.'),
+          formatCountMessage(counts.machineUpdate,
+            "Aucune modification de machine n'a ete enregistree durant cette periode.",
+            'Une machine a ete modifiee par cet utilisateur.',
+            '{n} modifications de machines ont ete enregistrees durant cette periode.'),
+          formatCountMessage(counts.machineDelete,
+            "Aucune suppression de machine n'a ete enregistree durant cette periode.",
+            'Une machine a ete supprimee par cet utilisateur.',
+            '{n} suppressions de machines ont ete enregistrees durant cette periode.'),
         ],
       },
       {
         title: 'Missions',
         value: counts.missionCreate + counts.missionUpdate + counts.missionDelete,
         lines: [
-          counts.missionCreate === 0
-            ? "Aucune creation de mission n'a ete enregistree durant cette periode."
-            : counts.missionCreate === 1
-              ? 'Une nouvelle mission a ete creee par cet utilisateur.'
-              : `${counts.missionCreate} creations de missions ont ete enregistrees durant cette periode.`,
-          counts.missionUpdate === 0
-            ? "Aucune modification de mission n'a ete enregistree durant cette periode."
-            : counts.missionUpdate === 1
-              ? 'Une mission a ete modifiee par cet utilisateur.'
-              : `${counts.missionUpdate} modifications de missions ont ete enregistrees durant cette periode.`,
-          counts.missionDelete === 0
-            ? "Aucune suppression de mission n'a ete enregistree durant cette periode."
-            : counts.missionDelete === 1
-              ? 'Une mission a ete supprimee par cet utilisateur.'
-              : `${counts.missionDelete} suppressions de missions ont ete enregistrees durant cette periode.`,
+          formatCountMessage(counts.missionCreate,
+            "Aucune creation de mission n'a ete enregistree durant cette periode.",
+            'Une nouvelle mission a ete creee par cet utilisateur.',
+            '{n} creations de missions ont ete enregistrees durant cette periode.'),
+          formatCountMessage(counts.missionUpdate,
+            "Aucune modification de mission n'a ete enregistree durant cette periode.",
+            'Une mission a ete modifiee par cet utilisateur.',
+            '{n} modifications de missions ont ete enregistrees durant cette periode.'),
+          formatCountMessage(counts.missionDelete,
+            "Aucune suppression de mission n'a ete enregistree durant cette periode.",
+            'Une mission a ete supprimee par cet utilisateur.',
+            '{n} suppressions de missions ont ete enregistrees durant cette periode.'),
         ],
       },
       {
         title: 'Interventions',
         value: counts.interventionCreate + counts.interventionUpdate + counts.interventionAssign,
         lines: [
-          counts.interventionCreate === 0
-            ? "Aucune creation d'intervention n'a ete enregistree durant cette periode."
-            : counts.interventionCreate === 1
-              ? 'Une nouvelle intervention a ete creee par cet utilisateur.'
-              : `${counts.interventionCreate} creations d'interventions ont ete enregistrees durant cette periode.`,
-          counts.interventionUpdate === 0
-            ? "Aucune modification d'intervention n'a ete detectee pour cette periode."
-            : counts.interventionUpdate === 1
-              ? 'Une intervention a ete modifiee par cet utilisateur.'
-              : `${counts.interventionUpdate} modifications d'interventions ont ete detectees pour cette periode.`,
-          counts.interventionAssign === 0
-            ? "Aucune affectation d'utilisateur n'a ete enregistree durant cette periode."
-            : counts.interventionAssign === 1
-              ? 'Un utilisateur a ete affecte a une intervention durant cette periode.'
-              : `${counts.interventionAssign} affectations d'utilisateurs ont ete enregistrees durant cette periode.`,
+          formatCountMessage(counts.interventionCreate,
+            "Aucune creation d'intervention n'a ete enregistree durant cette periode.",
+            'Une nouvelle intervention a ete creee par cet utilisateur.',
+            "{n} creations d'interventions ont ete enregistrees durant cette periode."),
+          formatCountMessage(counts.interventionUpdate,
+            "Aucune modification d'intervention n'a ete detectee pour cette periode.",
+            'Une intervention a ete modifiee par cet utilisateur.',
+            "{n} modifications d'interventions ont ete detectees pour cette periode."),
+          formatCountMessage(counts.interventionAssign,
+            "Aucune affectation d'utilisateur n'a ete enregistree durant cette periode.",
+            'Un utilisateur a ete affecte a une intervention durant cette periode.',
+            "{n} affectations d'utilisateurs ont ete enregistrees durant cette periode."),
         ],
       },
     ]
@@ -835,9 +826,9 @@ export default function UserDetails() {
                   </span>
                 </div>
                 <div className="space-y-1 text-sm leading-relaxed text-slate-700">
-                  <p>- {counts.machineCreate === 0 ? "Aucune création de machine n'a été enregistrée durant cette période." : counts.machineCreate === 1 ? 'Une nouvelle machine a été créée par cet utilisateur.' : `${counts.machineCreate} créations de machines ont été enregistrées durant cette période.`}</p>
-                  <p>- {counts.machineUpdate === 0 ? "Aucune modification de machine n'a été enregistrée durant cette période." : counts.machineUpdate === 1 ? 'Une machine a été modifiée par cet utilisateur.' : `${counts.machineUpdate} modifications de machines ont été enregistrées durant cette période.`}</p>
-                  <p>- {counts.machineDelete === 0 ? "Aucune suppression de machine n'a été enregistrée durant cette période." : counts.machineDelete === 1 ? 'Une machine a été supprimée par cet utilisateur.' : `${counts.machineDelete} suppressions de machines ont été enregistrées durant cette période.`}</p>
+                  <p>- {formatCountMessage(counts.machineCreate, "Aucune création de machine n'a été enregistrée durant cette période.", 'Une nouvelle machine a été créée par cet utilisateur.', '{n} créations de machines ont été enregistrées durant cette période.')}</p>
+                  <p>- {formatCountMessage(counts.machineUpdate, "Aucune modification de machine n'a été enregistrée durant cette période.", 'Une machine a été modifiée par cet utilisateur.', '{n} modifications de machines ont été enregistrées durant cette période.')}</p>
+                  <p>- {formatCountMessage(counts.machineDelete, "Aucune suppression de machine n'a été enregistrée durant cette période.", 'Une machine a été supprimée par cet utilisateur.', '{n} suppressions de machines ont été enregistrées durant cette période.')}</p>
                 </div>
               </div>
 
@@ -849,9 +840,9 @@ export default function UserDetails() {
                   </span>
                 </div>
                 <div className="space-y-1 text-sm leading-relaxed text-slate-700">
-                  <p>- {counts.missionCreate === 0 ? "Aucune création de mission n'a été enregistrée durant cette période." : counts.missionCreate === 1 ? 'Une nouvelle mission a été créée par cet utilisateur.' : `${counts.missionCreate} créations de missions ont été enregistrées durant cette période.`}</p>
-                  <p>- {counts.missionUpdate === 0 ? "Aucune modification de mission n'a été enregistrée durant cette période." : counts.missionUpdate === 1 ? 'Une mission a été modifiée par cet utilisateur.' : `${counts.missionUpdate} modifications de missions ont été enregistrées durant cette période.`}</p>
-                  <p>- {counts.missionDelete === 0 ? "Aucune suppression de mission n'a été enregistrée durant cette période." : counts.missionDelete === 1 ? 'Une mission a été supprimée par cet utilisateur.' : `${counts.missionDelete} suppressions de missions ont été enregistrées durant cette période.`}</p>
+                  <p>- {formatCountMessage(counts.missionCreate, "Aucune création de mission n'a été enregistrée durant cette période.", 'Une nouvelle mission a été créée par cet utilisateur.', '{n} créations de missions ont été enregistrées durant cette période.')}</p>
+                  <p>- {formatCountMessage(counts.missionUpdate, "Aucune modification de mission n'a été enregistrée durant cette période.", 'Une mission a été modifiée par cet utilisateur.', '{n} modifications de missions ont été enregistrées durant cette période.')}</p>
+                  <p>- {formatCountMessage(counts.missionDelete, "Aucune suppression de mission n'a été enregistrée durant cette période.", 'Une mission a été supprimée par cet utilisateur.', '{n} suppressions de missions ont été enregistrées durant cette période.')}</p>
                 </div>
               </div>
 
@@ -863,9 +854,9 @@ export default function UserDetails() {
                   </span>
                 </div>
                 <div className="space-y-1 text-sm leading-relaxed text-slate-700">
-                  <p>- {counts.interventionCreate === 0 ? "Aucune création d'intervention n'a été enregistrée durant cette période." : counts.interventionCreate === 1 ? 'Une nouvelle intervention a été créée par cet utilisateur.' : `${counts.interventionCreate} créations d'interventions ont été enregistrées durant cette période.`}</p>
-                  <p>- {counts.interventionUpdate === 0 ? "Aucune modification d'intervention n'a été détectée pour cette période." : counts.interventionUpdate === 1 ? 'Une intervention a été modifiée par cet utilisateur.' : `${counts.interventionUpdate} modifications d'interventions ont été détectées pour cette période.`}</p>
-                  <p>- {counts.interventionAssign === 0 ? "Aucune affectation d'utilisateur n'a été enregistrée durant cette période." : counts.interventionAssign === 1 ? 'Un utilisateur a été affecté à une intervention durant cette période.' : `${counts.interventionAssign} affectations d'utilisateurs ont été enregistrées durant cette période.`}</p>
+                  <p>- {formatCountMessage(counts.interventionCreate, "Aucune création d'intervention n'a été enregistrée durant cette période.", 'Une nouvelle intervention a été créée par cet utilisateur.', "{n} créations d'interventions ont été enregistrées durant cette période.")}</p>
+                  <p>- {formatCountMessage(counts.interventionUpdate, "Aucune modification d'intervention n'a été détectée pour cette période.", 'Une intervention a été modifiée par cet utilisateur.', "{n} modifications d'interventions ont été détectées pour cette période.")}</p>
+                  <p>- {formatCountMessage(counts.interventionAssign, "Aucune affectation d'utilisateur n'a été enregistrée durant cette période.", 'Un utilisateur a été affecté à une intervention durant cette période.', "{n} affectations d'utilisateurs ont été enregistrées durant cette période.")}</p>
                 </div>
               </div>
               </>)}

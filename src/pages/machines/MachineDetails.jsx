@@ -207,6 +207,12 @@ export default function MachineDetails({ currentUser }) {
     return new Date(machine.warrantyEndDate) >= new Date()
   }, [machine?.warrantyEndDate])
 
+  function getWarrantyLabel() {
+    if (warrantyActive === null) return 'Non défini'
+    return warrantyActive ? 'Oui' : 'Non'
+  }
+  const warrantyLabel = getWarrantyLabel()
+
   const interventionCards = useMemo(() => {
     return interventions.map((entry) => ({
       id: entry.id,
@@ -529,7 +535,7 @@ export default function MachineDetails({ currentUser }) {
                   <DetailField label="Fin de garantie" value={formatDate(machine.warrantyEndDate)} />
                   <DetailField label="Durée garantie" value={machine.dureeGarantie} />
                   <DetailField label="État réception" value={machine.etatReception} />
-                  <DetailField label="Garantie active" value={warrantyActive === null ? 'Non défini' : warrantyActive ? 'Oui' : 'Non'} />
+                  <DetailField label="Garantie active" value={warrantyLabel} />
                 </div>
                 {machine.observationsReception && (
                   <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5">

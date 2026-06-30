@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { apiFetch } from '../../api/apiClient'
 import { ChevronLeft, ChevronDown, Save, Loader2, Upload, X, FileText, Image as ImageIcon, AlertCircle, Cpu, Truck, ClipboardCheck, Shield, CheckCircle2, ImagePlus, Hash, Calendar, Tag, Wrench, MapPin, Package, Clock } from 'lucide-react'
+import { getStepLabelColor } from '../../utils/stepStyles'
 
 const STATUS_OPTIONS = ['En stock', 'Disponible', 'En utilisation', 'En maintenance', 'Hors service']
 const CATEGORY_OPTIONS = ['Compresseur', 'Pompe', 'Moteur', 'Groupe electrogene', 'Climatisation', 'Autre']
@@ -213,7 +214,7 @@ export default function MachineForm() {
                   }`}>
                     {isCompleted ? <CheckCircle2 size={16} strokeWidth={3} /> : <Icon size={16} />}
                   </div>
-                  <span className={`text-[9px] font-black uppercase tracking-wide ${isActive ? 'text-[#0052CC]' : isCompleted ? 'text-green-500' : 'text-slate-400'}`}>
+                  <span className={`text-[9px] font-black uppercase tracking-wide ${getStepLabelColor(isActive, isCompleted)}`}>
                     {step.title}
                   </span>
                 </button>
