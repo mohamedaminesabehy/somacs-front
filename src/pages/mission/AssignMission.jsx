@@ -74,6 +74,17 @@ function getEmployeeActivityTextColor(active) {
   return 'text-red-400'
 }
 
+function renderStepIconContent(isDone, Icon, isActive, size) {
+  if (isDone) {
+    const checkSize = size === 'lg' ? 20 : 14
+    const strokeWidth = size === 'lg' ? 4 : 3
+    return <Check size={checkSize} strokeWidth={strokeWidth} />
+  }
+  const iconSize = size === 'lg' ? 20 : 14
+  const strokeClass = isActive ? 'stroke-[3px]' : 'stroke-[2px]'
+  return <Icon size={iconSize} className={strokeClass} />
+}
+
 export default function AssignMission() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -829,7 +840,7 @@ export default function AssignMission() {
                     : isDone ? 'bg-green-500 text-white'
                     : 'bg-slate-100 text-slate-400'
                   }`}>
-                    {isDone ? <Check size={14} strokeWidth={3} /> : <Icon size={14} className={isActive ? 'stroke-[3px]' : 'stroke-[2px]'} />}
+                    {renderStepIconContent(isDone, Icon, isActive, 'sm')}
                   </div>
                   <span className={`text-[9px] font-black uppercase tracking-wide leading-none ${
                     getStepTextColor(isActive, isDone)
@@ -874,7 +885,7 @@ export default function AssignMission() {
                           ? 'bg-green-500 text-white shadow-lg shadow-green-100'
                           : 'bg-white text-slate-300 border-2 border-slate-100'
                     }`}>
-                      {isDone ? <Check size={20} className="stroke-[4px]" /> : <Icon size={20} className={isActive ? 'stroke-[3px]' : 'stroke-[2px]'} />}
+                      {renderStepIconContent(isDone, Icon, isActive, 'lg')}
                     </div>
                     <div className="pt-1">
                       <p className={`text-[10px] font-black uppercase tracking-widest leading-none mb-1 ${getStepTextColor(isActive, isDone)}`}>

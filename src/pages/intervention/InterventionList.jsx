@@ -64,6 +64,19 @@ function getInitials(name) {
 }
 
 /**
+ * Computes display data for a single intervention item.
+ * Used by both mobile card and desktop table row to avoid duplicating logic.
+ */
+function getItemDisplayData(item, highlightId) {
+  const normalizedType = normalizeTypeKey(item.type)
+  const st = statusConfig[item.status] || fallbackStatus
+  const ty = typeConfig[normalizedType] || fallbackType
+  const TyIcon = ty.icon || Wrench
+  const isHighlighted = String(item.id) === String(highlightId)
+  return { normalizedType, st, ty, TyIcon, isHighlighted }
+}
+
+/**
  * Tracks employee names by their assignment group ID.
  */
 function buildNamesByGroup(missionsData) {
@@ -886,11 +899,7 @@ export default function InterventionList() {
             {/* Mobile / tablet cards */}
             <div className="lg:hidden space-y-4 sm:space-y-5">
               {paginatedData.map((item) => {
-                const normalizedType = normalizeTypeKey(item.type)
-                const st = statusConfig[item.status] || fallbackStatus
-                const ty = typeConfig[normalizedType] || fallbackType
-                const TyIcon = ty.icon || Wrench
-                const isHighlighted = String(item.id) === String(highlightId)
+                const { st, ty, TyIcon, isHighlighted } = getItemDisplayData(item, highlightId)
                 const isAssigned = isItemAssigned(item)
                 return (
                   <div
@@ -977,11 +986,7 @@ export default function InterventionList() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {paginatedData.map((item, idx) => {
-                    const normalizedType = normalizeTypeKey(item.type)
-                    const st = statusConfig[item.status] || fallbackStatus
-                    const ty = typeConfig[normalizedType] || fallbackType
-                    const TyIcon = ty.icon || Wrench
-                    const isHighlighted = String(item.id) === String(highlightId)
+                    const { st, ty, TyIcon, isHighlighted } = getItemDisplayData(item, highlightId)
                     return (
                       <tr
                         key={item.id}
