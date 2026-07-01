@@ -147,6 +147,19 @@ function getStartOfMonth(date) {
   return new Date(year, month, 1)
 }
 
+/**
+ * Returns a human-readable count message with plural support.
+ * @param {number} count - The quantity
+ * @param {string} zeroMsg - Message when count is 0
+ * @param {string} oneMsg - Message when count is 1
+ * @param {string} pluralTemplate - Template for count > 1, uses {n} as placeholder
+ */
+function formatCountMessage(count, zeroMsg, oneMsg, pluralTemplate) {
+  if (count === 0) return zeroMsg
+  if (count === 1) return oneMsg
+  return pluralTemplate.replace('{n}', String(count))
+}
+
 function formatDateToISO(date) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')

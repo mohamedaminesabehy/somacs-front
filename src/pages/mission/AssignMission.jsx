@@ -41,6 +41,11 @@ const createSafeRandomId = () => {
   return String(Date.now())
 }
 
+function createAssignmentGroupId(employeeCount) {
+  if (employeeCount <= 1) return null
+  return `AG-${Date.now()}-${createSafeRandomId().slice(0, 8)}`
+}
+
 // -- Steps definition ----------------------------------------------------------
 const steps = [
   { id: 1, title: 'Type',        description: 'Nature de la mission', icon: Target },
@@ -276,10 +281,7 @@ export default function AssignMission() {
       }
 
       const createdMissions = []
-      const assignmentGroupId =
-        selectedEmployeeObjs.length > 1
-          ? `AG-${Date.now()}-${createSafeRandomId().slice(0, 8)}`
-          : null
+      const assignmentGroupId = createAssignmentGroupId(selectedEmployeeObjs.length)
       for (const employee of selectedEmployeeObjs) {
         // backend requires non-empty description; for interventions, default to the
         // intervention request if user didn't enter a description to avoid 400.

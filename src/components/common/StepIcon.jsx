@@ -10,7 +10,8 @@ import { Check } from 'lucide-react'
  * @param {boolean} props.isCompleted - Whether this step has been completed
  * @param {'sm' | 'lg'} [props.size='sm'] - Size variant: 'sm' for horizontal, 'lg' for vertical
  */
-export default function StepIcon({ icon: Icon, isActive, isCompleted, size = 'sm' }) {
+export default function StepIcon({ icon, isActive, isCompleted, size = 'sm' }) {
+  const IconComponent = icon
   const isLarge = size === 'lg'
   const iconSize = isLarge ? 20 : 16
   const checkSize = isLarge ? 20 : 16
@@ -42,7 +43,7 @@ export default function StepIcon({ icon: Icon, isActive, isCompleted, size = 'sm
     <div className={`${sizeClasses} flex items-center justify-center shrink-0 ${transitionClasses} ${stateClasses}`}>
       {isCompleted
         ? <Check size={checkSize} strokeWidth={isLarge ? 4 : 3} />
-        : <Icon size={iconSize} className={isActive ? 'stroke-[3px]' : 'stroke-[2px]'} />
+        : <IconComponent size={iconSize} className={isActive ? 'stroke-[3px]' : 'stroke-[2px]'} />
       }
     </div>
   )

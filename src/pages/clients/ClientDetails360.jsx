@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Building2,
@@ -551,7 +551,7 @@ export default function ClientDetails360() {
   const [toast, setToast] = useState('')
   const [currentSavPage, setCurrentSavPage] = useState(1)
 
-  const load = () => {
+  const load = useCallback(() => {
     let alive = true
     setLoading(true)
     setError(null)
@@ -561,9 +561,9 @@ export default function ClientDetails360() {
       .catch((err) => alive && setError(err))
       .finally(() => alive && setLoading(false))
     return () => { alive = false }
-  }
+  }, [id])
 
-  useEffect(() => load(), [id])
+  useEffect(() => load(), [id, load])
 
   const client = data?.client
   const directMachines = useMemo(() => data?.machines || [], [data])

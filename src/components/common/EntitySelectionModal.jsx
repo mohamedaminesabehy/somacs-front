@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../../api/apiClient'
 import {
   X,
@@ -279,7 +279,7 @@ export default function EntitySelectionModal({
 
   const colorClasses = getPrimaryColorClasses(primaryColor)
 
-  const fetchEntities = async () => {
+  const fetchEntities = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -296,7 +296,7 @@ export default function EntitySelectionModal({
     } finally {
       setLoading(false)
     }
-  }
+  }, [fetchEndpoint, entityName])
 
   useEffect(() => {
     if (isOpen) {
@@ -308,7 +308,7 @@ export default function EntitySelectionModal({
       setError(null)
       fetchEntities()
     }
-  }, [isOpen, fetchEndpoint, initialForm])
+  }, [isOpen, fetchEndpoint, initialForm, fetchEntities])
 
   useEffect(() => {
     setCurrentPage(1)

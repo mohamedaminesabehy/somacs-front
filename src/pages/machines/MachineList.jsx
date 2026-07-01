@@ -168,7 +168,7 @@ export default function MachineList({ currentUser }) {
       toastRef.current = setTimeout(() => setToast(null), 3500)
       navigate(location.pathname, { replace: true, state: {} })
     }
-  }, [location.state])
+  }, [location.state, location.pathname, navigate])
 
   const filtered = useMemo(() => {
     return machines.filter((m) => {

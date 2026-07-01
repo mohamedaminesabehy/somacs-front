@@ -330,6 +330,20 @@ function Card({ title, subtitle, icon, children, className = '' }) {
 
 /* -------------------------------------------------------------------------- */
 /*  Main component                                                            */
+const MISSION_PROGRESS_TONE = {
+  'À faire': 'bg-[#0052CC]',
+  'En cours': 'bg-amber-500',
+  Terminée: 'bg-emerald-500',
+  Bloquée: 'bg-red-500',
+}
+
+const INTERVENTION_PROGRESS_TONE = {
+  PENDING: 'bg-slate-400',
+  ASSIGNED: 'bg-[#0052CC]',
+  IN_PROGRESS: 'bg-amber-500',
+  CLOSED: 'bg-emerald-500',
+}
+
 /* -------------------------------------------------------------------------- */
 
 export default function OperationsDashboard({ currentUser }) {
@@ -517,24 +531,10 @@ export default function OperationsDashboard({ currentUser }) {
   const missionTotal = filteredMissions.length || 1
   const interventionTotal = filteredInterventions.length || 1
 
-  const missionProgressTone = {
-    'À faire': 'bg-[#0052CC]',
-    'En cours': 'bg-amber-500',
-    Terminée: 'bg-emerald-500',
-    Bloquée: 'bg-red-500',
-  }
-
-  const interventionProgressTone = {
-    PENDING: 'bg-slate-400',
-    ASSIGNED: 'bg-[#0052CC]',
-    IN_PROGRESS: 'bg-amber-500',
-    CLOSED: 'bg-emerald-500',
-  }
-
   const missionStatusRows = useMemo(() =>
     missionStatuses.map((status) => {
       const count = analytics.missionCounts[status] || 0
-      return { key: status, label: missionStatusLabel[status], count, pct: (count / missionTotal) * 100, tone: missionProgressTone[status] || 'bg-slate-400' }
+      return { key: status, label: missionStatusLabel[status], count, pct: (count / missionTotal) * 100, tone: MISSION_PROGRESS_TONE[status] || 'bg-slate-400' }
     }),
     [analytics.missionCounts, missionTotal],
   )
@@ -542,7 +542,7 @@ export default function OperationsDashboard({ currentUser }) {
   const interventionStatusRows = useMemo(() =>
     interventionStatuses.map((status) => {
       const count = analytics.interventionCounts[status] || 0
-      return { key: status, label: interventionStatusLabel[status], count, pct: (count / interventionTotal) * 100, tone: interventionProgressTone[status] || 'bg-slate-400' }
+      return { key: status, label: interventionStatusLabel[status], count, pct: (count / interventionTotal) * 100, tone: INTERVENTION_PROGRESS_TONE[status] || 'bg-slate-400' }
     }),
     [analytics.interventionCounts, interventionTotal],
   )
