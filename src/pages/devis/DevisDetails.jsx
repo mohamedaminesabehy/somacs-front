@@ -3,15 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../api/apiClient'
 import {
   ChevronLeft,
-  FileText,
   Calendar,
   User,
-  DollarSign,
-  RefreshCw,
   Download,
   AlertTriangle,
   Eye,
-  Plus,
   Hash,
   Truck,
   Layers,
@@ -19,60 +15,13 @@ import {
   Calculator,
   Building2,
   Phone,
-  Mail,
-  MapPin,
-  CheckCircle2,
-  Trash2,
-  Clock,
-  ArrowRight
 } from 'lucide-react'
-import DevisSuiviSection, { DevisSuiviTimeline, HorizontalStatusTimeline } from '../../components/devis/DevisSuiviSection.jsx'
+import DevisSuiviSection, { DevisSuiviTimeline } from '../../components/devis/DevisSuiviSection.jsx'
 import { formatDate } from '../../utils/date'
-import { normalizeRate, resolveTVA, toNumber } from '../../utils/devis'
-import { formatPrice, formatPrice as formatCurrency } from '../../utils/format'
+import { toNumber, computeDevisTotals } from '../../utils/devis'
+import { formatPrice } from '../../utils/format'
 
 // --- Helper Functions ---
-const getLineNetHT = (line) => {
-  const fromApi = toNumber(line?.Total_HT, NaN)
-  if (Number.isFinite(fromApi) && fromApi >= 0) return fromApi
-  const alt = toNumber(line?.TotalNetHT, NaN)
-  if (Number.isFinite(alt) && alt >= 0) return alt
-  const qte = Math.max(0, toNumber(line?.Qte))
-  const pu = Math.max(0, toNumber(line?.PU_HT))
-  const remise = normalizeRate(line?.Remise)
-  return qte * pu * (1 - remise / 100)
-}
-
-const computeTotals = (lines, footer = [], header = {}) => {
-  const articleLines = (Array.isArray(lines) ? lines : []).filter((d) => (d?.Code || d?.Designation) && toNumber(d?.Qte) > 0)
-
-  const totalHTBrut = articleLines.reduce((acc, d) => acc + toNumber(d.Qte) * toNumber(d.PU_HT), 0)
-  const totalRemise = articleLines.reduce(
-    (acc, d) => acc + toNumber(d.Qte) * toNumber(d.PU_HT) * (normalizeRate(d.Remise) / 100),
-    0,
-  )
-  const totalNetHT = articleLines.reduce((acc, d) => acc + getLineNetHT(d), 0)
-  const computedTVA = articleLines.reduce((acc, d) => acc + getLineNetHT(d) * (resolveTVA(d) / 100), 0)
-
-  const footerRows = Array.isArray(footer) ? footer : []
-  const footerTVA = footerRows.reduce((acc, f) => acc + toNumber(f?.Montant_TVA), 0)
-  const totalTVA = footerRows.length > 0 ? footerTVA : computedTVA
-
-  const timbreCandidates = [
-    header?.TIMBRE,
-    header?.Timbre,
-    header?.DROITTIMBRE,
-    header?.DroitTimbre,
-    header?.DROIT_TIMBRE,
-  ]
-  const timbreParsed = timbreCandidates.map((v) => toNumber(v, NaN)).find((v) => Number.isFinite(v) && v >= 0)
-  const timbre = Number.isFinite(timbreParsed) ? timbreParsed : 1.0
-
-  const totalTTC = totalNetHT + totalTVA + timbre
-
-  return { totalHTBrut, totalRemise, totalNetHT, totalTVA, timbre, totalTTC }
-}
-
 const normalizeDevisPayload = (payload) => {
   const toText = (value, fallback = '') => {
     if (value === null || value === undefined) {
@@ -124,7 +73,7 @@ const DevisFiche = React.forwardRef(function DevisFiche({ data }, ref) {
   if (!data || !data.header) return null
 
   const { header, details, footer } = data
-  const totals = computeTotals(details, footer, header)
+  const totals = computeDevisTotals(details, footer, header)
 
   return (
     <div ref={ref} className="bg-white shadow-2xl px-7 pt-5 pb-8 relative overflow-hidden border border-slate-300 text-slate-900 leading-tight" 
@@ -492,7 +441,7 @@ export default function DevisDetails() {
   }
 
   const { header, details, footer } = data
-  const totals = computeTotals(details, footer, header)
+  const totals = computeDevisTotals(details, footer, header)
 
   return (
     <div className="p-4 sm:p-6 bg-[#f8fafc] min-h-screen">
@@ -664,7 +613,7 @@ export default function DevisDetails() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right font-bold text-slate-900 text-sm">
-                        {formatCurrency(item.PU_HT)}
+                        {formatPrice(item.PU_HT)}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span className={`text-xs font-bold ${item.Remise > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
@@ -677,7 +626,7 @@ export default function DevisDetails() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right font-black text-blue-600 text-sm">
-                        {formatCurrency(item.Total_HT)}
+                        {formatPrice(item.Total_HT)}
                       </td>
                     </tr>
                   ))}
@@ -709,8 +658,8 @@ export default function DevisDetails() {
                     {footer.map((f, idx) => (
                       <tr key={idx}>
                         <td className="py-3 text-sm font-bold text-slate-900">TVA {f.TVA_Footer}%</td>
-                        <td className="py-3 text-right text-sm font-medium text-slate-600">{formatCurrency(f.Base_TVA)}</td>
-                        <td className="py-3 text-right text-sm font-bold text-slate-900">{formatCurrency(f.Montant_TVA)}</td>
+                        <td className="py-3 text-right text-sm font-medium text-slate-600">{formatPrice(f.Base_TVA)}</td>
+                        <td className="py-3 text-right text-sm font-bold text-slate-900">{formatPrice(f.Montant_TVA)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -729,28 +678,28 @@ export default function DevisDetails() {
               <div className="p-6 space-y-4">
                 <div className="flex justify-between items-center border-b border-white/10 pb-3">
                   <span className="text-white/70 font-bold uppercase text-[10px] tracking-widest">Total HT brut</span>
-                  <span className="text-lg font-black">{formatCurrency(totals.totalHTBrut)}</span>
+                  <span className="text-lg font-black">{formatPrice(totals.totalHTBrut)}</span>
                 </div>
                 <div className="flex justify-between items-center border-b border-white/10 pb-3">
                   <span className="text-white/70 font-bold uppercase text-[10px] tracking-widest">Total remise</span>
-                  <span className="text-lg font-black">{formatCurrency(totals.totalRemise)}</span>
+                  <span className="text-lg font-black">{formatPrice(totals.totalRemise)}</span>
                 </div>
                 <div className="flex justify-between items-center border-b border-white/10 pb-3">
                   <span className="text-white/70 font-bold uppercase text-[10px] tracking-widest">Total net HT</span>
-                  <span className="text-lg font-black">{formatCurrency(totals.totalNetHT)}</span>
+                  <span className="text-lg font-black">{formatPrice(totals.totalNetHT)}</span>
                 </div>
                 <div className="flex justify-between items-center border-b border-white/10 pb-3">
                   <span className="text-white/70 font-bold uppercase text-[10px] tracking-widest">Total TVA</span>
-                  <span className="text-lg font-black">{formatCurrency(totals.totalTVA)}</span>
+                  <span className="text-lg font-black">{formatPrice(totals.totalTVA)}</span>
                 </div>
                 <div className="flex justify-between items-center border-b border-white/10 pb-3">
                   <span className="text-white/70 font-bold uppercase text-[10px] tracking-widest">Droit de timbre</span>
-                  <span className="text-lg font-black">{formatCurrency(totals.timbre)}</span>
+                  <span className="text-lg font-black">{formatPrice(totals.timbre)}</span>
                 </div>
                 <div className="flex justify-between items-center pt-2">
                   <span className="text-white font-black uppercase text-xs tracking-[0.2em]">Total TTC</span>
                   <div className="text-right">
-                    <span className="text-3xl font-black block">{formatCurrency(totals.totalTTC)}</span>
+                    <span className="text-3xl font-black block">{formatPrice(totals.totalTTC)}</span>
                     <span className="text-[10px] font-bold text-white/60">Dinars Tunisiens</span>
                   </div>
                 </div>

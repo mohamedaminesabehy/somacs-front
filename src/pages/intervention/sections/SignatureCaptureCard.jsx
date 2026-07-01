@@ -43,7 +43,7 @@ export default function SignatureCaptureCard({
         ) : (
           <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center">
             <Camera size={20} className={canManageSignatures ? 'text-[#0052CC]' : 'text-slate-300'} />
-            <span className={`text-[9px] sm:text-[10px] font-black uppercase transition-colors ${canManageSignatures ? 'text-slate-400' : 'text-slate-300'}`}>
+            <span className={['text-[9px] sm:text-[10px] font-black uppercase transition-colors', canManageSignatures ? 'text-slate-400' : 'text-slate-300'].join(' ')}>
               {isBusy ? 'Enregistrement...' : placeholder}
             </span>
           </span>

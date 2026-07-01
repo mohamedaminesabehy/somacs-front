@@ -4,7 +4,7 @@ import { apiFetch } from '../../api/apiClient'
 import CompactPagination from '../../components/common/CompactPagination'
 import {
   Search, Plus, Eye, Edit2, Trash2, Settings, RefreshCw,
-  LayoutGrid, LayoutList, Building2, MapPin, Tag, AlertCircle,
+  LayoutGrid, LayoutList, Building2, Tag, AlertCircle,
   MoreHorizontal, X, Cpu, FileText,
   CheckCircle2,
   Truck, CalendarDays,
@@ -173,9 +173,8 @@ export default function MachineList({ currentUser }) {
   const filtered = useMemo(() => {
     return machines.filter((m) => {
       const q = search.toLowerCase()
-      const matchSearch = !q || [m.code, m.designation, m.brand, m.model, m.supplier, m.serialNumber, m.purchaseOrderNumber, m.receptionDate]
+      return !q || [m.code, m.designation, m.brand, m.model, m.supplier, m.serialNumber, m.purchaseOrderNumber, m.receptionDate]
         .some((v) => v && String(v).toLowerCase().includes(q))
-      return matchSearch
     })
   }, [machines, search])
 
@@ -338,10 +337,10 @@ export default function MachineList({ currentUser }) {
           </div>
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
-            {paginated.map((m) => (
-              <MachineCard key={m.id} machine={m}
-                onView={(m) => navigate(`/machines/${m.id}`)}
-                onEdit={(m) => navigate(`/machines/${m.id}/edit`)}
+            {paginated.map((machine) => (
+              <MachineCard key={machine.id} machine={machine}
+                onView={(item) => navigate(`/machines/${item.id}`)}
+                onEdit={(item) => navigate(`/machines/${item.id}/edit`)}
                 onDelete={handleDelete}
                 canManage={canManageMachines}
               />
@@ -351,10 +350,10 @@ export default function MachineList({ currentUser }) {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             {/* Mobile / tablet cards */}
             <div className="lg:hidden p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {paginated.map((m) => (
-                <MachineCard key={m.id} machine={m}
-                  onView={(m) => navigate(`/machines/${m.id}`)}
-                  onEdit={(m) => navigate(`/machines/${m.id}/edit`)}
+              {paginated.map((machine) => (
+                <MachineCard key={machine.id} machine={machine}
+                  onView={(item) => navigate(`/machines/${item.id}`)}
+                  onEdit={(item) => navigate(`/machines/${item.id}/edit`)}
                   onDelete={handleDelete}
                   canManage={canManageMachines}
                 />

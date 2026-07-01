@@ -571,11 +571,10 @@ export default function EmployeeMissions() {
         // Keep locally-known terminated missions that server may omit
         const prevTerminees = Array.isArray(prev) ? prev.filter((m) => m.status === 'Terminée') : []
         const existingIds = new Set(normalized.map((m) => m.id))
-        const merged = [
+        return [
           ...normalized,
           ...prevTerminees.filter((m) => !existingIds.has(m.id))
         ]
-        return merged
       })
     } catch {
       // Mission refresh is best-effort; keep the current list.
@@ -622,7 +621,7 @@ export default function EmployeeMissions() {
   }, [refreshMissions])
 
   useEffect(() => {
-    ;(async () => {
+    void (async () => {
       try {
         const response = await apiFetch('/interventions', { auth: true, cache: 'no-store' })
         if (!response.ok) return
@@ -664,7 +663,7 @@ export default function EmployeeMissions() {
       })
     })
 
-    ;(async () => {
+    void (async () => {
       try {
         const response = await apiFetch(`/missions/${missionId}`, {
           method: 'PATCH',

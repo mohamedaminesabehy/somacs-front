@@ -8,7 +8,6 @@ import { apiFetch } from "../api/apiClient"
 import VehicleForm, {
   parseMatricule,
   buildMatricule,
-  EMPTY_FORM
 } from "../components/vehicle/VehicleForm"
 
 export default function EditVehicle() {

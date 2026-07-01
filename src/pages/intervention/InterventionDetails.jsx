@@ -1,34 +1,27 @@
-﻿import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react'
+﻿import { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { apiFetch } from '../../api/apiClient'
 import { 
   ChevronLeft, 
-  Clock, 
-  User, 
-  Settings, 
-  CheckCircle2, 
   AlertCircle, 
-  Plus, 
-  Trash2, 
   Save,
   Calendar,
   Building2,
-  Phone,
-  MapPin,
-  Zap,
   Package,
   Printer,
   ClipboardCheck,
   ChevronRight,
-  Check,
-  Wrench,
   Eye,
-  XCircle
+  XCircle,
+  PenTool,
+  FileText
 } from 'lucide-react'
 import logo from '../../assets/logo.jpg'
 import FicheContent from '../../components/intervention/FicheContent'
 import MobileFichePreviewModal from '../../components/intervention/MobileFichePreviewModal'
 import SignatureCropModal from '../../components/intervention/SignatureCropModal'
+import HorizontalStepper from '../../components/common/HorizontalStepper'
+import VerticalStepper from '../../components/common/VerticalStepper'
 import {
   INTERVENTION_STATUS_CONFIG as statusConfig,
   INTERVENTION_STATUS_TO_SECTION as statusToSection,
@@ -36,7 +29,6 @@ import {
   mapRawToInterventionData,
 } from '../../utils/intervention'
 import { buildFichePrintHtml } from './fichePrintTemplate'
-import { getStepLabelColor } from '../../utils/stepStyles'
 import { ClientInfoFields, EquipmentInfoFields } from './sections/SectionInfoFields'
 import SectionDiagnostic from './sections/SectionDiagnostic'
 import SectionArticles from './sections/SectionArticles'
@@ -83,7 +75,11 @@ export default function InterventionDetails() {
   const [activeSection, setActiveSection] = useState(() => statusToSection[dbEntry?.status] || 1)
   const uiZoomPercent = useZoomDetection()
   const [status, setStatus] = useState(dbEntry?.status || 'PENDING')
-  const [isEditing, setIsEditing] = useState(() => (isReadOnlyView ? false : (isEmployeeHistoryEditFlow ? true : (dbEntry?.status || 'PENDING') !== 'CLOSED')))
+  const [isEditing, setIsEditing] = useState(() => {
+    if (isReadOnlyView) return false
+    if (isEmployeeHistoryEditFlow) return true
+    return (dbEntry?.status || 'PENDING') !== 'CLOSED'
+  })
   const [laborPrice, setLaborPrice] = useState(dbEntry?.laborPrice || 0)
   const [showMobilePreview, setShowMobilePreview] = useState(false)
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false)
@@ -497,88 +493,12 @@ export default function InterventionDetails() {
 
       <div className="flex flex-1 overflow-hidden flex-col min-w-0">
         {/* --- HORIZONTAL STEPPER (MOBILE/TABLET) --- */}
-        <div className={`${useHorizontalProgress ? 'bg-white border-b border-slate-100 px-4 py-3 shrink-0' : 'lg:hidden bg-white border-b border-slate-100 px-4 py-3 shrink-0'}`}>
-          <div className="flex items-center justify-between max-w-lg mx-auto">
-            {sections.map((section, idx) => {
-              const isActive = activeSection === section.id
-              const isCompleted = activeSection > section.id
-              const Icon = section.icon
-              
-              return (
-                <React.Fragment key={section.id}>
-                  <div className="flex flex-col items-center gap-1">
-                    <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 ${
-                        isActive ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-200 scale-110'
-                        : isCompleted ? 'bg-green-500 text-white'
-                        : 'bg-slate-100 text-slate-400'
-                      }`}
-                    >
-                      {isCompleted ? <Check size={16} strokeWidth={3} /> : <Icon size={16} />}
-                    </div>
-                    <span className={`text-[9px] font-black uppercase tracking-wide ${getStepLabelColor(isActive, isCompleted)}`}>
-                      {section.title}
-                    </span>
-                  </div>
-                  {idx < sections.length - 1 && (
-                    <div className={`flex-1 h-0.5 mx-1 rounded-full transition-colors duration-300 ${activeSection > section.id ? 'bg-green-400' : 'bg-slate-100'}`} />
-                  )}
-                </React.Fragment>
-              )
-            })}
-          </div>
-        </div>
+        <HorizontalStepper steps={sections} currentStep={activeSection} alwaysVisible={useHorizontalProgress} />
 
         <div className="flex flex-1 overflow-hidden min-w-0">
 
         {/* --- SIDEBAR (DESKTOP) --- */}
-        <div className={`${useHorizontalProgress ? 'hidden' : 'hidden lg:flex w-[320px] border-r border-slate-50 bg-slate-50/30 flex-col p-8 shrink-0 min-w-0'}`}>
-          <div className="space-y-2 mb-12">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Progression</h4>
-            <div className="h-1 w-12 bg-[#0052CC] rounded-full"></div>
-          </div>
-          
-          <div className="space-y-1">
-            {sections.map((section) => {
-              const isActive = activeSection === section.id
-              const isCompleted = activeSection > section.id
-              const Icon = section.icon
-              
-              return (
-                <div key={section.id} className="relative pb-10 last:pb-0">
-                  {section.id !== sections.length && (
-                    <div className={`absolute left-6 top-14 bottom-0 w-0.5 rounded-full ${isCompleted ? 'bg-[#0052CC]' : 'bg-slate-100'}`}></div>
-                  )}
-                  
-                  <div className="flex items-start gap-5 group cursor-default">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-500 z-10 ${
-                      isActive 
-                        ? 'bg-[#0052CC] text-white shadow-xl shadow-blue-200 scale-110'
-                        : isCompleted
-                          ? 'bg-green-500 text-white shadow-lg shadow-green-100'
-                          : 'bg-white text-slate-300 border-2 border-slate-50 group-hover:border-slate-200'
-                    }`}>
-                      {isCompleted ? <Check size={20} className="stroke-[4px]" /> : <Icon size={20} className={isActive ? 'stroke-[3px]' : 'stroke-[2px]'} />}
-                    </div>
-                    <div className="pt-1">
-                      <p className={`text-[10px] font-black uppercase tracking-widest leading-none mb-1 transition-colors ${isActive ? 'text-[#0052CC]' : 'text-slate-300'}`}>Étape 0{section.id}</p>
-                      <p className={`text-base font-black tracking-tight transition-colors ${isActive ? 'text-slate-900' : 'text-slate-400'}`}>{section.title}</p>
-                      <p className={`text-[11px] font-bold mt-0.5 transition-colors ${isActive ? 'text-slate-500' : 'text-slate-300'}`}>{section.description}</p>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          <div className="mt-auto bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-            <div className="flex items-center gap-3 mb-3">
-              <Zap size={16} className="text-orange-400 fill-orange-400" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Rappel SAV</span>
-            </div>
-            <p className="text-[11px] font-bold text-slate-500 leading-relaxed italic">"Complétez le diagnostic et les articles utilisés avant de clôturer le dossier."</p>
-          </div>
-        </div>
+        <VerticalStepper steps={sections} currentStep={activeSection} hidden={useHorizontalProgress} />
 
         {/* --- MAIN CONTENT --- */}
         <div className="flex-1 overflow-y-auto no-scrollbar bg-white flex flex-col relative min-w-0">

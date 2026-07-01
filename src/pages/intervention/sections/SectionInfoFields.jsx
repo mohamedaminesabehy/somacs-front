@@ -1,5 +1,4 @@
-import { Building2, User, Phone, MapPin, FileText, Settings, Zap } from 'lucide-react'
-import { Hash, Cpu } from 'lucide-react'
+import { Building2, User, Phone, MapPin, FileText, Settings, Zap, Hash, Cpu } from 'lucide-react'
 
 const INPUT_BASE = "w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:ring-4 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm hover:border-slate-300"
 const INPUT_BLUE = `${INPUT_BASE} focus:border-[#0052CC] focus:ring-[#0052CC]/10`
@@ -7,8 +6,10 @@ const INPUT_ORANGE = `${INPUT_BASE} focus:border-orange-500 focus:ring-orange-50
 const INPUT_READONLY = "w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm"
 
 function FieldLabel({ children, color = 'blue' }) {
-  const dotColor = color === 'blue' ? 'bg-[#0052CC]' : color === 'orange' ? 'bg-orange-500' : 'bg-slate-300'
-  const focusColor = color === 'blue' ? 'group-focus-within:text-[#0052CC]' : 'group-focus-within:text-orange-500'
+  const dotColorMap = { blue: 'bg-[#0052CC]', orange: 'bg-orange-500' }
+  const focusColorMap = { blue: 'group-focus-within:text-[#0052CC]', orange: 'group-focus-within:text-orange-500' }
+  const dotColor = dotColorMap[color] || 'bg-slate-300'
+  const focusColor = focusColorMap[color] || ''
   return (
     <label className={`text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 ${focusColor} transition-colors`}>
       <span className={`w-1.5 h-1.5 ${dotColor} rounded-full`}></span>
@@ -21,7 +22,9 @@ function getClientAddress(selectedClient, interventionData) {
   if (!selectedClient) return interventionData.clientAddress
   const trimmed = String(selectedClient.address || '').trim()
   if (trimmed) return trimmed
-  return `${selectedClient.city || ''}${selectedClient.zone ? `, ${selectedClient.zone}` : ''}`
+  const city = selectedClient.city || ''
+  const zone = selectedClient.zone ? ', ' + selectedClient.zone : ''
+  return city + zone
 }
 
 function getMachineModelValue(selectedMachine, interventionData) {

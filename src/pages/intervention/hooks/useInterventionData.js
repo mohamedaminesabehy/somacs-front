@@ -5,9 +5,35 @@ import {
 } from '../../../utils/intervention'
 import { interventionsDB } from '../interventionsMockData'
 
+// ─── Helper: resolve employees from a single mission ──────────────────────────
+async function resolveEmployeesFromMission(missionId, fallback) {
+  const response = await apiFetch(`/missions/${missionId}`, { cache: 'no-store' })
+  if (!response.ok) return fallback
+  const missionData = await response.json()
+  return buildAssignedEmployeesDisplay(missionData, fallback)
+}
+
+// ─── Helper: resolve employees from all linked missions ───────────────────────
+async function resolveEmployeesFromLinkedMissions(interventionId, fallback) {
+  const listResponse = await apiFetch('/missions', { cache: 'no-store' })
+  if (!listResponse.ok) return fallback
+
+  const missions = await listResponse.json().catch(() => [])
+  const rows = Array.isArray(missions) ? missions : []
+  const linkedRows = rows.filter((m) => String(m?.interventionId || '') === String(interventionId))
+
+  if (linkedRows.length === 0) return fallback
+
+  const names = new Set()
+  for (const row of linkedRows) {
+    const display = buildAssignedEmployeesDisplay(row, fallback)
+    display.split(',').map((n) => n.trim()).filter(Boolean).forEach((n) => names.add(n))
+  }
+  return names.size > 0 ? Array.from(names).join(', ') : fallback
+}
+
 /**
  * Custom hook that encapsulates all data-fetching logic for InterventionDetails.
- * Reduces the cognitive complexity of the main component.
  */
 export function useInterventionData({ id, missionId, assignedTechnicianName }) {
   const [dbEntry, setDbEntry] = useState(() => interventionsDB[id] || interventionsDB['INT-2026-001'])
@@ -19,7 +45,7 @@ export function useInterventionData({ id, missionId, assignedTechnicianName }) {
   // Fetch intervention data
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
+    void (async () => {
       try {
         const response = await apiFetch(`/interventions/${id}`)
         if (!response.ok) return
@@ -33,7 +59,7 @@ export function useInterventionData({ id, missionId, assignedTechnicianName }) {
   // Fetch signatures
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
+    void (async () => {
       try {
         const response = await apiFetch(`/interventions/${id}/signatures`, { cache: 'no-store' })
         if (!response.ok) return
@@ -47,7 +73,7 @@ export function useInterventionData({ id, missionId, assignedTechnicianName }) {
   // Fetch clients and machines for selection
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
+    void (async () => {
       try {
         const [clientsRes, machinesRes] = await Promise.all([
           apiFetch('/clients'),
@@ -67,45 +93,12 @@ export function useInterventionData({ id, missionId, assignedTechnicianName }) {
   // Fetch assigned employees from mission
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
+    void (async () => {
       try {
-        if (missionId) {
-          const response = await apiFetch(`/missions/${missionId}`, { cache: 'no-store' })
-          if (!response.ok) {
-            if (!cancelled) setAssignedMissionEmployees(assignedTechnicianName)
-            return
-          }
-          const missionData = await response.json()
-          if (!cancelled) {
-            setAssignedMissionEmployees(buildAssignedEmployeesDisplay(missionData, assignedTechnicianName))
-          }
-          return
-        }
-
-        const listResponse = await apiFetch('/missions', { cache: 'no-store' })
-        if (!listResponse.ok) {
-          if (!cancelled) setAssignedMissionEmployees(assignedTechnicianName)
-          return
-        }
-        const missions = await listResponse.json().catch(() => [])
-        const rows = Array.isArray(missions) ? missions : []
-        const linkedRows = rows.filter((m) => String(m?.interventionId || '') === String(id))
-        if (linkedRows.length === 0) {
-          if (!cancelled) setAssignedMissionEmployees(assignedTechnicianName)
-          return
-        }
-
-        const names = new Set()
-        for (const row of linkedRows) {
-          const display = buildAssignedEmployeesDisplay(row, assignedTechnicianName)
-            .split(',')
-            .map((name) => name.trim())
-            .filter(Boolean)
-          display.forEach((name) => names.add(name))
-        }
-        if (!cancelled) {
-          setAssignedMissionEmployees(names.size > 0 ? Array.from(names).join(', ') : assignedTechnicianName)
-        }
+        const result = missionId
+          ? await resolveEmployeesFromMission(missionId, assignedTechnicianName)
+          : await resolveEmployeesFromLinkedMissions(id, assignedTechnicianName)
+        if (!cancelled) setAssignedMissionEmployees(result)
       } catch {
         if (!cancelled) setAssignedMissionEmployees(assignedTechnicianName)
       }

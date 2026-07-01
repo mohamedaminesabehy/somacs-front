@@ -1,5 +1,4 @@
-import { Clock, AlertCircle, Wrench } from 'lucide-react'
-import { PhoneCall } from 'lucide-react'
+import { Clock, AlertCircle, Wrench, PhoneCall } from 'lucide-react'
 
 export default function SectionDiagnostic({ interventionData, handleChange, setInterventionData }) {
   return (

@@ -546,25 +546,26 @@ export default function DevisSuiviSection({ devis, enableTimeline = true, onStat
 
   // Sync uniquement les champs non-statuts si devis change (ex: montant recalculé)
   // Ne jamais écraser selectedStatuses depuis init — déjà géré dans defaultDraft via localStorage
+  const { numeroDevis, typDoc, clientCode, commercialCode } = init
   useEffect(() => {
     setDraft(prev => ({
       ...prev,
-      numeroDevis: init.numeroDevis,
-      typDoc: init.typDoc,
-      clientCode: init.clientCode,
-      commercialCode: init.commercialCode,
+      numeroDevis,
+      typDoc,
+      clientCode,
+      commercialCode,
     }))
-  }, [init.numeroDevis, init.typDoc]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [numeroDevis, typDoc, clientCode, commercialCode])
 
   const loadSuivi = useCallback(async () => {
-    if (!init.numeroDevis || !init.typDoc) { setLoading(false); setRecordExists(false); return }
+    if (!numeroDevis || !typDoc) { setLoading(false); setRecordExists(false); return }
     try {
-      const data = await fetchDevisSuivi(init.numeroDevis, init.typDoc)
+      const data = await fetchDevisSuivi(numeroDevis, typDoc)
       setRecordExists(true); setSuiviId(data.id || null)
       // Priorité : localStorage > statuts dérivés de l'API
       // On ne rétrograde jamais : on fusionne le statut API avec les statuts stockés
-      const storedStatuses = getStoredStatuses(init.numeroDevis, init.typDoc)
-      const storedStatusDates = getStoredStatusDates(init.numeroDevis, init.typDoc) || {}
+      const storedStatuses = getStoredStatuses(numeroDevis, typDoc)
+      const storedStatusDates = getStoredStatusDates(numeroDevis, typDoc) || {}
       const apiStatus = data.status || 'CREATED'
       let selectedStatuses
       if (storedStatuses) {
@@ -600,7 +601,7 @@ export default function DevisSuiviSection({ devis, enableTimeline = true, onStat
       onStatusesChange?.(selectedStatuses)
     } catch { setRecordExists(false) }
     finally { setLoading(false) }
-  }, [init.numeroDevis, init.typDoc]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [numeroDevis, typDoc, init.createdAt, onStatusesChange])
 
   useEffect(() => { loadSuivi() }, [loadSuivi])
 
@@ -717,7 +718,9 @@ export default function DevisSuiviSection({ devis, enableTimeline = true, onStat
           </p>
         </div>
         <div className={"inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.3em] " + statusMeta.tone}>
-          {isPurchased ? <BadgeCheck size={13} /> : isRefused ? <XCircle size={13} /> : <PhoneCall size={13} />}
+          {isPurchased && <BadgeCheck size={13} />}
+          {!isPurchased && isRefused && <XCircle size={13} />}
+          {!isPurchased && !isRefused && <PhoneCall size={13} />}
           {statusMeta.label}
         </div>
       </div>

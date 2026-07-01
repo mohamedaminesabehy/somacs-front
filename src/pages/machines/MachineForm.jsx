@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { apiFetch } from '../../api/apiClient'
-import { ChevronLeft, ChevronDown, Save, Loader2, Upload, X, FileText, Image as ImageIcon, AlertCircle, Cpu, Truck, ClipboardCheck, Shield, CheckCircle2, ImagePlus, Hash, Calendar, Tag, Wrench, MapPin, Package, Clock } from 'lucide-react'
+import { ChevronLeft, ChevronDown, Save, Loader2, Upload, X, FileText, Image as ImageIcon, AlertCircle, Cpu, Truck, ClipboardCheck, Shield, CheckCircle2, ImagePlus, Hash, Calendar, Tag, Package, Clock } from 'lucide-react'
 import { getStepLabelColor } from '../../utils/stepStyles'
 
 const STATUS_OPTIONS = ['En stock', 'Disponible', 'En utilisation', 'En maintenance', 'Hors service']

@@ -67,6 +67,15 @@ function buildDeleteMissionSummary(mission) {
   }
 }
 
+/**
+ * Returns a delta direction indicator: true for positive, false for negative, null for zero.
+ */
+function getDeltaDirection(value) {
+  if (value > 0) return true
+  if (value < 0) return false
+  return null
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function ListMission() {
   const navigate = useNavigate()
@@ -423,7 +432,7 @@ export default function ListMission() {
         value: todayCount,
         delta: `${todayDelta >= 0 ? '+' : ''}${todayDelta}`,
         deltaLabel: 'depuis hier',
-        deltaUp: todayDelta > 0 ? true : todayDelta < 0 ? false : null,
+        deltaUp: getDeltaDirection(todayDelta),
         icon: Calendar,
         accent: 'blue',
       },
@@ -443,7 +452,7 @@ export default function ListMission() {
         value: doneAll,
         delta: `${doneDelta >= 0 ? '+' : ''}${doneDelta}`,
         deltaLabel: 'cette semaine',
-        deltaUp: doneDelta > 0 ? true : doneDelta < 0 ? false : null,
+        deltaUp: getDeltaDirection(doneDelta),
         icon: CheckCircle2,
         accent: 'emerald',
       },

@@ -52,23 +52,51 @@ export function mapRawToInterventionData(raw, assignedTechnicianName = '') {
   return {
     clientId: raw?.clientId || clientEntity?.id || '',
     machineId: raw?.machineId || machineEntity?.id || '',
+    ...mapDateTimeFields(raw),
+    technicianName: resolveTechnicianName(raw, assignedTechnicianName),
+    ficheNumber: raw?.ficheNumber || '',
+    ...mapClientFields(raw, clientEntity),
+    ...mapMachineFields(raw, machineEntity),
+    ...mapDiagnosticFields(raw),
+  }
+}
+
+function mapDateTimeFields(raw) {
+  return {
     interventionDate: raw?.interventionDate || raw?.date || '',
     startTime: raw?.startTime || '',
     endTime: raw?.endTime || '',
     totalTime: raw?.totalTime || '',
-    technicianName: assignedTechnicianName || raw?.assignedEmployeesDisplay || raw?.technicianName || raw?.assignedTo || raw?.assignee || raw?.technician || '',
-    ficheNumber: raw?.ficheNumber || '',
-    siteName: raw?.siteName || raw?.site || machineEntity?.site || '',
+  }
+}
+
+function resolveTechnicianName(raw, fallback) {
+  return fallback || raw?.assignedEmployeesDisplay || raw?.technicianName || raw?.assignedTo || raw?.assignee || raw?.technician || ''
+}
+
+function mapClientFields(raw, clientEntity) {
+  return {
+    siteName: raw?.siteName || raw?.site || clientEntity?.site || '',
     clientName: raw?.clientName || raw?.client || clientEntity?.name || '',
     clientCode: raw?.clientCode || clientEntity?.code || '',
     clientPhone: raw?.clientPhone || raw?.phone || clientEntity?.phone || '',
     clientEmail: raw?.clientEmail || clientEntity?.email || '',
     clientAddress: raw?.clientAddress || formatClientAddress(clientEntity) || '',
     requestorName: raw?.requestorName || '',
+  }
+}
+
+function mapMachineFields(raw, machineEntity) {
+  return {
     machineType: raw?.machineType || raw?.machine || machineEntity?.designation || '',
     machineBrand: raw?.machineBrand || machineEntity?.brand || '',
     machineModel: raw?.machineModel || machineEntity?.year || '',
     serialNumber: raw?.serialNumber || machineEntity?.serialNumber || '',
+  }
+}
+
+function mapDiagnosticFields(raw) {
+  return {
     problemDescription: raw?.problemDescription || raw?.request || '',
     telephoneDiagnostic: raw?.telephoneDiagnostic || '',
     interventionType: raw?.interventionType || raw?.type || '',

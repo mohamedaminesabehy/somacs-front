@@ -119,6 +119,42 @@ function findContentBounds(imageData, alphaThreshold = 12) {
   return { left, top, right, bottom }
 }
 
+/** Trim transparent borders around ink content. */
+function trimCanvas(canvas, imageData) {
+  const bounds = findContentBounds(imageData)
+  if (!bounds) return canvas
+
+  const pad = Math.round(Math.min(canvas.width, canvas.height) * 0.04 + 4)
+  const left = Math.max(0, bounds.left - pad)
+  const top = Math.max(0, bounds.top - pad)
+  const right = Math.min(canvas.width - 1, bounds.right + pad)
+  const bottom = Math.min(canvas.height - 1, bounds.bottom + pad)
+  const tw = Math.max(1, right - left + 1)
+  const th = Math.max(1, bottom - top + 1)
+
+  const tCanvas = document.createElement('canvas')
+  tCanvas.width = tw
+  tCanvas.height = th
+  const tCtx = tCanvas.getContext('2d')
+  tCtx.drawImage(canvas, left, top, tw, th, 0, 0, tw, th)
+  return tCanvas
+}
+
+/** Scale canvas down if larger than max dimensions. */
+function scaleCanvas(canvas) {
+  const scale = Math.min(1, MAX_OUTPUT_WIDTH / canvas.width, MAX_OUTPUT_HEIGHT / canvas.height)
+  if (scale >= 1) return canvas
+
+  const oCanvas = document.createElement('canvas')
+  oCanvas.width = Math.max(1, Math.round(canvas.width * scale))
+  oCanvas.height = Math.max(1, Math.round(canvas.height * scale))
+  const oCtx = oCanvas.getContext('2d')
+  oCtx.imageSmoothingEnabled = true
+  oCtx.imageSmoothingQuality = 'high'
+  oCtx.drawImage(canvas, 0, 0, oCanvas.width, oCanvas.height)
+  return oCanvas
+}
+
 /**
  * Process a captured signature into a clean transparent PNG.
  *
@@ -131,49 +167,15 @@ export async function processSignatureImage(image, region = null, options = {}) 
   const { canvas, ctx } = drawToCanvas(image, region)
 
   // 1. Remove the white background → transparency.
-  let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
   removeWhiteBackground(imageData, options)
   ctx.putImageData(imageData, 0, 0)
 
   // 2. Auto-trim the empty (transparent) borders around the ink.
-  const bounds = findContentBounds(imageData)
-  let trimmed = canvas
-  if (bounds) {
-    const pad = Math.round(
-      Math.min(canvas.width, canvas.height) * 0.04 + 4,
-    )
-    const left = Math.max(0, bounds.left - pad)
-    const top = Math.max(0, bounds.top - pad)
-    const right = Math.min(canvas.width - 1, bounds.right + pad)
-    const bottom = Math.min(canvas.height - 1, bounds.bottom + pad)
-    const tw = Math.max(1, right - left + 1)
-    const th = Math.max(1, bottom - top + 1)
-
-    const tCanvas = document.createElement('canvas')
-    tCanvas.width = tw
-    tCanvas.height = th
-    const tCtx = tCanvas.getContext('2d')
-    tCtx.drawImage(canvas, left, top, tw, th, 0, 0, tw, th)
-    trimmed = tCanvas
-  }
+  const trimmed = trimCanvas(canvas, imageData)
 
   // 3. Optimise: cap the output size while keeping the aspect ratio.
-  const scale = Math.min(
-    1,
-    MAX_OUTPUT_WIDTH / trimmed.width,
-    MAX_OUTPUT_HEIGHT / trimmed.height,
-  )
-  let output = trimmed
-  if (scale < 1) {
-    const oCanvas = document.createElement('canvas')
-    oCanvas.width = Math.max(1, Math.round(trimmed.width * scale))
-    oCanvas.height = Math.max(1, Math.round(trimmed.height * scale))
-    const oCtx = oCanvas.getContext('2d')
-    oCtx.imageSmoothingEnabled = true
-    oCtx.imageSmoothingQuality = 'high'
-    oCtx.drawImage(trimmed, 0, 0, oCanvas.width, oCanvas.height)
-    output = oCanvas
-  }
+  const output = scaleCanvas(trimmed)
 
   const blob = await new Promise((resolve) =>
     output.toBlob((b) => resolve(b), 'image/png'),

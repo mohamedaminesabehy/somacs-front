@@ -1,15 +1,15 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react'
+﻿import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../api/apiClient'
 import {
-  Search, Plus, MoreVertical, Eye, Edit2, Trash2, Wrench,
-  CheckCircle2, FileText, ChevronRight, UserPlus, Hourglass,
-  UserCheck, Building2, Calendar, Settings,
-  PlayCircle, LayoutGrid, LayoutList, X, TrendingUp, AlertTriangle,
-  SlidersHorizontal, RefreshCw, UserCheck2, Filter, ChevronDown,
-  ArrowUpRight, Clock, MapPin, MoreHorizontal, Printer,
-  Share2, ShieldCheck, Zap, FileSearch, Truck, GraduationCap,
-  ShieldAlert, ClipboardCheck, ChevronLeft, ChevronRight as ChevronRightIcon
+  Search, Plus, Eye, Edit2, Trash2, Wrench,
+  CheckCircle2, Hourglass,
+  Building2, Calendar,
+  PlayCircle, LayoutGrid, LayoutList, X, AlertTriangle,
+  RefreshCw, UserCheck2, Filter, ChevronDown,
+  MoreHorizontal,
+  FileSearch, Truck, GraduationCap,
+  ShieldAlert, ChevronLeft, ChevronRight as ChevronRightIcon
 } from 'lucide-react'
 
 // ─── Configuration ────────────────────────────────────────────────────────────
@@ -43,19 +43,100 @@ function normalizeTypeKey(value) {
     .toUpperCase()
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-const _mockInterventions = [
-  { id: 'INT-001', client: 'Total Energies',    machine: 'Compresseur C-12',  type: 'REPARATION',   status: 'PENDING',     date: '2025-05-01', assignee: null, priority: 'Haute' },
-  { id: 'INT-002', client: 'Sonatrach',         machine: 'Turbine T-04',      type: 'GARANTIE',     status: 'ASSIGNED',    date: '2025-05-02', assignee: 'Ali Boumediene', priority: 'Critique' },
-  { id: 'INT-003', client: 'Air Liquide',       machine: 'Pompe P-07',        type: 'INSTALLATION', status: 'IN_PROGRESS', date: '2025-05-03', assignee: 'Sara Meziane', priority: 'Moyenne' },
-  { id: 'INT-004', client: 'Cevital',           machine: 'Moteur M-21',       type: 'FORMATION',    status: 'PENDING',     date: '2025-04-28', assignee: 'Karim Hadj', priority: 'Haute' },
-  { id: 'INT-005', client: 'Naftal',            machine: 'Générateur G-03',  type: 'LIVRAISON',    status: 'CLOSED',      date: '2025-04-25', assignee: 'Sara Meziane', priority: 'Basse' },
-  { id: 'INT-006', client: 'Total Energies',    machine: 'Vanne V-09',        type: 'DEVIS',        status: 'IN_PROGRESS', date: '2025-05-04', assignee: 'Yacine Ferhat', priority: 'Haute' },
-  { id: 'INT-007', client: 'Sonelgaz',          machine: 'Transform. TR-02',  type: 'REPARATION',   status: 'PENDING',     date: '2025-05-05', assignee: null, priority: 'Moyenne' },
-  { id: 'INT-008', client: 'Hamamet Resort',    machine: 'Climatiseur CL-15', type: 'REPARATION',   status: 'ASSIGNED',    date: '2025-05-06', assignee: 'Ali Boumediene', priority: 'Basse' },
-  { id: 'INT-009', client: 'Cevital',           machine: 'Convoyeur CV-01',   type: 'DEVIS',        status: 'CLOSED',      date: '2025-04-22', assignee: 'Karim Hadj', priority: 'Moyenne' },
-  { id: 'INT-010', client: 'Sonatrach',         machine: 'Robinet RB-11',     type: 'INSTALLATION', status: 'IN_PROGRESS', date: '2025-04-30', assignee: 'Yacine Ferhat', priority: 'Haute' },
-]
+/**
+ * Determines if an intervention item is already assigned to a technician.
+ * Extracted to avoid duplicating this logic in mobile cards, desktop table, and ActionMenu.
+ */
+function isItemAssigned(item) {
+  return Boolean(String(item?.assignee || '').trim())
+    || Boolean(String(item?.assignedTo || '').trim())
+    || Boolean(String(item?.technicianName || '').trim())
+    || Boolean(item?.hasLinkedMission)
+}
+
+/**
+ * Builds a map of interventionId -> Set of assigned employee names,
+ * and a map of interventionId -> linked mission count from mission data.
+ */
+function buildMissionMaps(missionsData) {
+  const agentsByIntervention = new Map()
+  const linkedMissionCounts = new Map()
+
+  if (!Array.isArray(missionsData)) return { agentsByIntervention, linkedMissionCounts }
+
+  const namesByGroup = new Map()
+
+  for (const mission of missionsData) {
+    const groupId = mission?.assignmentGroupId
+    const employeeName = String(mission?.employee || '').trim()
+    const interventionId = mission?.interventionId
+
+    if (interventionId) {
+      linkedMissionCounts.set(interventionId, (linkedMissionCounts.get(interventionId) || 0) + 1)
+    }
+
+    if (!employeeName) continue
+
+    if (interventionId) {
+      if (!agentsByIntervention.has(interventionId)) {
+        agentsByIntervention.set(interventionId, new Set())
+      }
+      agentsByIntervention.get(interventionId).add(employeeName)
+    }
+
+    if (groupId) {
+      if (!namesByGroup.has(groupId)) {
+        namesByGroup.set(groupId, new Set())
+      }
+      namesByGroup.get(groupId).add(employeeName)
+    }
+  }
+
+  // Consolidate grouped names within interventions
+  for (const [groupId, names] of namesByGroup.entries()) {
+    for (const mission of missionsData) {
+      if (mission?.assignmentGroupId === groupId && mission?.interventionId) {
+        const interventionId = mission.interventionId
+        if (agentsByIntervention.has(interventionId)) {
+          const agents = agentsByIntervention.get(interventionId)
+          agents.clear()
+          for (const name of names) {
+            agents.add(name)
+          }
+        }
+      }
+    }
+  }
+
+  return { agentsByIntervention, linkedMissionCounts }
+}
+
+/**
+ * Normalizes raw intervention API data into UI-ready format.
+ */
+function normalizeInterventions(interventionsData, agentsByIntervention, linkedMissionCounts) {
+  if (!Array.isArray(interventionsData)) return []
+  return interventionsData.map((i) => {
+    const interventionId = i.id
+    const assignees = agentsByIntervention.get(interventionId)
+    const assigneeDisplay = assignees && assignees.size > 0
+      ? Array.from(assignees).join(', ')
+      : (i.assignee || i.assignedTo || i.technicianName || null)
+
+    return {
+      id: i.id,
+      client: i.client || i.clientName || '',
+      machine: i.machine || i.machineType || '',
+      type: i.type || '',
+      status: i.status || 'PENDING',
+      date: i.date || i.interventionDate || '',
+      assignee: assigneeDisplay,
+      priority: i.priority || 'Moyenne',
+      linkedMissionCount: linkedMissionCounts.get(interventionId) || 0,
+      hasLinkedMission: (linkedMissionCounts.get(interventionId) || 0) > 0,
+    }
+  })
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -94,7 +175,7 @@ function StatCard({ label, count, total, icon, active, onClick, colorClass }) {
 function ActionMenu({ item, onNavigate }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
-  const isAlreadyAssigned = Boolean(String(item?.assignee || '').trim()) || Boolean(String(item?.assignedTo || '').trim()) || Boolean(String(item?.technicianName || '').trim()) || Boolean(item?.hasLinkedMission)
+  const isAlreadyAssigned = isItemAssigned(item)
 
   useEffect(() => {
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
@@ -328,6 +409,14 @@ export default function InterventionList() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 6
 
+  const resetFilters = () => {
+    setStartDate('')
+    setEndDate('')
+    setSearch('')
+    setTypeFilter('ALL')
+    setStatusFilter('ALL')
+  }
+
   useEffect(() => {
     const refreshOnFocus = () => fetchInterventions()
     const refreshOnVisible = () => {
@@ -348,7 +437,6 @@ export default function InterventionList() {
   const fetchInterventions = async () => {
     setLoading(true)
     try {
-      // Fetch interventions and missions in parallel
       const [interventionsRes, missionsRes] = await Promise.all([
         apiFetch('/interventions', { auth: true }),
         apiFetch('/missions', { auth: true }),
@@ -363,85 +451,8 @@ export default function InterventionList() {
       const interventionsData = await interventionsRes.json()
       const missionsData = await missionsRes.json()
 
-      // Build a map of interventionId -> grouped employee names
-      const agentsByIntervention = new Map()
-      const linkedMissionCounts = new Map()
-      if (Array.isArray(missionsData)) {
-        const namesByGroup = new Map()
-
-        // First pass: group names by assignmentGroupId
-        for (const mission of missionsData) {
-          const groupId = mission?.assignmentGroupId
-          const employeeName = String(mission?.employee || '').trim()
-          const interventionId = mission?.interventionId
-
-          if (interventionId) {
-            linkedMissionCounts.set(
-              interventionId,
-              (linkedMissionCounts.get(interventionId) || 0) + 1,
-            )
-          }
-
-          if (!employeeName) continue
-
-          // Track by intervention for direct lookup
-          if (interventionId) {
-            if (!agentsByIntervention.has(interventionId)) {
-              agentsByIntervention.set(interventionId, new Set())
-            }
-            agentsByIntervention.get(interventionId).add(employeeName)
-          }
-
-          // Also track grouped names for multi-assignment display
-          if (groupId) {
-            if (!namesByGroup.has(groupId)) {
-              namesByGroup.set(groupId, new Set())
-            }
-            namesByGroup.get(groupId).add(employeeName)
-          }
-        }
-
-        // Second pass: consolidate grouped names within interventions
-        for (const [groupId, names] of namesByGroup.entries()) {
-          for (const mission of missionsData) {
-            if (mission?.assignmentGroupId === groupId && mission?.interventionId) {
-              const interventionId = mission.interventionId
-              if (agentsByIntervention.has(interventionId)) {
-                // Replace with all grouped names for this group
-                const agents = agentsByIntervention.get(interventionId)
-                agents.clear()
-                for (const name of names) {
-                  agents.add(name)
-                }
-              }
-            }
-          }
-        }
-      }
-
-      // Normalize interventions with grouped technician names
-      const normalized = Array.isArray(interventionsData)
-        ? interventionsData.map((i) => {
-            const interventionId = i.id
-            const assignees = agentsByIntervention.get(interventionId)
-            const assigneeDisplay = assignees && assignees.size > 0
-              ? Array.from(assignees).join(', ')
-              : (i.assignee || i.assignedTo || i.technicianName || null)
-
-            return {
-              id: i.id,
-              client: i.client || i.clientName || '',
-              machine: i.machine || i.machineType || '',
-              type: i.type || '',
-              status: i.status || 'PENDING',
-              date: i.date || i.interventionDate || '',
-              assignee: assigneeDisplay,
-              priority: i.priority || 'Moyenne',
-              linkedMissionCount: linkedMissionCounts.get(interventionId) || 0,
-              hasLinkedMission: (linkedMissionCounts.get(interventionId) || 0) > 0,
-            }
-          })
-        : []
+      const { agentsByIntervention, linkedMissionCounts } = buildMissionMaps(missionsData)
+      const normalized = normalizeInterventions(interventionsData, agentsByIntervention, linkedMissionCounts)
       setInterventions(normalized)
     } catch (error) {
       console.error('Error fetching interventions:', error)
@@ -573,12 +584,13 @@ export default function InterventionList() {
       const missionsDeletedCount = Number(
         payload?.missionsDeletedCount ?? (payload?.missionDeleted ? 1 : 0),
       ) || 0
-      const successMessage =
-        missionsDeletedCount > 1
-          ? `L’intervention et les ${missionsDeletedCount} missions liées ont été supprimées avec succès.`
-          : missionsDeletedCount === 1
-            ? 'L’intervention et la mission liée ont été supprimées avec succès.'
-            : 'L’intervention a été supprimée avec succès.'
+
+      let successMessage = "L'intervention a \u00e9t\u00e9 supprim\u00e9e avec succ\u00e8s."
+      if (missionsDeletedCount > 1) {
+        successMessage = `L'intervention et les ${missionsDeletedCount} missions li\u00e9es ont \u00e9t\u00e9 supprim\u00e9es avec succ\u00e8s.`
+      } else if (missionsDeletedCount === 1) {
+        successMessage = "L'intervention et la mission li\u00e9e ont \u00e9t\u00e9 supprim\u00e9es avec succ\u00e8s."
+      }
 
       await fetchInterventions()
       setDeleteDialog({ open: false, item: null, isDeleting: false, error: '' })
@@ -829,7 +841,7 @@ export default function InterventionList() {
             <div className="flex items-center justify-end gap-2 w-full lg:w-auto lg:ml-auto">
               {(startDate || endDate || search || typeFilter !== 'ALL' || statusFilter !== 'ALL') && (
                 <button 
-                  onClick={() => { setStartDate(''); setEndDate(''); setSearch(''); setTypeFilter('ALL'); setStatusFilter('ALL'); }}
+                  onClick={resetFilters}
                   className="p-2.5 text-red-500 hover:bg-red-50 rounded-xl transition-all"
                   title="Réinitialiser"
                 >
@@ -864,7 +876,7 @@ export default function InterventionList() {
                 const ty = typeConfig[normalizedType] || fallbackType
                 const TyIcon = ty.icon || Wrench
                 const isHighlighted = String(item.id) === String(highlightId)
-                const isAssigned = Boolean(String(item.assignee || '').trim()) || Boolean(String(item.assignedTo || '').trim()) || Boolean(String(item.technicianName || '').trim()) || Boolean(item.hasLinkedMission)
+                const isAssigned = isItemAssigned(item)
                 return (
                   <div
                     key={item.id}
@@ -957,7 +969,7 @@ export default function InterventionList() {
                       <p className="text-base font-black text-slate-400">Aucune intervention trouvée</p>
                       <p className="text-sm text-slate-300 font-bold">Modifiez vos filtres ou effectuez une nouvelle recherche</p>
                     </div>
-                    <button onClick={() => { setStartDate(''); setEndDate(''); setSearch(''); setTypeFilter('ALL'); setStatusFilter('ALL'); }} className="mt-1 px-6 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all">EFFACER LES FILTRES</button>
+                    <button onClick={resetFilters} className="mt-1 px-6 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all">EFFACER LES FILTRES</button>
                   </div>
                 </div>
               )}
@@ -1058,10 +1070,10 @@ export default function InterventionList() {
                               Modifier
                             </button>
                             <button 
-                              disabled={Boolean(item.assignee) || item.status === 'ASSIGNED'}
+                              disabled={isItemAssigned(item)}
                               onClick={(e) => { e.stopPropagation(); handleNavigate('assign', item) }}
                               className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-sm border active:scale-95 ${
-                                Boolean(String(item.assignee || '').trim()) || Boolean(String(item.assignedTo || '').trim()) || Boolean(String(item.technicianName || '').trim()) || Boolean(item.hasLinkedMission)
+                                isItemAssigned(item)
                                   ? 'text-slate-300 bg-slate-100 border-slate-200 cursor-not-allowed pointer-events-none'
                                   : 'text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white border-[#004a77]/10'
                               }`}
@@ -1092,7 +1104,7 @@ export default function InterventionList() {
                             <p className="text-lg font-black text-slate-400">Aucune intervention trouvée</p>
                             <p className="text-sm text-slate-300 font-bold">Modifiez vos filtres ou effectuez une nouvelle recherche</p>
                           </div>
-                          <button onClick={() => { setStartDate(''); setEndDate(''); setSearch(''); setTypeFilter('ALL'); setStatusFilter('ALL'); }} className="mt-2 px-6 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all">EFFACER LES FILTRES</button>
+                          <button onClick={resetFilters} className="mt-2 px-6 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all">EFFACER LES FILTRES</button>
                         </div>
                       </td>
                     </tr>

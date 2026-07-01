@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
-  ArrowLeft, CheckCircle2, XCircle, Clock, Calendar, MapPin,
+  ArrowLeft, CheckCircle2, Clock, Calendar, MapPin,
   Building2, Wrench, ClipboardList, AlertTriangle, Link2,
-  User, FileText, Hash, ChevronRight, Edit2, Loader2,
+  User, FileText, Hash, ChevronRight, Edit2,
   CheckSquare, Flag, Phone, Zap, Info,
   ExternalLink, History, Save,
   MoreVertical, Paperclip, File, X,
@@ -185,7 +185,7 @@ export default function MissionDetails() {
   }, [mission])
 
   useEffect(() => {
-    ;(async () => {
+    void (async () => {
       setIsLoadingMission(true)
       try {
         const response = await apiFetch(`/missions/${id}`, { auth: true, cache: 'no-store' })
@@ -215,7 +215,7 @@ export default function MissionDetails() {
       setIntervention(null)
       return
     }
-    ;(async () => {
+    void (async () => {
       try {
         const response = await apiFetch(`/interventions/${mission.interventionId}`, { auth: true })
         if (!response.ok) return
@@ -347,7 +347,6 @@ export default function MissionDetails() {
 
   const priority   = PRIORITY_CONFIG[mission.priority] || PRIORITY_CONFIG['Moyenne']
   const statusCfg  = STATUS_CONFIG[status] || STATUS_CONFIG['À faire']
-  const StatusIcon = statusCfg.icon
 
   const handleStatusChange = (newStatus) => {
     if (statusAnimTimerRef.current) {
@@ -356,7 +355,7 @@ export default function MissionDetails() {
     }
     setStatus(newStatus)
     setMission((prev) => (prev ? { ...prev, status: newStatus } : prev))
-    ;(async () => {
+    void (async () => {
       try {
         // Le kilométrage reste facultatif : on l'enregistre seulement s'il est renseigné.
         if (newStatus === 'Terminée' && mission.vehicleId) {
@@ -448,7 +447,7 @@ export default function MissionDetails() {
     if (missionId) {
       setMission((prev) => (prev ? { ...prev, status: nextStatus, notes: nextNotes } : prev))
     }
-    ;(async () => {
+    void (async () => {
       try {
         const response = await apiFetch(`/missions/${missionId}`, {
           method: 'PATCH',
@@ -479,10 +478,8 @@ export default function MissionDetails() {
       setIsSaving(false)
     })()
   }
-  const progressPct =
-    status === 'À faire'  ? 10  :
-    status === 'En cours' ? 50  :
-    status === 'Terminée' ? 100 : 0
+  const PROGRESS_MAP = { 'À faire': 10, 'En cours': 50, 'Terminée': 100 }
+  const progressPct = PROGRESS_MAP[status] || 0
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex flex-col">

@@ -1,10 +1,49 @@
 // ── Per-intervention mock data (keyed by intervention ID) ──
 // Each entry has: status, completedUpToSection (1-4), and the fields filled.
 // Fields beyond completedUpToSection are intentionally empty strings.
+
+// ─── Shared defaults & factory ────────────────────────────────────────────────
+
+const EMPTY_INTERVENTION = {
+  technicianName: '',
+  interventionDate: '',
+  ficheNumber: '',
+  startTime: '',
+  endTime: '',
+  totalTime: '',
+  siteName: '',
+  clientName: '',
+  clientCode: '',
+  clientPhone: '',
+  clientEmail: '',
+  clientAddress: '',
+  requestorName: '',
+  machineType: '',
+  machineBrand: '',
+  machineModel: '',
+  serialNumber: '',
+  problemDescription: '',
+  telephoneDiagnostic: '',
+  interventionType: 'Réparation',
+  interventionDetail: '',
+  numEssai: '',
+  essaiConcluant: null,
+  parts: [],
+  laborPrice: 0,
+}
+
+function createIntervention(status, completedUpToSection, overrides = {}) {
+  return { status, completedUpToSection, ...EMPTY_INTERVENTION, ...overrides }
+}
+
+function createPart(id, reference, designation, quantity) {
+  return { id, reference, designation, quantity }
+}
+
+// ─── Mock database ────────────────────────────────────────────────────────────
+
 export const interventionsDB = {
-  'INT-2026-001': {
-    status: 'IN_PROGRESS',
-    completedUpToSection: 2,  // sections 1+2 done, on section 3 (Articles)
+  'INT-2026-001': createIntervention('IN_PROGRESS', 2, {
     technicianName: 'Jean Dupont',
     interventionDate: '2026-03-01',
     ficheNumber: '2026/03/01 100201',
@@ -24,26 +63,18 @@ export const interventionsDB = {
     serialNumber: 'SN-99184688',
     problemDescription: 'Fuite hydraulique vérin gauche - Intervention urgente demandée.',
     telephoneDiagnostic: 'Tentative de résolution à distance : vérification pression, test électrovanne. Problème persistant, intervention sur site requise.',
-    interventionType: 'Réparation',
     interventionDetail: 'Remplacement joint hydraulique vérin gauche, purge circuit hydraulique, test pression 250 bars.',
     numEssai: '2',
     essaiConcluant: true,
     parts: [
-      { id: 1, reference: 'PART-001', designation: 'Filtre à air haute performance', quantity: 2 },
-      { id: 2, reference: 'PART-082', designation: 'Huile hydraulique 5L', quantity: 1 },
+      createPart(1, 'PART-001', 'Filtre à air haute performance', 2),
+      createPart(2, 'PART-082', 'Huile hydraulique 5L', 1),
     ],
-    laborPrice: 0,
-  },
-  'INT-2026-002': {
-    status: 'PENDING',
-    completedUpToSection: 1,  // only section 1 done (informations), on section 1
-    technicianName: '',
+  }),
+
+  'INT-2026-002': createIntervention('PENDING', 1, {
     interventionDate: '2026-03-02',
     ficheNumber: '2026/03/02 100302',
-    startTime: '',
-    endTime: '',
-    totalTime: '',
-    siteName: '',
     clientName: 'Usine MetalPlus',
     clientCode: 'CLT-445',
     clientPhone: '71445001',
@@ -55,23 +86,12 @@ export const interventionsDB = {
     machineModel: 'GA-55',
     serialNumber: 'SN-44500232',
     problemDescription: 'Compresseur en surchauffe — arrêt automatique fréquent.',
-    telephoneDiagnostic: '',
-    interventionType: 'Réparation',
-    interventionDetail: '',
-    numEssai: '',
-    essaiConcluant: null,
-    parts: [],
-    laborPrice: 0,
-  },
-  'INT-2026-003': {
-    status: 'ASSIGNED',
-    completedUpToSection: 1,  // section 1 done, on section 2 (Diagnostic)
+  }),
+
+  'INT-2026-003': createIntervention('ASSIGNED', 1, {
     technicianName: 'Pierre Martin',
     interventionDate: '2026-03-02',
     ficheNumber: '2026/03/02 100303',
-    startTime: '',
-    endTime: '',
-    totalTime: '',
     siteName: 'Radès',
     clientName: 'Logistique Express',
     clientCode: 'CLT-116',
@@ -84,17 +104,9 @@ export const interventionsDB = {
     machineModel: 'TX3-20',
     serialNumber: 'SN-11600412',
     problemDescription: 'Chariot ne démarre plus après la nuit — batterie testée OK.',
-    telephoneDiagnostic: '',
-    interventionType: 'Réparation',
-    interventionDetail: '',
-    numEssai: '',
-    essaiConcluant: null,
-    parts: [],
-    laborPrice: 0,
-  },
-  'INT-2026-004': {
-    status: 'CLOSED',
-    completedUpToSection: 4,  // everything done
+  }),
+
+  'INT-2026-004': createIntervention('CLOSED', 4, {
     technicianName: 'Jean Dupont',
     interventionDate: '2026-02-28',
     ficheNumber: '2026/02/28 090401',
@@ -114,25 +126,21 @@ export const interventionsDB = {
     serialNumber: 'SN-29001140',
     problemDescription: 'Groupe électrogène ne démarre pas — panne démarreur.',
     telephoneDiagnostic: 'Diagnostic téléphonique : test batterie démarreur, contrôle relais. Démarreur HS confirmé.',
-    interventionType: 'Réparation',
     interventionDetail: 'Remplacement démarreur 24V, test démarrage à froid x3, vérification alternateur.',
     numEssai: '3',
     essaiConcluant: true,
     parts: [
-      { id: 1, reference: 'DEP-024V', designation: 'Démarreur 24V Caterpillar', quantity: 1 },
-      { id: 2, reference: 'REL-001', designation: 'Relais de démarrage 24V', quantity: 2 },
+      createPart(1, 'DEP-024V', 'Démarreur 24V Caterpillar', 1),
+      createPart(2, 'REL-001', 'Relais de démarrage 24V', 2),
     ],
     laborPrice: 320,
-  },
-  'INT-2026-005': {
-    status: 'TESTING',
-    completedUpToSection: 3,  // sections 1+2+3 done, on section 4 (Clôture)
+  }),
+
+  'INT-2026-005': createIntervention('TESTING', 3, {
     technicianName: 'Marie Curie',
     interventionDate: '2026-03-01',
     ficheNumber: '2026/03/01 110501',
     startTime: '11:00',
-    endTime: '',
-    totalTime: '',
     siteName: 'Sfax',
     clientName: 'AgriTech SA',
     clientCode: 'CLT-512',
@@ -146,25 +154,19 @@ export const interventionsDB = {
     serialNumber: 'SN-51200876',
     problemDescription: "Électrovanne principale bloquée en position fermée — pas d'arrosage depuis 48h.",
     telephoneDiagnostic: "Test téléphonique : vérification alimentation 24VAC OK, bobine testée = défectueuse.",
-    interventionType: 'Réparation',
     interventionDetail: "Remplacement électrovanne 24VAC, recâblage zone A, test ouverture/fermeture x5.",
     numEssai: '5',
     essaiConcluant: true,
     parts: [
-      { id: 1, reference: 'EV-24V-RB', designation: 'Électrovanne 24VAC Rain Bird', quantity: 1 },
-      { id: 2, reference: 'CAB-2X1.5', designation: 'Câble 2x1.5mm² (10m)', quantity: 2 },
+      createPart(1, 'EV-24V-RB', 'Électrovanne 24VAC Rain Bird', 1),
+      createPart(2, 'CAB-2X1.5', 'Câble 2x1.5mm² (10m)', 2),
     ],
     laborPrice: 180,
-  },
-  'INT-2026-006': {
-    status: 'PENDING',
-    completedUpToSection: 1,
-    technicianName: '',
+  }),
+
+  'INT-2026-006': createIntervention('PENDING', 1, {
     interventionDate: '2026-03-03',
     ficheNumber: '2026/03/03 140601',
-    startTime: '',
-    endTime: '',
-    totalTime: '',
     siteName: 'La Marsa',
     clientName: 'Clinique Moderne',
     clientCode: 'CLT-780',
@@ -177,23 +179,13 @@ export const interventionsDB = {
     machineModel: 'Gen2-MRL',
     serialNumber: 'SN-78000201',
     problemDescription: "Ascenseur bloqué entre 2ème et 3ème étage — alarme active.",
-    telephoneDiagnostic: '',
     interventionType: 'Garantie',
-    interventionDetail: '',
-    numEssai: '',
-    essaiConcluant: null,
-    parts: [],
-    laborPrice: 0,
-  },
-  'INT-2026-007': {
-    status: 'ASSIGNED',
-    completedUpToSection: 1,
+  }),
+
+  'INT-2026-007': createIntervention('ASSIGNED', 1, {
     technicianName: 'Sarah Martin',
     interventionDate: '2026-03-03',
     ficheNumber: '2026/03/03 150701',
-    startTime: '',
-    endTime: '',
-    totalTime: '',
     siteName: 'Tunis',
     clientName: 'MegaDistrib SA',
     clientCode: 'CLT-331',
@@ -206,12 +198,5 @@ export const interventionsDB = {
     machineModel: 'BXV-10',
     serialNumber: 'SN-33101551',
     problemDescription: "Motorisation de porte à ouverture incomplète — blocage à 70% de course.",
-    telephoneDiagnostic: '',
-    interventionType: 'Réparation',
-    interventionDetail: '',
-    numEssai: '',
-    essaiConcluant: null,
-    parts: [],
-    laborPrice: 0,
-  },
+  }),
 }

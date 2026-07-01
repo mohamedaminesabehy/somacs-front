@@ -120,6 +120,13 @@ function getMachineReference(machine) {
   return machine?.code || machine?.reference || machine?.referenceFournisseur || ''
 }
 
+function formatMachineDisplay(machine) {
+  const label = getMachineLabel(machine) || ''
+  const ref = getMachineReference(machine)
+  const display = ref ? `${label} (${ref})`.trim() : label.trim()
+  return display || null
+}
+
 function machineKey(machine) {
   if (!machine) return null
   if (present(machine.id)) return `id:${machine.id}`
@@ -234,7 +241,7 @@ function MachineStatusPill({ status }) {
   else if (s.includes('utilisation'))                  { cls = 'bg-blue-50 text-blue-700 border-blue-200'; dot = 'bg-blue-500' }
   else if (s.includes('maintenance'))                  { cls = 'bg-amber-50 text-amber-700 border-amber-200'; dot = 'bg-amber-500' }
   else if (s.includes('hors'))                         { cls = 'bg-red-50 text-red-700 border-red-200'; dot = 'bg-red-500' }
-  else if (s.includes('archiv'))                       { cls = 'bg-slate-100 text-slate-500 border-slate-200'; dot = 'bg-slate-400' }
+  else if (s.includes('archiv'))                       { cls = 'bg-slate-100 text-slate-500 border-slate-200' }
   return (
     <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-[11px] font-bold ${cls}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
@@ -1131,11 +1138,7 @@ function InterventionDetailsModal({ intervention, clientName, onClose }) {
               <ModalField
                 icon={Cpu}
                 label="Machine liée"
-                value={
-                  machine
-                    ? `${getMachineLabel(machine) || ''}${getMachineReference(machine) ? ` (${getMachineReference(machine)})` : ''}`.trim() || null
-                    : null
-                }
+                value={machine ? formatMachineDisplay(machine) : null}
               />
               <ModalField icon={Tag}       label="Marque machine"     value={machine?.brand} />
               <ModalField icon={Settings}  label="Modèle machine"     value={machine?.model} />

@@ -20,7 +20,7 @@ import {
 } from 'lucide-react'
 import ArticleSelectionModal from '../../components/devis/ArticleSelectionModal'
 import ArticleRecommendations from '../../components/devis/ArticleRecommendations'
-import { extractTauxFromCode, normalizeRate, resolveTVA, toNumber } from '../../utils/devis'
+import { extractTauxFromCode, normalizeRate, resolveTVA, toNumber, computeDevisTotals } from '../../utils/devis'
 import { formatPrice as formatCurrency } from '../../utils/format'
 
 // --- Helpers ---
@@ -54,39 +54,6 @@ const createEmptyLine = () => ({
   TVA: 0,
   TotalNetHT: 0,
 })
-
-// Calcule les totaux depuis les lignes (même logique que DevisDetails)
-const computeTotals = (lines) => {
-  const articleLines = lines.filter((d) => d.Code && toNumber(d.Qte) > 0)
-
-  const totalHTBrut = articleLines.reduce((acc, d) => acc + toNumber(d.Qte) * toNumber(d.PU_HT), 0)
-  const totalRemise = articleLines.reduce(
-    (acc, d) => acc + toNumber(d.Qte) * toNumber(d.PU_HT) * (normalizeRate(d.Remise) / 100),
-    0
-  )
-  const totalNetHT = articleLines.reduce((acc, d) => acc + toNumber(d.TotalNetHT), 0)
-  const totalTVA = articleLines.reduce(
-    (acc, d) => acc + toNumber(d.TotalNetHT) * (resolveTVA(d) / 100),
-    0
-  )
-  const timbre = 1.0
-  const totalTTC = totalNetHT + totalTVA + timbre
-
-  // Groupement TVA par taux numérique résolu
-  const tvaMap = {}
-  for (const d of articleLines) {
-    const taux = resolveTVA(d)
-    const key = String(taux)
-    const base = toNumber(d.TotalNetHT)
-    const montant = base * (taux / 100)
-    if (!tvaMap[key]) tvaMap[key] = { taux, base: 0, montant: 0 }
-    tvaMap[key].base += base
-    tvaMap[key].montant += montant
-  }
-  const tvaSummary = Object.values(tvaMap).sort((a, b) => a.taux - b.taux)
-
-  return { totalHTBrut, totalRemise, totalNetHT, totalTVA, timbre, totalTTC, tvaSummary }
-}
 
 const computeLine = (item) => {
   const qte = Math.max(0, toNumber(item.Qte))
@@ -128,7 +95,7 @@ const CreateDevis = () => {
   const [isArticleModalOpen, setIsArticleModalOpen] = useState(false)
   const [articleRowIndex, setArticleRowIndex] = useState(null)
 
-  const totals = computeTotals(details)
+  const totals = computeDevisTotals(details)
   const activeLines = details.filter((line) => line.Code && toNumber(line.Qte) > 0)
   const openLines = details.filter((line) => !line.Code).length
 

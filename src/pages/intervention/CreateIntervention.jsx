@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react'
+﻿import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../api/apiClient'
 import { 
@@ -15,18 +15,10 @@ import {
   Cpu,
   Hash,
   FileText,
-  Clock,
   Printer,
-  FileSearch,
-  CheckCircle2,
-  ShieldCheck,
   Zap,
-  QrCode,
   Calendar,
-  UserCheck,
   Eye,
-  Plus,
-  Search,
   Users
 } from 'lucide-react'
 import logo from '../../assets/logo.jpg'
@@ -34,7 +26,9 @@ import FicheContent from '../../components/intervention/FicheContent'
 import MobileFichePreviewModal from '../../components/intervention/MobileFichePreviewModal'
 import ClientSelectionModal from '../../components/client/ClientSelectionModal'
 import MachineSelectionModal from '../../components/machine/MachineSelectionModal'
-import { getStepLabelColor } from '../../utils/stepStyles'
+import HorizontalStepper from '../../components/common/HorizontalStepper'
+import VerticalStepper from '../../components/common/VerticalStepper'
+import { useZoomDetection } from './hooks/useZoomDetection'
 
 const steps = [
   { id: 1, title: 'Client', description: 'Identification', icon: User },
@@ -58,11 +52,10 @@ function generateFicheNumber() {
 export default function CreateIntervention() {
   const navigate = useNavigate()
   const [currentStep, setCurrentStep] = useState(1)
-  const [uiZoomPercent, setUiZoomPercent] = useState(100)
+  const uiZoomPercent = useZoomDetection()
   const [showMobilePreview, setShowMobilePreview] = useState(false)
   const [isClientModalOpen, setIsClientModalOpen] = useState(false)
   const [isMachineModalOpen, setIsMachineModalOpen] = useState(false)
-  const baseDprRef = useRef(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
   const [formData, setFormData] = useState(() => ({
     clientId: '',
     clientName: '',
@@ -96,47 +89,6 @@ export default function CreateIntervention() {
   }
   const previewParts = []
   const previewLaborPrice = Number(formData.laborPrice) || ''
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined
-
-    const toPercent = (value) => {
-      const n = Number(value)
-      if (!Number.isFinite(n) || n <= 0) return null
-      return Math.round(n * 100)
-    }
-
-    const computeZoomPercent = () => {
-      const base = baseDprRef.current || 1
-      const current = window.devicePixelRatio || 1
-      const byDpr = Math.round((current / base) * 100)
-
-      const byWindowRatio =
-        window.innerWidth > 0 && window.outerWidth > 0
-          ? Math.round((window.outerWidth / window.innerWidth) * 100)
-          : null
-
-      const viewportScale = window.visualViewport?.scale
-      const byViewport = toPercent(viewportScale)
-
-      // Prefer sources that actually change with browser zoom.
-      let next = byWindowRatio
-      if (!next || next === 100) next = byViewport
-      if (!next || next === 100) next = byDpr
-      if (!next || !Number.isFinite(next)) next = 100
-
-      setUiZoomPercent(next)
-    }
-
-    computeZoomPercent()
-    window.addEventListener('resize', computeZoomPercent)
-    window.visualViewport?.addEventListener('resize', computeZoomPercent)
-
-    return () => {
-      window.removeEventListener('resize', computeZoomPercent)
-      window.visualViewport?.removeEventListener('resize', computeZoomPercent)
-    }
-  }, [])
 
   const useHorizontalProgress = uiZoomPercent > 80
 
@@ -693,75 +645,12 @@ export default function CreateIntervention() {
       </div>
 
       {/* ── Mobile / Tablet horizontal stepper ── */}
-      <div className={`${useHorizontalProgress ? 'bg-white border-b border-slate-100 px-4 py-3 shrink-0' : 'lg:hidden bg-white border-b border-slate-100 px-4 py-3 shrink-0'}`}>
-        <div className="flex items-center justify-between max-w-lg mx-auto">
-          {steps.map((step, index) => {
-            const isActive = currentStep === step.id
-            const isCompleted = currentStep > step.id
-            const Icon = step.icon
-            return (
-              <React.Fragment key={step.id}>
-                <div className="flex flex-col items-center gap-1">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 ${
-                    isActive ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-200 scale-110'
-                    : isCompleted ? 'bg-green-500 text-white'
-                    : 'bg-slate-100 text-slate-400'
-                  }`}>
-                    {isCompleted ? <Check size={16} strokeWidth={3} /> : <Icon size={16} />}
-                  </div>
-                  <span className={`text-[9px] font-black uppercase tracking-wide ${getStepLabelColor(isActive, isCompleted)}`}>
-                    {step.title}
-                  </span>
-                </div>
-                {index < steps.length - 1 && (
-                  <div className={`flex-1 h-0.5 mx-1 rounded-full transition-colors duration-300 ${currentStep > step.id ? 'bg-green-400' : 'bg-slate-100'}`} />
-                )}
-              </React.Fragment>
-            )
-          })}
-        </div>
-      </div>
+      <HorizontalStepper steps={steps} currentStep={currentStep} alwaysVisible={useHorizontalProgress} />
 
       <div className="flex flex-1 overflow-hidden min-w-0">
 
         {/* ── Desktop left stepper sidebar ── */}
-        <div className={`${useHorizontalProgress ? 'hidden' : 'hidden lg:flex w-[320px] border-r border-slate-50 bg-slate-50/30 flex-col p-8 shrink-0 min-w-0'}`}>
-          <div className="space-y-2 mb-12">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Progression</h4>
-            <div className="h-1 w-12 bg-[#0052CC] rounded-full"></div>
-          </div>
-
-          <div className="space-y-1">
-            {steps.map((step) => {
-              const isActive = currentStep === step.id
-              const isCompleted = currentStep > step.id
-              const Icon = step.icon
-              return (
-                <div key={step.id} className="relative pb-10 last:pb-0">
-                  {step.id !== steps.length && (
-                    <div className={`absolute left-6 top-14 bottom-0 w-0.5 rounded-full ${isCompleted ? 'bg-[#0052CC]' : 'bg-slate-100'}`}></div>
-                  )}
-                  <div className="flex items-start gap-5 group cursor-default">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-500 z-10 ${
-                      isActive
-                        ? 'bg-[#0052CC] text-white shadow-xl shadow-blue-200 scale-110'
-                        : isCompleted
-                          ? 'bg-green-500 text-white shadow-lg shadow-green-100'
-                          : 'bg-white text-slate-300 border-2 border-slate-50 group-hover:border-slate-200'
-                    }`}>
-                      {isCompleted ? <Check size={20} className="stroke-[4px]" /> : <Icon size={20} className={isActive ? 'stroke-[3px]' : 'stroke-[2px]'} />}
-                    </div>
-                    <div className="pt-1">
-                      <p className={`text-[10px] font-black uppercase tracking-widest leading-none mb-1 transition-colors ${isActive ? 'text-[#0052CC]' : 'text-slate-300'}`}>Étape 0{step.id}</p>
-                      <p className={`text-base font-black tracking-tight transition-colors ${isActive ? 'text-slate-900' : 'text-slate-400'}`}>{step.title}</p>
-                      <p className={`text-[11px] font-bold mt-0.5 transition-colors ${isActive ? 'text-slate-500' : 'text-slate-300'}`}>{step.description}</p>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
+        <VerticalStepper steps={steps} currentStep={currentStep} hidden={useHorizontalProgress} />
 
         {/* ── Form area ── */}
         <div className="flex-1 overflow-y-auto no-scrollbar bg-white flex flex-col min-w-0">

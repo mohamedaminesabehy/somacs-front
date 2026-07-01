@@ -28,12 +28,10 @@ async function getServiceWorkerRegistration() {
   if (typeof window === 'undefined') return null
   if (!('serviceWorker' in navigator)) return null
   try {
-    const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js')
-    return reg
+    return await navigator.serviceWorker.register('/firebase-messaging-sw.js')
   } catch {
     try {
-      const reg = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js')
-      return reg || null
+      return (await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js')) || null
     } catch {
       return null
     }
@@ -101,12 +99,11 @@ export async function onForegroundMessage(handler) {
   if (!app) return noop
 
   const messaging = getMessaging(app)
-  const unsubscribe = onMessage(messaging, (payload) => {
+  return onMessage(messaging, (payload) => {
     try {
       handler(payload)
     } catch {
       // Foreground notification handlers are user-provided and optional.
     }
   })
-  return unsubscribe
 }

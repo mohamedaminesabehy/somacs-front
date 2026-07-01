@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { AlertCircle, Building2, Calendar, CheckCircle2, Edit3, Eye, FileText, Hash, History, Search, User, Wrench, X } from 'lucide-react'
+import { AlertCircle, Building2, Calendar, CheckCircle2, Edit3, Eye, Hash, History, Search, User, Wrench, X } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 import logo from '../../assets/logo.jpg'
 import FichePreviewFrame from '../../components/intervention/FichePreviewFrame'
@@ -77,7 +77,7 @@ function InterventionPreview({ intervention }) {
       return () => window.clearTimeout(resetTimer)
     }
     let cancelled = false
-    ;(async () => {
+    void (async () => {
       try {
         const response = await apiFetch(`/interventions/${interventionId}/signatures`, { cache: 'no-store' })
         if (!response.ok) return
@@ -172,7 +172,7 @@ export default function EmployeeHistory() {
   }, [location.pathname, location.search, location.state, navigate])
 
   useEffect(() => {
-    ;(async () => {
+    void (async () => {
       setIsLoading(true)
       try {
         let resolvedEmployeeName = ''

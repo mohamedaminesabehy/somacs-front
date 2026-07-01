@@ -261,7 +261,9 @@ export default function VehicleForm({
     { label: "Annee", ok: !!form.annee },
   ]
 
-  const submitButtonLabel = loading ? "Creation..." : (saving ? "Enregistrement..." : "Enregistrer")
+  let submitButtonLabel = "Enregistrer"
+  if (loading) submitButtonLabel = "Creation..."
+  else if (saving) submitButtonLabel = "Enregistrement..."
 
   return (
     <div className="min-h-screen bg-[#F6F9FC]">

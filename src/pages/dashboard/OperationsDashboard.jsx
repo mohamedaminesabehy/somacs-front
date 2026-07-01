@@ -9,12 +9,10 @@ import {
   ClipboardList,
   Clock3,
   FileText,
-  HardDrive,
   LayoutDashboard,
   Layers,
   PlusCircle,
   Send,
-  Trophy,
   UserPlus,
   UserRound,
   Users,
@@ -78,6 +76,22 @@ function ProgressBar({ value, tone = 'bg-[#0052CC]' }) {
         className={`h-full rounded-full transition-all duration-500 ${tone}`}
         style={{ width: `${width}%` }}
       />
+    </div>
+  )
+}
+
+function StatusRowsList({ rows }) {
+  return (
+    <div className="space-y-3">
+      {rows.map((row) => (
+        <div key={row.key}>
+          <div className="flex items-center justify-between text-xs mb-1.5">
+            <span className="text-slate-600">{row.label}</span>
+            <span className="font-semibold text-slate-800">{row.count}</span>
+          </div>
+          <ProgressBar value={row.pct} tone={row.tone} />
+        </div>
+      ))}
     </div>
   )
 }
@@ -714,17 +728,7 @@ export default function OperationsDashboard({ currentUser }) {
             {isLoading ? (
               <SkeletonRows count={4} />
             ) : (
-              <div className="space-y-3">
-                {missionStatusRows.map((row) => (
-                  <div key={row.key}>
-                    <div className="flex items-center justify-between text-xs mb-1.5">
-                      <span className="text-slate-600">{row.label}</span>
-                      <span className="font-semibold text-slate-800">{row.count}</span>
-                    </div>
-                    <ProgressBar value={row.pct} tone={row.tone} />
-                  </div>
-                ))}
-              </div>
+              <StatusRowsList rows={missionStatusRows} />
             )}
           </Card>
 
@@ -733,17 +737,7 @@ export default function OperationsDashboard({ currentUser }) {
             {isLoading ? (
               <SkeletonRows count={4} />
             ) : (
-              <div className="space-y-3">
-                {interventionStatusRows.map((row) => (
-                  <div key={row.key}>
-                    <div className="flex items-center justify-between text-xs mb-1.5">
-                      <span className="text-slate-600">{row.label}</span>
-                      <span className="font-semibold text-slate-800">{row.count}</span>
-                    </div>
-                    <ProgressBar value={row.pct} tone={row.tone} />
-                  </div>
-                ))}
-              </div>
+              <StatusRowsList rows={interventionStatusRows} />
             )}
           </Card>
 
