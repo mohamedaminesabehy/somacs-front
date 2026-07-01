@@ -26,7 +26,7 @@ function buildNamesByGroup(missions) {
       ? mission.groupedEmployees.map((n) => String(n || '').trim()).filter(Boolean)
       : []
     const employeeName = String(mission?.employee || '').trim()
-    const allNames = serverNames.length > 0 ? serverNames : (employeeName ? [employeeName] : [])
+    const allNames = serverNames.length > 0 ? serverNames : getEmployeeNameFallback(employeeName)
     if (!groupId || allNames.length === 0) continue
     if (!namesByGroup.has(groupId)) namesByGroup.set(groupId, new Set())
     allNames.forEach((n) => namesByGroup.get(groupId).add(n))
@@ -81,4 +81,9 @@ function deduplicateEntries(entries) {
     if (!uniq.has(key)) uniq.set(key, row)
   }
   return uniq
+}
+
+function getEmployeeNameFallback(employeeName) {
+  if (employeeName) return [employeeName]
+  return []
 }

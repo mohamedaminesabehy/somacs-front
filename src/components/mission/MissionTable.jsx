@@ -1,12 +1,13 @@
 import { forwardRef, useImperativeHandle, useState, useEffect, useRef } from 'react'
 import { AlertCircle, ClipboardList, Users, Eye, Edit, Trash2, MapPin, Building2, Phone, Calendar, Wrench, Paperclip, FileText, Clock, UserCheck, Hourglass, Link2, Download, Truck } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
+import { getAvatarFromName } from '../../utils/format'
+import { getStatusColorKey } from '../../utils/status'
 import { useMissionTableData } from './useMissionTableData'
 import {
   priorityColors,
   statusColors,
   interventionStatusColors,
-  getGroupedEmployeeNames,
   getGroupedEmployeeStatuses,
   truncateText,
   getPriorityColor,
@@ -41,7 +42,7 @@ function MissionTableInner(props, ref) {
     highlightMissionId,
     highlightAssignmentGroupId,
   } = props || {}
-  const { missions, setMissions, fetchMissions, interventionsList, employeeUsers, fetchInterventions } = useMissionTableData(missionsProp)
+  const { missions, fetchMissions, interventionsList, employeeUsers, fetchInterventions } = useMissionTableData(missionsProp)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState('create')
   const [formMissionId, setFormMissionId] = useState(null)

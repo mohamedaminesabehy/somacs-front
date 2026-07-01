@@ -48,7 +48,12 @@ export function useMissionStatusActions({
       setVehicleMileageError('')
       animateStatusChange(newStatus, setStatusJustChangedTo, statusAnimTimerRef)
 
-      await restartPolling(mission.id, setMission, setStatus, setGroupedEmployeesDisplay, setVehicleKilometrageDepart, setVehicleKilometrageRetour, mileageEditingRef, refreshTimerRef)
+      await restartPolling({
+        missionId: mission.id, setMission, setStatus,
+        setGroupedEmployees: setGroupedEmployeesDisplay,
+        setDepart: setVehicleKilometrageDepart, setRetour: setVehicleKilometrageRetour,
+        mileageEditingRef, refreshTimerRef,
+      })
 
       setShowSaveToast(`Cette mission est ${newStatus}`)
       setTimeout(() => setShowSaveToast(false), 3000)
@@ -134,7 +139,8 @@ function animateStatusChange(newStatus, setStatusJustChangedTo, timerRef) {
   }, 700)
 }
 
-async function restartPolling(missionId, setMission, setStatus, setGroupedEmployees, setDepart, setRetour, mileageEditingRef, refreshTimerRef) {
+async function restartPolling(opts) {
+  const { missionId, setMission, setStatus, setGroupedEmployees, setDepart, setRetour, mileageEditingRef, refreshTimerRef } = opts
   if (refreshTimerRef.current) {
     window.clearInterval(refreshTimerRef.current)
     refreshTimerRef.current = null
@@ -144,10 +150,7 @@ async function restartPolling(missionId, setMission, setStatus, setGroupedEmploy
   if (missionRes.ok) {
     const latest = await missionRes.json().catch(() => null)
     if (latest) {
-      setMission((prev) => (prev ? { ...prev, ...latest, status: latest.status || prev.status } : latest))
-      setStatus(latest.status || 'À faire')
-      setGroupedEmployees(buildGroupedEmployeesDisplay(latest))
-      syncMileage(setDepart, setRetour, latest)
+      applyMissionUpdate(latest, setMission, setStatus, setGroupedEmployees, setDepart, setRetour)
       try { window.dispatchEvent(new CustomEvent('mission:updated', { detail: latest })) } catch { /* best-effort */ }
     }
   }
@@ -157,11 +160,22 @@ async function restartPolling(missionId, setMission, setStatus, setGroupedEmploy
       const pollRes = await apiFetch(`/missions/${missionId}`, { auth: true, cache: 'no-store' })
       if (!pollRes.ok) return
       const pollData = await pollRes.json()
-      const nextStatus = pollData?.status || 'À faire'
-      setMission((prev) => (prev ? { ...prev, ...pollData, status: nextStatus } : pollData))
-      setStatus((prev) => (prev !== nextStatus ? nextStatus : prev))
-      setGroupedEmployees(buildGroupedEmployeesDisplay(pollData))
-      if (!mileageEditingRef.current) syncMileage(setDepart, setRetour, pollData)
+      applyMissionPoll(pollData, setMission, setStatus, setGroupedEmployees, setDepart, setRetour, mileageEditingRef)
     } catch { /* best-effort */ }
   }, 5000)
+}
+
+function applyMissionUpdate(data, setMission, setStatus, setGroupedEmployees, setDepart, setRetour) {
+  setMission((prev) => (prev ? { ...prev, ...data, status: data.status || prev.status } : data))
+  setStatus(data.status || 'À faire')
+  setGroupedEmployees(buildGroupedEmployeesDisplay(data))
+  syncMileage(setDepart, setRetour, data)
+}
+
+function applyMissionPoll(data, setMission, setStatus, setGroupedEmployees, setDepart, setRetour, mileageEditingRef) {
+  const nextStatus = data?.status || 'À faire'
+  setMission((prev) => (prev ? { ...prev, ...data, status: nextStatus } : data))
+  setStatus((prev) => (prev !== nextStatus ? nextStatus : prev))
+  setGroupedEmployees(buildGroupedEmployeesDisplay(data))
+  if (!mileageEditingRef.current) syncMileage(setDepart, setRetour, data)
 }

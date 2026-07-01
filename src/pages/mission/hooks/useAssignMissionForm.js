@@ -155,9 +155,7 @@ export function useAssignMissionForm({ interventionsList, employeeList, navigate
 
       for (const employee of selectedEmployeeObjs) {
         const payloadDescription = cleanedDescription ||
-          (missionType === 'Intervention' && selectedIntervention?.request
-            ? String(selectedIntervention.request).trim()
-            : `Mission ${missionType}${formData.interventionId ? ` — ${formData.interventionId}` : ''}`)
+          buildFallbackDescription(missionType, selectedIntervention, formData.interventionId)
 
         const selectedVehicleId = vehicleId ? Number(vehicleId) : null
         const payload = {
@@ -215,6 +213,14 @@ export function useAssignMissionForm({ interventionsList, employeeList, navigate
 }
 
 // ─── Pure helpers (extracted to reduce CC) ────────────────────────────────────
+
+function buildFallbackDescription(missionType, selectedIntervention, interventionId) {
+  if (missionType === 'Intervention' && selectedIntervention?.request) {
+    return String(selectedIntervention.request).trim()
+  }
+  const suffix = interventionId ? ` — ${interventionId}` : ''
+  return `Mission ${missionType}${suffix}`
+}
 
 function validateSubmission({ selectedEmployeeObjs, missionType, formData, vehicleId }) {
   if (selectedEmployeeObjs.length === 0) return 'Veuillez sélectionner au moins un technicien valide.'

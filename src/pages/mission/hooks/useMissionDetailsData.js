@@ -108,7 +108,12 @@ export function useMissionDetailsData(id) {
     const missionId = mission?.id
     const interventionId = mission?.interventionId
     if (!missionId) return
-    const refresh = () => refreshMission({ id: missionId, interventionId }, setMission, setStatus, setGroupedEmployeesDisplay, setVehicleKilometrageDepart, setVehicleKilometrageRetour, setIntervention, mileageEditingRef)
+    const refresh = () => refreshMission({
+      missionRef: { id: missionId, interventionId },
+      setMission, setStatus, setGroupedEmployeesDisplay,
+      setDepart: setVehicleKilometrageDepart, setRetour: setVehicleKilometrageRetour,
+      setIntervention, mileageEditingRef,
+    })
     const onFocus = () => refresh()
     window.addEventListener('focus', onFocus)
     refreshTimerRef.current = window.setInterval(refresh, 5000)
@@ -132,7 +137,7 @@ export function useMissionDetailsData(id) {
 
 // ─── Background refresh helper ────────────────────────────────────────────────
 
-async function refreshMission(missionRef, setMission, setStatus, setGroupedEmployeesDisplay, setDepart, setRetour, setIntervention, mileageEditingRef) {
+async function refreshMission({ missionRef, setMission, setStatus, setGroupedEmployeesDisplay, setDepart, setRetour, setIntervention, mileageEditingRef }) {
   try {
     const missionRes = await apiFetch(`/missions/${missionRef.id}`, { auth: true, cache: 'no-store' })
     if (missionRes.ok) {

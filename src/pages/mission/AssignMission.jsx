@@ -34,6 +34,14 @@ import { getStepTextColor, getStepTitleColor, getStepDescColor } from '../../uti
 import { useAssignMissionData } from './hooks/useAssignMissionData'
 import { useAssignMissionForm } from './hooks/useAssignMissionForm'
 
+// -- Priority config -----------------------------------------------------------
+const priorityConfig = {
+  Critique: { color: 'bg-red-50 border-red-400 text-red-700', dot: 'bg-red-500', label: 'Critique' },
+  Haute: { color: 'bg-orange-50 border-orange-400 text-orange-700', dot: 'bg-orange-500', label: 'Haute' },
+  Moyenne: { color: 'bg-blue-50 border-blue-400 text-blue-700', dot: 'bg-blue-500', label: 'Moyenne' },
+  Basse: { color: 'bg-slate-50 border-slate-300 text-slate-600', dot: 'bg-slate-400', label: 'Basse' },
+}
+
 // -- Steps definition ----------------------------------------------------------
 const steps = [
   { id: 1, title: 'Type',        description: 'Nature de la mission', icon: Target },

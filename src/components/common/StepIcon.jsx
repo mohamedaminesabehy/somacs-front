@@ -39,10 +39,12 @@ export default function StepIcon({ icon, isActive, isCompleted, size = 'sm' }) {
   const stateClass = STATE_CLASSES[size][stateKey]
   const strokeClass = isActive ? 'stroke-[3px]' : 'stroke-[2px]'
 
+  const checkStrokeWidth = size === 'lg' ? 4 : 3
+
   return (
     <div className={`${cfg.container} flex items-center justify-center shrink-0 ${cfg.transition} ${stateClass}`}>
       {isCompleted
-        ? <Check size={cfg.check} strokeWidth={size === 'lg' ? 4 : 3} />
+        ? <Check size={cfg.check} strokeWidth={checkStrokeWidth} />
         : <IconComponent size={cfg.icon} className={strokeClass} />
       }
     </div>
