@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../api/apiClient'
-import { fetchDevisSuiviStatuses } from '../../api/devisSuiviApi'
 import { StatusBadge } from '../../components/devis/DevisSuiviBadges'
 import { formatCurrency } from '../../utils/format'
 import { formatDateTime as formatDate, todayInputDate } from '../../utils/date'
+import { useDevisListData } from './hooks/useDevisListData'
 import {
   Search, Plus, Eye, Trash2, FileText,
   Calendar, RefreshCw, AlertTriangle,
@@ -74,23 +74,55 @@ function KpiCard({ label, value, sub, color = 'slate', icon: Icon }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 const DevisList = () => {
-  const [devis, setDevis] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const navigate = useNavigate()
+
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [sortOrder, setSortOrder] = useState('desc')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
-  const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, totalPages: 0, validated: 0, cancelled: 0 })
-  // Map of { [numeroDevis]: crmStatus } for the current page
-  const [suiviStatuses, setSuiviStatuses] = useState({})
-  const navigate = useNavigate()
 
-  // Delete confirmation state
-  const [deleteTarget, setDeleteTarget] = useState(null) // NUMERO du devis à supprimer
-  const [deleting, setDeleting] = useState(false)
-  const [deleteSuccess, setDeleteSuccess] = useState(null)
+  const {
+    devis, setDevis, loading, error,
+    pagination, setPagination, suiviStatuses,
+    deleteTarget, setDeleteTarget, deleting, deleteSuccess,
+    handleDeleteConfirm, fetchDevis,
+  } = useDevisListData({ debouncedSearch, dateFrom, dateTo })
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm)
+      setPagination((prev) => ({ ...prev, page: 1 }))
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [searchTerm, setPagination])
+
+  // Reset to page 1 when date range changes
+  useEffect(() => {
+    setPagination((prev) => (prev.page === 1 ? prev : { ...prev, page: 1 }))
+  }, [dateFrom, dateTo, setPagination])
+
+  const handleToday = () => {
+    const today = todayInputDate()
+    setDateFrom(today)
+    setDateTo(today)
+  }
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= pagination.totalPages) {
+      setPagination((prev) => ({ ...prev, page: newPage }))
+    }
+  }
+
+  const handleSort = () => {
+    const newOrder = sortOrder === 'asc' ? 'desc' : 'asc'
+    setSortOrder(newOrder)
+    setDevis((prev) => [...prev].sort((a, b) => {
+      const da = new Date(a.DATDOC), db = new Date(b.DATDOC)
+      return newOrder === 'asc' ? da - db : db - da
+    }))
+  }
 
   // Export Excel modal state
   const [exportModalOpen, setExportModalOpen] = useState(false)
@@ -99,174 +131,6 @@ const DevisList = () => {
   const [exportLoading, setExportLoading] = useState(false)
   const [exportError, setExportError] = useState('')
   const [exportSuccess, setExportSuccess] = useState('')
-
-  // Refs pour gérer les requêtes concurrentes / annulations propres
-  const fetchAbortRef = useRef(null)
-  const suiviAbortRef = useRef(null)
-  const isMountedRef = useRef(true)
-
-  useEffect(() => {
-    isMountedRef.current = true
-    return () => {
-      isMountedRef.current = false
-      // Annule toutes les requêtes en vol au démontage
-      try { fetchAbortRef.current?.abort() } catch {
-        // Abort cleanup is best-effort during unmount.
-      }
-      try { suiviAbortRef.current?.abort() } catch {
-        // Abort cleanup is best-effort during unmount.
-      }
-    }
-  }, [])
-
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchTerm)
-      setPagination(prev => ({ ...prev, page: 1 }))
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [searchTerm])
-
-  // Tout changement de période ramène à la première page
-  useEffect(() => {
-    setPagination(prev => (prev.page === 1 ? prev : { ...prev, page: 1 }))
-  }, [dateFrom, dateTo])
-
-  // After loading a page of devis, fetch their CRM statuses in one batch call
-  const loadSuiviStatuses = useCallback(async (rows) => {
-    // Annule un précédent batch encore en vol
-    try { suiviAbortRef.current?.abort() } catch {
-      // Previous status request may already be closed.
-    }
-    if (!rows?.length) {
-      if (isMountedRef.current) setSuiviStatuses({})
-      return
-    }
-    const numeros = rows.map(r => r.NUMERO).filter(Boolean)
-    const controller = new AbortController()
-    suiviAbortRef.current = controller
-    try {
-      const map = await fetchDevisSuiviStatuses(numeros, controller.signal)
-      if (!isMountedRef.current || controller.signal.aborted) return
-      setSuiviStatuses(map || {})
-    } catch (err) {
-      if (err?.name === 'AbortError') return
-      // Non-blocking — fallback ERP badge
-      if (isMountedRef.current) setSuiviStatuses({})
-    }
-  }, [])
-
-  const fetchDevis = useCallback(async (page) => {
-    // Annule la requête précédente pour éviter les races
-    try { fetchAbortRef.current?.abort() } catch {
-      // Previous list request may already be closed.
-    }
-    const controller = new AbortController()
-    fetchAbortRef.current = controller
-
-    if (isMountedRef.current) { setLoading(true); setError(null) }
-    try {
-      const query = new URLSearchParams({ page: String(page), limit: String(pagination.limit) })
-      if (debouncedSearch) query.append('search', debouncedSearch)
-      if (dateFrom) query.append('dateFrom', dateFrom)
-      if (dateTo) query.append('dateTo', dateTo)
-      const response = await apiFetch(`/devis?${query.toString()}`, {
-        auth: true,
-        signal: controller.signal,
-        timeoutMs: 25_000,
-      })
-      if (!isMountedRef.current || controller.signal.aborted) return
-
-      if (response.ok) {
-        const result = await response.json()
-        if (!isMountedRef.current) return
-        if (result.error) {
-          setError(result.error); setDevis([])
-        } else {
-          setDevis(Array.isArray(result.data) ? result.data : [])
-          setPagination(prev => ({
-            ...prev,
-            total: Number(result.total || 0),
-            totalPages: Number(result.totalPages || 0),
-            validated: Number(result.validated ?? 0),
-            cancelled: Number(result.cancelled ?? 0),
-          }))
-          loadSuiviStatuses(result.data)
-        }
-      } else {
-        const errData = await response.json().catch(() => ({}))
-        if (!isMountedRef.current) return
-        setError(response.status === 401
-          ? (errData.message || 'Session expirée. Veuillez vous reconnecter.')
-          : (errData.message || `Erreur serveur: ${response.status}`))
-        setDevis([])
-      }
-    } catch (err) {
-      if (err?.name === 'AbortError' || err?.name === 'TimeoutError') return
-      if (!isMountedRef.current) return
-      const msg = /timeout/i.test(err?.message || '')
-        ? 'Le serveur met trop de temps à répondre. Réessayez ou affinez votre recherche.'
-        : 'Impossible de joindre le serveur. Vérifiez votre connexion.'
-      setError(msg)
-      setDevis([])
-    } finally {
-      // GARANTIT que le loader ne reste JAMAIS bloqué
-      if (isMountedRef.current && !controller.signal.aborted) {
-        setLoading(false)
-      }
-    }
-  }, [debouncedSearch, pagination.limit, loadSuiviStatuses, dateFrom, dateTo])
-
-  useEffect(() => {
-    fetchDevis(pagination.page)
-  }, [pagination.page, debouncedSearch, dateFrom, dateTo, fetchDevis])
-
-  const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= pagination.totalPages) {
-      setPagination(prev => ({ ...prev, page: newPage }))
-    }
-  }
-
-  const handleDeleteConfirm = async () => {
-    if (!deleteTarget || deleting) return
-    setDeleting(true)
-    try {
-      const response = await apiFetch(`/devis/${encodeURIComponent(deleteTarget)}`, { method: 'DELETE', auth: true })
-      if (response.ok) {
-        setDevis(prev => prev.filter(d => d.NUMERO !== deleteTarget))
-        setPagination(prev => ({ ...prev, total: Math.max(0, prev.total - 1) }))
-        setDeleteSuccess(`Le devis ${deleteTarget} a été supprimé avec succès.`)
-        setTimeout(() => setDeleteSuccess(null), 4000)
-      } else {
-        const data = await response.json().catch(() => ({}))
-        setError(data.message || 'Erreur lors de la suppression du devis.')
-      }
-    } catch {
-      setError('Impossible de supprimer le devis. Vérifiez votre connexion.')
-    } finally {
-      setDeleting(false)
-      setDeleteTarget(null)
-    }
-  }
-
-  const handleSort = () => {
-    const newOrder = sortOrder === 'asc' ? 'desc' : 'asc'
-    setSortOrder(newOrder)
-    setDevis(prev => [...prev].sort((a, b) => {
-      const da = new Date(a.DATDOC), db = new Date(b.DATDOC)
-      return newOrder === 'asc' ? da - db : db - da
-    }))
-  }
-
-  // Filtre rapide : devis du jour (début = fin = aujourd'hui)
-  const handleToday = () => {
-    const today = todayInputDate() // yyyy-MM-dd local
-    setDateFrom(today)
-    setDateTo(today)
-  }
-
-  // Repli page courante (utilisé seulement si le backend ne renvoie aucun compteur).
   // Même logique métier que le backend : CRM PURCHASED = validé, sinon ETATDOC ERP ;
   // CRM REFUSED/EXPIRED = annulé, sinon IsAnnuler.
   const isValidatedDoc = (i) => {

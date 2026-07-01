@@ -50,6 +50,34 @@ const sections = [
   { id: 4, title: 'Clôture', description: 'Signatures & Validation', icon: ClipboardCheck },
 ]
 
+function NavigationLeftButtons({ activeSection, setActiveSection, setShowMobilePreview }) {
+  return (
+    <div className="flex items-center gap-3 w-full sm:w-auto">
+      <button
+        type="button"
+        onClick={() => setActiveSection(prev => Math.max(prev - 1, 1))}
+        disabled={activeSection === 1}
+        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider transition-all ${
+          activeSection === 1
+            ? 'text-slate-300 cursor-not-allowed'
+            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:scale-95 shadow-sm hover:shadow-md border border-slate-200 sm:border-none'
+        }`}
+      >
+        <ChevronLeft size={18} />
+        <span className="sm:inline">Précédent</span>
+      </button>
+
+      <button
+        onClick={() => setShowMobilePreview(true)}
+        className="xl:hidden flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl font-bold text-xs uppercase tracking-wider transition-all active:scale-95"
+      >
+        <Eye size={18} />
+        Aperçu
+      </button>
+    </div>
+  )
+}
+
 // ── Shared fiche content (identical layout for both desktop preview and mobile modal) ──
 
 export default function InterventionDetails() {
@@ -513,29 +541,7 @@ export default function InterventionDetails() {
               {isEmployeeHistoryEditFlow && activeSection === sections.length ? (
                 <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t-2 border-slate-200 flex flex-col gap-3 shrink-0">
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 w-full sm:w-auto">
-                      <button
-                        type="button"
-                        onClick={() => setActiveSection(prev => Math.max(prev - 1, 1))}
-                        disabled={activeSection === 1}
-                        className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider transition-all ${
-                          activeSection === 1 
-                            ? 'text-slate-300 cursor-not-allowed' 
-                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:scale-95 shadow-sm hover:shadow-md border border-slate-200 sm:border-none'
-                        }`}
-                      >
-                        <ChevronLeft size={18} />
-                        <span className="sm:inline">Précédent</span>
-                      </button>
-
-                      <button
-                        onClick={() => setShowMobilePreview(true)}
-                        className="xl:hidden flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl font-bold text-xs uppercase tracking-wider transition-all active:scale-95"
-                      >
-                        <Eye size={18} />
-                        Aperçu
-                      </button>
-                    </div>
+                    <NavigationLeftButtons activeSection={activeSection} setActiveSection={setActiveSection} setShowMobilePreview={setShowMobilePreview} />
                   </div>
 
                   <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-3 pt-1">
@@ -561,28 +567,8 @@ export default function InterventionDetails() {
                 </div>
               ) : (
                 <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t-2 border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
-                  <div className="flex items-center gap-3 w-full sm:w-auto order-2 sm:order-1">
-                    <button
-                      type="button"
-                      onClick={() => setActiveSection(prev => Math.max(prev - 1, 1))}
-                      disabled={activeSection === 1}
-                      className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider transition-all ${
-                        activeSection === 1 
-                          ? 'text-slate-300 cursor-not-allowed' 
-                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:scale-95 shadow-sm hover:shadow-md border border-slate-200 sm:border-none'
-                      }`}
-                    >
-                      <ChevronLeft size={18} />
-                      <span className="sm:inline">Précédent</span>
-                    </button>
-
-                    <button
-                      onClick={() => setShowMobilePreview(true)}
-                      className="xl:hidden flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl font-bold text-xs uppercase tracking-wider transition-all active:scale-95"
-                    >
-                      <Eye size={18} />
-                      Aperçu
-                    </button>
+                  <div className="order-2 sm:order-1">
+                    <NavigationLeftButtons activeSection={activeSection} setActiveSection={setActiveSection} setShowMobilePreview={setShowMobilePreview} />
                   </div>
                   
                   {activeSection < sections.length ? (

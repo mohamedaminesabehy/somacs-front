@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Activity,
@@ -19,9 +19,8 @@ import {
   Wrench,
   X,
 } from 'lucide-react'
-import { apiFetch } from '../../api/apiClient'
-import { fetchDevisTotals } from '../../api/devisSuiviApi'
 import { isSameMonthYear, parseDateLike, relativeDateLabel } from '../../utils/date'
+import { useOperationsDashboardData } from './hooks/useOperationsDashboardData'
 
 /* -------------------------------------------------------------------------- */
 /*  Constants                                                                 */
@@ -354,64 +353,10 @@ export default function OperationsDashboard({ currentUser }) {
   const [monthPickerOpen, setMonthPickerOpen] = useState(false)
   const [draftMonth, setDraftMonth] = useState(() => new Date().getMonth())
   const [draftYear, setDraftYear] = useState(() => new Date().getFullYear())
-  const [isLoading, setIsLoading] = useState(true)
   const [currentActivityPage, setCurrentActivityPage] = useState(1)
-  const [users, setUsers] = useState([])
-  const [missions, setMissions] = useState([])
-  const [interventions, setInterventions] = useState([])
-  const [machines, setMachines] = useState([])
-  const [devis, setDevis] = useState([])
-  const [devisTotals, setDevisTotals] = useState({ total: 0, valides: 0, enAttente: 0, nonValides: 0 })
 
-  useEffect(() => {
-    let cancelled = false
-    const loadAll = async () => {
-      setIsLoading(true)
-      const [usersRes, missionsRes, interventionsRes, machinesRes, devisRes] = await Promise.allSettled([
-        apiFetch('/users', { auth: true }),
-        apiFetch('/missions', { auth: true }),
-        apiFetch('/interventions/summary', { auth: true }),
-        apiFetch('/machines/summary', { auth: true }),
-        apiFetch('/devis?page=1&limit=200', { auth: true }),
-      ])
-      if (cancelled) return
-      const readArray = async (result, isPaginated = false) => {
-        if (result.status !== 'fulfilled') return []
-        const response = result.value
-        if (!response?.ok) return []
-        try {
-          const payload = await response.json()
-          if (isPaginated) return Array.isArray(payload?.data) ? payload.data : []
-          return Array.isArray(payload) ? payload : []
-        } catch { return [] }
-      }
-      const [nextUsers, nextMissions, nextInterventions, nextMachines, nextDevis] = await Promise.all([
-        readArray(usersRes),
-        readArray(missionsRes),
-        readArray(interventionsRes),
-        readArray(machinesRes),
-        readArray(devisRes, true),
-      ])
-      if (cancelled) return
-      setUsers(nextUsers)
-      setMissions(nextMissions)
-      setInterventions(nextInterventions)
-      setMachines(nextMachines)
-      setDevis(nextDevis)
-      setIsLoading(false)
-    }
-    loadAll()
-    return () => { cancelled = true }
-  }, [])
-
-  // Recharge les totaux devis à chaque changement de mois/année
-  useEffect(() => {
-    let cancelled = false
-    fetchDevisTotals(selectedMonth + 1, selectedYear)
-      .then(data => { if (!cancelled) setDevisTotals(data) })
-      .catch(() => { /* non bloquant */ })
-    return () => { cancelled = true }
-  }, [selectedMonth, selectedYear])
+  const { isLoading, users, missions, interventions, machines, devis, devisTotals } =
+    useOperationsDashboardData({ selectedMonth, selectedYear })
 
   const yearOptions = useMemo(() => {
     const years = new Set()

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Plus, Search,
@@ -7,7 +7,8 @@ import {
   X, TrendingUp,
 } from 'lucide-react'
 import MissionTable from '../../components/mission/MissionTable'
-import { apiFetch } from '../../api/apiClient'
+import { useListMissionData } from './hooks/useListMissionData'
+import { useMissionGrouping } from './hooks/useMissionGrouping'
 
 const accentMap = {
   blue:    { bg: 'bg-blue-50',    border: 'border-blue-100',    icon: 'bg-blue-100 text-blue-600',     value: 'text-blue-700',    delta: 'text-blue-500',    bar: 'bg-blue-500'    },
@@ -81,14 +82,15 @@ export default function ListMission() {
   const navigate = useNavigate()
   const location = useLocation()
   const tableRef = useRef(null)
-  const toastTimerRef = useRef(null)
-  const highlightTimerRef = useRef(null)
 
-  const [missions, setMissions] = useState([])
-  const [toast, setToast] = useState({ open: false, message: '' })
-  const [deleteDialog, setDeleteDialog] = useState({ open: false, mission: null, isDeleting: false })
-  const [highlightMissionId, setHighlightMissionId] = useState('')
-  const [highlightGroupId, setHighlightGroupId] = useState('')
+  const {
+    missions, refreshMissions,
+    toast, dismissToast,
+    deleteDialog, setDeleteDialog, handleDeleteMission,
+    highlightMissionId, highlightGroupId,
+  } = useListMissionData({ location, navigate })
+
+  const { groupedMissionRows } = useMissionGrouping(missions)
 
   const [search, setSearch]                 = useState('')
   const [filterEmployee, setFilterEmployee] = useState('all')
@@ -100,193 +102,6 @@ export default function ListMission() {
   const [endDate, setEndDate]               = useState('')
   const [activeTab, setActiveTab]           = useState('all')
 
-  const missionsWithGroupedEmployees = useMemo(() => {
-    // Build a local name map from the current list as a fallback only.
-    // The server already decorates each mission with `employeeDisplay` and
-    // `groupedEmployees` by querying ALL missions in the group (even those
-    // not visible to the current user). Prefer those server-side values so
-    // that technician names are never lost when a user only sees a subset.
-    const namesByGroup = new Map()
-
-    for (const mission of missions) {
-      const groupId = mission?.assignmentGroupId
-      // Collect names from server-provided groupedEmployees first
-      const serverNames = Array.isArray(mission?.groupedEmployees)
-        ? mission.groupedEmployees.map((n) => String(n || '').trim()).filter(Boolean)
-        : []
-      const employeeName = String(mission?.employee || '').trim()
-      const allNames = serverNames.length > 0 ? serverNames : (employeeName ? [employeeName] : [])
-      if (!groupId || allNames.length === 0) continue
-      if (!namesByGroup.has(groupId)) {
-        namesByGroup.set(groupId, new Set())
-      }
-      allNames.forEach((n) => namesByGroup.get(groupId).add(n))
-    }
-
-    return missions.map((mission) => {
-      // Use server-provided employeeDisplay if it is non-empty
-      if (mission?.employeeDisplay && String(mission.employeeDisplay).trim()) {
-        return mission
-      }
-      const groupId = mission?.assignmentGroupId
-      if (!groupId || !namesByGroup.has(groupId)) {
-        return { ...mission, employeeDisplay: mission?.employee || '' }
-      }
-      const names = Array.from(namesByGroup.get(groupId))
-      return {
-        ...mission,
-        employeeDisplay: names.join(', '),
-      }
-    })
-  }, [missions])
-
-  const groupedMissionRows = useMemo(() => {
-    const firstByGroup = new Map()
-    const entriesByGroup = new Map()
-    const standalone = []
-
-    for (const mission of missionsWithGroupedEmployees) {
-      const groupId = String(mission?.assignmentGroupId || '').trim()
-      if (!groupId) {
-        standalone.push(mission)
-        continue
-      }
-      if (!entriesByGroup.has(groupId)) {
-        entriesByGroup.set(groupId, [])
-      }
-      const groupEntries = entriesByGroup.get(groupId)
-      const employeeName = String(mission?.employee || '').trim()
-      if (employeeName) {
-        groupEntries.push({
-          missionId: mission.id,
-          employeeName,
-          employeeUserId: mission.employeeUserId,
-          status: mission.status,
-          notes: mission.notes,
-        })
-      }
-      if (!firstByGroup.has(groupId)) {
-        firstByGroup.set(groupId, mission)
-      }
-    }
-
-    const groupedRows = Array.from(firstByGroup.entries()).map(([groupId, mission]) => {
-      const rawEntries = entriesByGroup.get(groupId) || []
-      const uniq = new Map()
-      for (const row of rawEntries) {
-        const key = `${row.employeeUserId || ''}_${row.employeeName}`
-        if (!uniq.has(key)) {
-          uniq.set(key, row)
-        }
-      }
-      return {
-        ...mission,
-        groupedEmployeeStatuses: Array.from(uniq.values()),
-      }
-    })
-
-    return [...standalone, ...groupedRows]
-      .sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0))
-  }, [missionsWithGroupedEmployees])
-
-  const showToast = (message, durationMs = 3000) => {
-    if (toastTimerRef.current) {
-      window.clearTimeout(toastTimerRef.current)
-      toastTimerRef.current = null
-    }
-    setToast({ open: true, message })
-    toastTimerRef.current = window.setTimeout(() => {
-      setToast({ open: false, message: '' })
-      toastTimerRef.current = null
-    }, durationMs)
-  }
-
-  const refreshMissions = async () => {
-    try {
-        const response = await apiFetch('/missions', { auth: true })
-      if (!response.ok) return
-      const data = await response.json()
-      setMissions(Array.isArray(data) ? data : [])
-    } catch (error) {
-      console.error('Error fetching missions:', error)
-    }
-  }
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const t = window.setTimeout(() => {
-      refreshMissions()
-    }, 0)
-    return () => window.clearTimeout(t)
-  }, [])
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search || '')
-    const toastKey = params.get('toast') || location.state?.toast || ''
-    const highlight = params.get('highlight') || location.state?.highlight || ''
-    const highlightGroup = params.get('highlightGroup') || location.state?.highlightGroup || ''
-    if (!toastKey && !highlight && !highlightGroup) return
-
-    if (toastTimerRef.current) {
-      window.clearTimeout(toastTimerRef.current)
-      toastTimerRef.current = null
-    }
-    if (highlightTimerRef.current) {
-      window.clearTimeout(highlightTimerRef.current)
-      highlightTimerRef.current = null
-    }
-
-    if (toastKey === 'assigned') {
-      window.setTimeout(() => {
-        setToast({ open: true, message: 'Nouvelle mission affectée avec succès.' })
-        toastTimerRef.current = window.setTimeout(() => {
-          setToast({ open: false, message: '' })
-          toastTimerRef.current = null
-        }, 3000)
-      }, 0)
-    }
-
-    if (highlight || highlightGroup) {
-      window.setTimeout(() => {
-        setHighlightMissionId(String(highlight || ''))
-        setHighlightGroupId(String(highlightGroup || ''))
-        highlightTimerRef.current = window.setTimeout(() => {
-          setHighlightMissionId('')
-          setHighlightGroupId('')
-          highlightTimerRef.current = null
-        }, 1800)
-      }, 0)
-    }
-
-    if (location.search || location.state?.toast || location.state?.highlight || location.state?.highlightGroup) {
-      navigate({ pathname: location.pathname, search: '' }, { replace: true, state: {} })
-    }
-
-    return () => {
-      if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
-      toastTimerRef.current = null
-      if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current)
-      highlightTimerRef.current = null
-    }
-  }, [location.pathname, location.search, location.state, navigate])
-
-  useEffect(() => {
-    const msg = typeof window !== 'undefined' ? window.sessionStorage.getItem('missions_bg_toast') : ''
-    if (!msg) return
-    if (typeof window !== 'undefined') window.sessionStorage.removeItem('missions_bg_toast')
-
-    if (toastTimerRef.current) {
-      window.clearTimeout(toastTimerRef.current)
-      toastTimerRef.current = null
-    }
-    window.setTimeout(() => {
-      setToast({ open: true, message: msg })
-      toastTimerRef.current = window.setTimeout(() => {
-        setToast({ open: false, message: '' })
-        toastTimerRef.current = null
-      }, 4000)
-    }, 0)
-  }, [])
 
   const todayKey = useMemo(() => new Date().toISOString().slice(0, 10), [])
 
@@ -564,44 +379,7 @@ export default function ListMission() {
               <button
                 type="button"
                 disabled={deleteDialog.isDeleting || !deleteDialog.mission?.id}
-                onClick={async () => {
-                  const missionId = deleteDialog.mission?.id
-                  if (!missionId || deleteDialog.isDeleting) return
-                  setDeleteDialog((prev) => ({ ...prev, isDeleting: true }))
-                  try {
-                    const missionToDelete = deleteDialog.mission
-                    const groupId = String(missionToDelete?.assignmentGroupId || '').trim()
-
-                    if (groupId) {
-                      const groupedIds = missions
-                        .filter((m) => String(m?.assignmentGroupId || '').trim() === groupId)
-                        .map((m) => m.id)
-                      const results = await Promise.all(
-                        groupedIds.map((rowId) => apiFetch(`/missions/${rowId}`, { method: 'DELETE', auth: true })),
-                      )
-                      const allDeleted = results.every((res) => res.ok)
-                      if (allDeleted) {
-                        await refreshMissions()
-                        setDeleteDialog({ open: false, mission: null, isDeleting: false })
-                        showToast('Mission de groupe supprimée avec succès.', 3500)
-                        return
-                      }
-                    } else {
-                      const response = await apiFetch(`/missions/${missionId}`, { method: 'DELETE', auth: true })
-                      if (response.ok) {
-                        await refreshMissions()
-                        setDeleteDialog({ open: false, mission: null, isDeleting: false })
-                        showToast('Mission supprimée avec succès.', 3500)
-                        return
-                      }
-                    }
-                    setDeleteDialog((prev) => ({ ...prev, isDeleting: false }))
-                    showToast('Échec de la suppression de la mission.', 4000)
-                  } catch {
-                    setDeleteDialog((prev) => ({ ...prev, isDeleting: false }))
-                    showToast('Erreur lors de la suppression de la mission.', 4000)
-                  }
-                }}
+                onClick={handleDeleteMission}
                 className={`px-4 py-2.5 rounded-xl text-sm font-black transition-all active:scale-95 ${
                   deleteDialog.isDeleting
                     ? 'bg-red-400 text-white cursor-not-allowed'
@@ -634,13 +412,7 @@ export default function ListMission() {
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  if (toastTimerRef.current) {
-                    window.clearTimeout(toastTimerRef.current)
-                    toastTimerRef.current = null
-                  }
-                  setToast({ open: false, message: '' })
-                }}
+                onClick={dismissToast}
                 className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-colors"
                 aria-label="Fermer"
               >

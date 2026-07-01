@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react'
+﻿import React from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   ChevronRight,
@@ -27,24 +27,12 @@ import {
   Loader2,
   Truck,
 } from 'lucide-react'
-import { apiFetch } from '../../api/apiClient'
 import {
   INTERVENTION_STATUS_BADGE as statusColors,
 } from '../../utils/intervention'
 import { getStepTextColor, getStepTitleColor, getStepDescColor } from '../../utils/stepStyles'
 import { useAssignMissionData } from './hooks/useAssignMissionData'
-
-const createSafeRandomId = () => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID().replace(/-/g, '')
-  }
-  return String(Date.now())
-}
-
-function createAssignmentGroupId(employeeCount) {
-  if (employeeCount <= 1) return null
-  return `AG-${Date.now()}-${createSafeRandomId().slice(0, 8)}`
-}
+import { useAssignMissionForm } from './hooks/useAssignMissionForm'
 
 // -- Steps definition ----------------------------------------------------------
 const steps = [
@@ -81,328 +69,21 @@ function getEmployeeActivityTextColor(active) {
 export default function AssignMission() {
   const navigate = useNavigate()
   const location = useLocation()
-  const [currentStep, setCurrentStep] = useState(1)
-  const [attachments, setAttachments] = useState([])
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const isMountedRef = useRef(true)
+  const prefillInterventionId = location.state?.prefillInterventionId || ''
 
   const { interventionsList, employeeList, availableVehicles, availableVehiclesLoading } = useAssignMissionData()
 
-  // Step 1 — Type
-  const [missionType, setMissionType] = useState('') // 'Normal' | 'Intervention'
+  const form = useAssignMissionForm({ interventionsList, employeeList, navigate, prefillInterventionId })
 
-  // Step 2 � Details
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    site: '',
-    address: '',
-    interventionId: '',
-  })
-
-  // Step 3 � Affectation
-  const [selectedEmployees, setSelectedEmployees] = useState([])
-  const [showMaxEmployeesPopup, setShowMaxEmployeesPopup] = useState(false)
-  const [priority, setPriority] = useState('Moyenne')
-  const [dueDate, setDueDate] = useState('')
-  const [dueTime, setDueTime] = useState('')
-  const [vehicleId, setVehicleId] = useState('')
-  const siteManuallyEditedRef = useRef(false)
-
-  const handleChange = (e) => {
-    const { name, value } = e.target
-    if (name === 'site') {
-      siteManuallyEditedRef.current = true
-    }
-    if (name === 'interventionId') {
-      siteManuallyEditedRef.current = false
-    }
-    setFormData((prev) => ({ ...prev, [name]: value }))
-  }
-
-  const linkableInterventions = useMemo(
-    () => interventionsList.filter((i) => i.status === 'PENDING' && !String(i.assignedTo || '').trim()),
-    [interventionsList],
-  )
-
-  const selectedIntervention = linkableInterventions.find(
-    (i) => i.id === formData.interventionId
-  )
-  const selectedEmployeeObjs = employeeList.filter((e) => selectedEmployees.includes(e.name))
-  const prefillDoneRef = useRef(false)
-  const prefillInterventionId = location.state?.prefillInterventionId || ''
-  const fileInputRef = useRef(null)
-
-  useEffect(() => {
-    return () => {
-      isMountedRef.current = false
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!showMaxEmployeesPopup) return
-    const timer = setTimeout(() => setShowMaxEmployeesPopup(false), 2200)
-    return () => clearTimeout(timer)
-  }, [showMaxEmployeesPopup])
-
-  useEffect(() => {
-    if (prefillDoneRef.current) return
-    if (!prefillInterventionId) return
-
-    prefillDoneRef.current = true
-    setMissionType('Intervention')
-    setCurrentStep(2)
-    setFormData((prev) => ({
-      ...prev,
-      interventionId: prefillInterventionId,
-      title: prev.title || `Intervention SAV � ${prefillInterventionId}`,
-      description: '',
-    }))
-  }, [prefillInterventionId])
-
-  useEffect(() => {
-    if (missionType !== 'Intervention') return
-    siteManuallyEditedRef.current = false
-  }, [missionType])
-
-  useEffect(() => {
-    if (missionType !== 'Intervention') return
-    if (!selectedIntervention) return
-    setFormData((prev) => ({
-      ...prev,
-      site: siteManuallyEditedRef.current
-        ? prev.site
-        : (String(selectedIntervention.site || '').trim() ? selectedIntervention.site : prev.site),
-      address: String(prev.address || '').trim() ? prev.address : (selectedIntervention.address || ''),
-    }))
-  }, [missionType, selectedIntervention])
-
-  const canGoNext = () => {
-    if (currentStep === 1) return missionType !== ''
-    if (currentStep === 2) {
-      if (missionType === 'Normal') return formData.title.trim() !== '' && formData.description.trim() !== ''
-      if (missionType === 'Intervention') return formData.interventionId !== '' && formData.title.trim() !== ''
-    }
-    if (currentStep === 3) return selectedEmployees.length > 0 && dueDate !== ''
-    return true
-  }
-
-  const toggleEmployeeSelection = (employeeName) => {
-    setSelectedEmployees((prev) => {
-      if (prev.includes(employeeName)) {
-        return prev.filter((name) => name !== employeeName)
-      }
-      if (prev.length >= 3) {
-        setShowMaxEmployeesPopup(true)
-        return prev
-      }
-      return [...prev, employeeName]
-    })
-  }
-
-  const nextStep = () => {
-    if (canGoNext()) setCurrentStep((prev) => Math.min(prev + 1, steps.length))
-  }
-  const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 1))
-
-  const handlePickFiles = (e) => {
-    const files = Array.from(e.target.files || [])
-    if (files.length === 0) return
-
-    const maxBytes = 10 * 1024 * 1024
-    const allowed = files.filter((f) => f.size <= maxBytes)
-    if (allowed.length !== files.length) {
-      alert('Certains fichiers d�passent 10MB et ont �t� ignor�s.')
-    }
-    setAttachments((prev) => {
-      const next = [...prev, ...allowed].slice(0, 10)
-      const uniq = new Map()
-      for (const f of next) {
-        const key = `${f.name}_${f.size}_${f.lastModified}`
-        if (!uniq.has(key)) uniq.set(key, f)
-      }
-      return Array.from(uniq.values())
-    })
-    e.target.value = ''
-  }
-
-  const removeAttachment = (file) => {
-    setAttachments((prev) =>
-      prev.filter(
-        (f) => !(f.name === file.name && f.size === file.size && f.lastModified === file.lastModified),
-      ),
-    )
-  }
-
-  const openFilePicker = () => {
-    const el = fileInputRef.current
-    if (!el) return
-    el.value = ''
-    el.click()
-  }
-
-  const handleSubmit = async () => {
-    if (isSubmitting) return
-    const selectedNames = selectedEmployees
-    try {
-      setIsSubmitting(true)
-      if (selectedEmployeeObjs.length === 0) {
-        alert('Veuillez s�lectionner au moins un technicien valide.')
-        if (isMountedRef.current) setIsSubmitting(false)
-        return
-      }
-
-      const cleanedTitle = String(formData.title || '').trim()
-      const cleanedDescription = String(formData.description || '').trim()
-      const cleanedMissionType = String(missionType || '').trim()
-
-      if (!cleanedMissionType) {
-        alert('Veuillez s�lectionner un type de mission.')
-        if (isMountedRef.current) setIsSubmitting(false)
-        return
-      }
-
-      if (!cleanedTitle) {
-        alert('Le titre de la mission est requis.')
-        if (isMountedRef.current) setIsSubmitting(false)
-        return
-      }
-
-      if (!cleanedDescription && cleanedMissionType !== 'Intervention') {
-        alert('La description de la mission est requise.')
-        if (isMountedRef.current) setIsSubmitting(false)
-        return
-      }
-
-      if (selectedEmployeeObjs.length > 1 && vehicleId) {
-        alert('Un v�hicule ne peut pas �tre affect� � plusieurs missions actives en m�me temps. Retirez le v�hicule ou affectez un seul technicien.')
-        if (isMountedRef.current) setIsSubmitting(false)
-        return
-      }
-
-      const createdMissions = []
-      const assignmentGroupId = createAssignmentGroupId(selectedEmployeeObjs.length)
-      for (const employee of selectedEmployeeObjs) {
-        // backend requires non-empty description; for interventions, default to the
-        // intervention request if user didn't enter a description to avoid 400.
-        const payloadDescription = cleanedDescription ||
-          (missionType === 'Intervention' && selectedIntervention?.request
-            ? String(selectedIntervention.request).trim()
-            : `Mission ${missionType}${formData.interventionId ? ` � ${formData.interventionId}` : ''}`)
-
-        const selectedVehicleId = vehicleId ? Number(vehicleId) : null
-
-        const payload = {
-          title: cleanedTitle,
-          description: payloadDescription,
-          employee: employee.name,
-          employeeUserId: employee.id,
-          assignmentGroupId,
-          priority,
-          status: '� faire',
-          dueDate: dueDate || "Aujourd'hui",
-          dueTime: dueTime || null,
-          type: missionType,
-          interventionId: missionType === 'Intervention' ? formData.interventionId : null,
-          site: formData.site,
-          address: formData.address,
-          // Ne pas envoyer vehicleId si null pour �viter les probl�mes de transformation DTO
-          ...(selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
-        }
-
-        const response = await apiFetch('/missions', {
-          method: 'POST',
-          body: payload,
-          auth: true,
-        })
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          const message = Array.isArray(errorData?.message)
-            ? errorData.message.join(', ')
-            : errorData?.message || 'Erreur lors de la cr�ation de la mission.'
-          console.error('[AssignMission] POST /missions failed:', response.status, errorData)
-          alert(message)
-          if (isMountedRef.current) setIsSubmitting(false)
-          return
-        }
-        const createdMission = await response.json().catch(() => null)
-        if (createdMission?.id) {
-          createdMissions.push(createdMission)
-        }
-      }
-
-      const highlightMissionId = createdMissions.length > 0 ? String(createdMissions[0]?.id || '') : ''
-      const highlightGroupId = assignmentGroupId ? String(assignmentGroupId) : ''
-      const params = new URLSearchParams()
-      params.set('toast', 'assigned')
-      if (highlightMissionId) params.set('highlight', highlightMissionId)
-      if (highlightGroupId) params.set('highlightGroup', highlightGroupId)
-      navigate(`/missions?${params.toString()}`, {
-        state: { toast: 'assigned', highlight: highlightMissionId, highlightGroup: highlightGroupId },
-      })
-      if (createdMissions.length > 0) {
-        void (async () => {
-          try {
-            if (missionType === 'Intervention' && formData.interventionId) {
-              await apiFetch(`/interventions/${formData.interventionId}`, {
-                method: 'PATCH',
-                body: { status: 'ASSIGNED', assignedTo: selectedNames.join(', ') },
-                auth: true,
-              })
-            }
-
-            if (attachments.length > 0) {
-              for (const mission of createdMissions) {
-                const form = new FormData()
-                for (const file of attachments) {
-                  form.append('files', file)
-                }
-                const uploadRes = await apiFetch(`/missions/${mission.id}/attachments`, {
-                  method: 'POST',
-                  body: form,
-                  auth: true,
-                })
-                if (!uploadRes.ok) {
-                  if (typeof window !== 'undefined') {
-                    window.sessionStorage.setItem(
-                      'missions_bg_toast',
-                      'Missions cr��es, mais erreur lors de l�upload des fichiers.',
-                    )
-                  }
-                  break
-                }
-              }
-            }
-          } catch {
-            if (typeof window !== 'undefined') {
-              window.sessionStorage.setItem(
-                'missions_bg_toast',
-                'Missions cr��es, mais une �tape de finalisation a �chou� (upload / mise � jour).',
-              )
-            }
-          }
-        })()
-      }
-    } catch (error) {
-      console.error('[AssignMission] erreur inattendue:', error)
-      // Distinguer erreur r�seau r�elle vs erreur JS (ex: variable undefined)
-      const isNetworkError = error instanceof TypeError && error.message.toLowerCase().includes('fetch')
-      const msg = isNetworkError
-        ? 'Impossible de joindre le serveur. V�rifiez que le backend est d�marr�.'
-        : `Erreur: ${error?.message || 'Une erreur inattendue est survenue.'}`
-      alert(msg)
-      if (isMountedRef.current) setIsSubmitting(false)
-    }
-  }
-
-  // -- Priority config -------------------------------------------------------
-  const priorityConfig = {
-    Critique: { color: 'bg-red-50 border-red-400 text-red-700',    dot: 'bg-red-500',    label: 'Critique' },
-    Haute:    { color: 'bg-orange-50 border-orange-400 text-orange-700', dot: 'bg-orange-500', label: 'Haute' },
-    Moyenne:  { color: 'bg-blue-50 border-blue-400 text-blue-700', dot: 'bg-blue-500',   label: 'Moyenne' },
-    Basse:    { color: 'bg-slate-50 border-slate-300 text-slate-600', dot: 'bg-slate-400', label: 'Basse' },
-  }
-
+  const {
+    currentStep, missionType, setMissionType, formData, handleChange,
+    selectedEmployees, toggleEmployeeSelection, showMaxEmployeesPopup,
+    priority, setPriority, dueDate, setDueDate, dueTime, setDueTime,
+    vehicleId, setVehicleId, attachments, handlePickFiles, removeAttachment, openFilePicker,
+    fileInputRef, isSubmitting, handleSubmit,
+    linkableInterventions, selectedIntervention, selectedEmployeeObjs,
+    canGoNext, nextStep, prevStep,
+  } = form
   // -- Render step content ---------------------------------------------------
   const renderStep1 = () => (
           <div className="space-y-6 sm:space-y-10 animate-in fade-in zoom-in-95 duration-500">

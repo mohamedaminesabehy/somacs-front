@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   ArrowLeft, CheckCircle2, Clock, Calendar, MapPin,
@@ -9,12 +9,13 @@ import {
   MoreVertical, Paperclip, File, X,
   Download, Eye, Truck
 } from 'lucide-react'
-import { apiFetch } from '../../api/apiClient'
 import {
   MISSION_PRIORITY_CONFIG as PRIORITY_CONFIG,
   MISSION_STATUS_CONFIG as STATUS_CONFIG,
   MISSION_STATUS_STEPS as STATUS_STEPS,
 } from '../../constants/missionConstants'
+import { useMissionDetailsData } from './hooks/useMissionDetailsData'
+import { useMissionStatusActions } from './hooks/useMissionStatusActions'
 
 const ACTIONS_SECTION_ACCENT = {
   'À faire': 'border-blue-200',
@@ -53,32 +54,6 @@ function InfoItem({ label, value, icon, colorClass = "text-slate-500" }) {
   )
 }
 
-function buildGroupedEmployeesDisplay(missionLike) {
-  const primary = String(missionLike?.employee || '').trim()
-  const fromArray = Array.isArray(missionLike?.groupedEmployees)
-    ? missionLike.groupedEmployees.map((name) => String(name || '').trim()).filter(Boolean)
-    : []
-  const fromDisplay = String(missionLike?.employeeDisplay || '')
-    .split(',')
-    .map((name) => name.trim())
-    .filter(Boolean)
-
-  return Array.from(new Set([primary, ...fromArray, ...fromDisplay].filter(Boolean))).join(', ')
-}
-
-function syncVehicleMileageState(setDepart, setRetour, missionLike) {
-  setDepart(
-    typeof missionLike?.vehicleKilometrageDepart === 'number' || typeof missionLike?.vehicleKilometrageDepart === 'string'
-      ? missionLike.vehicleKilometrageDepart
-      : '',
-  )
-  setRetour(
-    typeof missionLike?.vehicleKilometrageRetour === 'number' || typeof missionLike?.vehicleKilometrageRetour === 'string'
-      ? missionLike.vehicleKilometrageRetour
-      : '',
-  )
-}
-
 function downloadDocument(url, filename) {
   const link = document.createElement('a')
   link.href = url
@@ -95,192 +70,57 @@ export default function MissionDetails() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const [mission, setMission] = useState(null)
-  const [intervention, setIntervention] = useState(null)
-  const [isLoadingMission, setIsLoadingMission] = useState(true)
-  const [showInterventionPreview, setShowInterventionPreview] = useState(false)
+  const data = useMissionDetailsData(id)
+  const {
+    mission, setMission, intervention, isLoadingMission,
+    status, setStatus, notes, setNotes,
+    groupedEmployeesDisplay,
+    vehicleKilometrageDepart, setVehicleKilometrageDepart,
+    vehicleKilometrageRetour, setVehicleKilometrageRetour,
+    missionActionError, setMissionActionError,
+    attachments, mileageEditingRef, refreshTimerRef,
+    setGroupedEmployeesDisplay,
+  } = data
 
-  const [status, setStatus] = useState(mission?.status || 'À faire')
-  const [notes, setNotes]   = useState(mission?.notes || '')
-  const [isSaving, setIsSaving] = useState(false)
-  const [showSaveToast, setShowSaveToast] = useState(false)
-  const refreshTimerRef = useRef(null)
-  const statusAnimTimerRef = useRef(null)
-  const [statusJustChangedTo, setStatusJustChangedTo] = useState('')
+  const {
+    isSaving, showSaveToast, statusJustChangedTo, vehicleMileageError,
+    handleStatusChange, handleSave,
+  } = useMissionStatusActions({
+    mission, setMission, status, setStatus, notes,
+    setGroupedEmployeesDisplay, setVehicleKilometrageDepart, setVehicleKilometrageRetour,
+    vehicleKilometrageDepart, vehicleKilometrageRetour,
+    setMissionActionError, refreshTimerRef, mileageEditingRef,
+  })
+
+  const [showInterventionPreview, setShowInterventionPreview] = useState(false)
+  const [docViewer, setDocViewer] = useState({ open: false, url: '', type: '', name: '', isPdf: false, downloadUrl: '', publicId: '' })
+  const [showInterventionClosedSuccess, setShowInterventionClosedSuccess] = useState(false)
+  const [showStatusAttention, setShowStatusAttention] = useState(false)
+  const [statusAttentionText, setStatusAttentionText] = useState('')
   const statusAttentionTimerRef = useRef(null)
   const lastStatusAttentionRef = useRef('')
   const lastInterventionStatusRef = useRef('')
-  const [showStatusAttention, setShowStatusAttention] = useState(false)
-  const [statusAttentionText, setStatusAttentionText] = useState('')
-  const [missionActionError, setMissionActionError] = useState('')
-  const [docViewer, setDocViewer] = useState({ open: false, url: '', type: '', name: '', isPdf: false, downloadUrl: '', publicId: '' })
-  const [groupedEmployeesDisplay, setGroupedEmployeesDisplay] = useState('')
-  const [vehicleKilometrageDepart, setVehicleKilometrageDepart] = useState('')
-  const [vehicleKilometrageRetour, setVehicleKilometrageRetour] = useState('')
-  const [vehicleMileageError, setVehicleMileageError] = useState('')
-  const [showInterventionClosedSuccess, setShowInterventionClosedSuccess] = useState(false)
-  // Track whether the user is actively editing the mileage fields so the
-  // background polling never overwrites what they are typing.
-  const mileageEditingRef = useRef(false)
 
+  // Handle intervention closed success toast from navigation state
   useEffect(() => {
     if (!location.state?.interventionClosedSuccess) return undefined
-
     setShowInterventionClosedSuccess(true)
     navigate(
       { pathname: location.pathname, search: location.search },
-      {
-        replace: true,
-        state: {
-          ...location.state,
-          interventionClosedSuccess: false,
-        },
-      },
+      { replace: true, state: { ...location.state, interventionClosedSuccess: false } },
     )
-
-    const timer = window.setTimeout(() => {
-      setShowInterventionClosedSuccess(false)
-    }, 4500)
-
+    const timer = window.setTimeout(() => setShowInterventionClosedSuccess(false), 4500)
     return () => window.clearTimeout(timer)
   }, [location.pathname, location.search, location.state, navigate])
 
-  const attachments = useMemo(() => {
-    const list = Array.isArray(mission?.attachments) ? mission.attachments : []
-    return list.map((a, idx) => {
-      // Determine if it's an image or PDF/file
-      const isPdf = a.format === 'pdf' || (a.url && a.url.toLowerCase().includes('.pdf'))
-      const isImage = a.resourceType === 'image' && !isPdf
-      
-      // For PDFs, we need to modify the URL
-      let displayUrl = a.url
-      let viewUrl = a.url // URL for viewing in modal (without download flag)
-      let downloadUrl = a.url
-      
-      if (isPdf && a.url) {
-        // Convert PDF URL to display first page as PNG image for preview
-        displayUrl = a.url.replace('/upload/', '/upload/pg_1,f_png/')
-        
-        // For viewing in modal, use original URL without any flags
-        viewUrl = a.url
-        
-        // For download, add fl_attachment flag to force download
-        downloadUrl = a.url.replace('/upload/', '/upload/fl_attachment/')
-      }
-      
-      return {
-        id: a.publicId || String(idx),
-        name: a.originalFilename || a.publicId || `Fichier ${idx + 1}`,
-        type: isImage ? 'image' : 'file',
-        size: typeof a.bytes === 'number' ? `${Math.ceil(a.bytes / 1024)} KB` : '',
-        date: a.createdAt || '',
-        url: a.url,
-        displayUrl: displayUrl, // URL for preview (first page as image for PDFs)
-        viewUrl: viewUrl, // URL for viewing in modal (no download)
-        downloadUrl: downloadUrl, // URL for download
-        publicId: a.publicId || '', // Public ID for signed URL generation
-        isPdf: isPdf,
-      }
-    })
-  }, [mission])
-
-  useEffect(() => {
-    void (async () => {
-      setIsLoadingMission(true)
-      try {
-        const response = await apiFetch(`/missions/${id}`, { auth: true, cache: 'no-store' })
-        if (!response.ok) {
-          if (response.status === 403) {
-            setMissionActionError("Accès refusé : vous n'avez pas la permission (403).")
-          }
-          setMission(null)
-          return
-        }
-        const data = await response.json()
-        setMission(data)
-        setStatus(data?.status || 'À faire')
-        setNotes(data?.notes || '')
-        setGroupedEmployeesDisplay(buildGroupedEmployeesDisplay(data))
-          syncVehicleMileageState(setVehicleKilometrageDepart, setVehicleKilometrageRetour, data)
-      } catch {
-        setMission(null)
-      } finally {
-        setIsLoadingMission(false)
-      }
-    })()
-  }, [id])
-
-  useEffect(() => {
-    if (!mission?.interventionId) {
-      setIntervention(null)
-      return
-    }
-    void (async () => {
-      try {
-        const response = await apiFetch(`/interventions/${mission.interventionId}`, { auth: true })
-        if (!response.ok) return
-        const data = await response.json()
-        setIntervention(data)
-      } catch {
-        // Linked intervention details are optional on this view.
-      }
-    })()
-  }, [mission?.interventionId])
-
-  useEffect(() => {
-    if (!mission?.id) return
-
-    const refresh = async () => {
-      try {
-        const missionRes = await apiFetch(`/missions/${mission.id}`, { auth: true, cache: 'no-store' })
-        if (missionRes.ok) {
-          const data = await missionRes.json()
-          const nextStatus = data?.status || 'À faire'
-          setMission((prev) => (prev ? { ...prev, ...data, status: nextStatus } : data))
-          setStatus((prev) => (prev !== nextStatus ? nextStatus : prev))
-          setGroupedEmployeesDisplay(buildGroupedEmployeesDisplay(data))
-          // Only sync mileage fields from the server if the user is not
-          // currently typing in them — otherwise the poll would erase input.
-          if (!mileageEditingRef.current) {
-            syncVehicleMileageState(setVehicleKilometrageDepart, setVehicleKilometrageRetour, data)
-          }
-        }
-
-        if (mission.interventionId) {
-          const interventionRes = await apiFetch(`/interventions/${mission.interventionId}`, { auth: true, cache: 'no-store' })
-          if (interventionRes.ok) {
-            const iv = await interventionRes.json()
-            setIntervention(iv)
-          }
-        }
-      } catch {
-        // Background refresh is best-effort; keep current mission state.
-      }
-    }
-
-    const onFocus = () => refresh()
-    window.addEventListener('focus', onFocus)
-    refreshTimerRef.current = window.setInterval(refresh, 5000)
-    return () => {
-      window.removeEventListener('focus', onFocus)
-      if (refreshTimerRef.current) window.clearInterval(refreshTimerRef.current)
-      refreshTimerRef.current = null
-      if (statusAnimTimerRef.current) window.clearTimeout(statusAnimTimerRef.current)
-      statusAnimTimerRef.current = null
-      if (statusAttentionTimerRef.current) window.clearTimeout(statusAttentionTimerRef.current)
-      statusAttentionTimerRef.current = null
-    }
-  }, [mission?.id, mission?.interventionId])
-
+  // Status attention notification
   useEffect(() => {
     if (!status) return
     const interventionStatus = intervention?.status || ''
     const interventionChanged = interventionStatus && lastInterventionStatusRef.current !== interventionStatus
     if (interventionChanged) lastInterventionStatusRef.current = interventionStatus
-
     if (!interventionChanged && lastStatusAttentionRef.current === status) return
     lastStatusAttentionRef.current = status
-
     if (statusAttentionTimerRef.current) window.clearTimeout(statusAttentionTimerRef.current)
     setStatusAttentionText(`Statut actuel : ${status}`)
     setShowStatusAttention(true)
@@ -290,6 +130,7 @@ export default function MissionDetails() {
     }, 3500)
   }, [status, intervention?.status])
 
+  // Loading and error states
   if (!mission && !isLoadingMission) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4">
@@ -319,25 +160,12 @@ export default function MissionDetails() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-pulse">
             <div className="lg:col-span-8 space-y-6">
               <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-slate-100" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-3 w-24 bg-slate-100 rounded" />
-                    <div className="h-5 w-2/3 bg-slate-100 rounded" />
-                  </div>
-                </div>
+                <div className="flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-slate-100" /><div className="flex-1 space-y-2"><div className="h-3 w-24 bg-slate-100 rounded" /><div className="h-5 w-2/3 bg-slate-100 rounded" /></div></div>
                 <div className="h-20 bg-slate-50 rounded-xl" />
-                <div className="h-16 bg-slate-50 rounded-xl" />
-              </div>
-              <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {[0, 1, 2, 3].map((i) => <div key={i} className="h-24 bg-slate-50 rounded-xl" />)}
-                </div>
               </div>
             </div>
             <div className="lg:col-span-4 space-y-6">
               <div className="bg-white rounded-2xl border border-slate-200 p-6 h-48" />
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 h-64" />
             </div>
           </div>
         </main>
@@ -347,137 +175,6 @@ export default function MissionDetails() {
 
   const priority   = PRIORITY_CONFIG[mission.priority] || PRIORITY_CONFIG['Moyenne']
   const statusCfg  = STATUS_CONFIG[status] || STATUS_CONFIG['À faire']
-
-  const handleStatusChange = (newStatus) => {
-    if (statusAnimTimerRef.current) {
-      window.clearTimeout(statusAnimTimerRef.current)
-      statusAnimTimerRef.current = null
-    }
-    setStatus(newStatus)
-    setMission((prev) => (prev ? { ...prev, status: newStatus } : prev))
-    void (async () => {
-      try {
-        // Le kilométrage reste facultatif : on l'enregistre seulement s'il est renseigné.
-        if (newStatus === 'Terminée' && mission.vehicleId) {
-          const departText = String(vehicleKilometrageDepart ?? '').trim()
-          const retourText = String(vehicleKilometrageRetour ?? '').trim()
-          if (departText !== '' || retourText !== '') {
-            const depart = departText === '' ? null : Number(departText)
-            const retour = retourText === '' ? null : Number(retourText)
-            const kmRes = await apiFetch(`/missions/${mission.id}/vehicle-kilometrage`, {
-              method: 'PATCH',
-              body: { vehicleKilometrageDepart: depart, vehicleKilometrageRetour: retour },
-              auth: true,
-            })
-            if (!kmRes.ok) {
-              const kmErr = await kmRes.json().catch(() => ({}))
-              setVehicleMileageError(kmErr.message || 'Kilométrage non enregistré, statut mis à jour.')
-            }
-          }
-        }
-
-        const response = await apiFetch(`/missions/${mission.id}`, {
-          method: 'PATCH',
-          body: { status: newStatus },
-          auth: true,
-        })
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.message || 'Impossible de mettre à jour le statut.')
-        }
-        setMissionActionError('')
-        setVehicleMileageError('')
-        setStatusJustChangedTo(newStatus)
-        statusAnimTimerRef.current = window.setTimeout(() => {
-          setStatusJustChangedTo('')
-          statusAnimTimerRef.current = null
-        }, 700)
-        if (refreshTimerRef.current) {
-          window.clearInterval(refreshTimerRef.current)
-          refreshTimerRef.current = null
-        }
-        const missionRes = await apiFetch(`/missions/${mission.id}`, { auth: true, cache: 'no-store' })
-        if (missionRes.ok) {
-          const latestMission = await missionRes.json().catch(() => null)
-          if (latestMission) {
-            setMission((prev) => (prev ? { ...prev, ...latestMission, status: latestMission.status || newStatus } : latestMission))
-            setStatus(latestMission.status || newStatus)
-            setGroupedEmployeesDisplay(buildGroupedEmployeesDisplay(latestMission))
-            syncVehicleMileageState(setVehicleKilometrageDepart, setVehicleKilometrageRetour, latestMission)
-            try {
-              window.dispatchEvent(new CustomEvent('mission:updated', { detail: latestMission }))
-            } catch {
-              // Ignore malformed attachment metadata.
-            }
-          }
-        }
-        refreshTimerRef.current = window.setInterval(async () => {
-          try {
-            const pollRes = await apiFetch(`/missions/${mission.id}`, { auth: true, cache: 'no-store' })
-            if (!pollRes.ok) return
-            const pollData = await pollRes.json()
-            const nextStatus = pollData?.status || 'À faire'
-            setMission((prev) => (prev ? { ...prev, ...pollData, status: nextStatus } : pollData))
-            setStatus((prev) => (prev !== nextStatus ? nextStatus : prev))
-            setGroupedEmployeesDisplay(buildGroupedEmployeesDisplay(pollData))
-            if (!mileageEditingRef.current) {
-              syncVehicleMileageState(setVehicleKilometrageDepart, setVehicleKilometrageRetour, pollData)
-            }
-          } catch {
-            // Ignore malformed attachment metadata.
-          }
-        }, 5000)
-        setShowSaveToast(`Cette mission est ${newStatus}`)
-        setTimeout(() => setShowSaveToast(false), 3000)
-      } catch (error) {
-        console.error('Erreur MAJ statut:', error)
-        setMissionActionError(error?.message || 'Impossible de mettre à jour le statut.')
-        // Rétablir le statut précédent en cas d'erreur
-        setStatus(mission.status)
-        setMission((prev) => (prev ? { ...prev, status: mission.status } : prev))
-      }
-    })()
-  }
-
-  const handleSave = () => {
-    setIsSaving(true)
-    const missionId = mission?.id
-    const nextStatus = status
-    const nextNotes = notes
-    if (missionId) {
-      setMission((prev) => (prev ? { ...prev, status: nextStatus, notes: nextNotes } : prev))
-    }
-    void (async () => {
-      try {
-        const response = await apiFetch(`/missions/${missionId}`, {
-          method: 'PATCH',
-          body: { status: nextStatus, notes: nextNotes },
-          auth: true,
-        })
-        if (response.ok) {
-          await response.json().catch(() => null)
-          const fullRes = await apiFetch(`/missions/${missionId}`, { auth: true, cache: 'no-store' })
-          if (fullRes.ok) {
-            const full = await fullRes.json().catch(() => null)
-            if (full) {
-              setMission((prev) => (prev ? { ...prev, ...full } : full))
-              setStatus(full?.status || nextStatus)
-              setNotes(full?.notes || nextNotes)
-              setGroupedEmployeesDisplay(buildGroupedEmployeesDisplay(full))
-                try { window.dispatchEvent(new CustomEvent('mission:updated', { detail: full })) } catch {
-                  // Mission update events are best-effort.
-                }
-            }
-          }
-        }
-        setShowSaveToast(true)
-        setTimeout(() => setShowSaveToast(false), 3000)
-      } catch {
-        // Status update errors are handled by preserving the current view.
-      }
-      setIsSaving(false)
-    })()
-  }
   const PROGRESS_MAP = { 'À faire': 10, 'En cours': 50, 'Terminée': 100 }
   const progressPct = PROGRESS_MAP[status] || 0
 

@@ -1,89 +1,24 @@
-import { forwardRef, useImperativeHandle, useState, useEffect, useCallback, useRef } from 'react'
+import { forwardRef, useImperativeHandle, useState, useEffect, useRef } from 'react'
 import { AlertCircle, ClipboardList, Users, Eye, Edit, Trash2, MapPin, Building2, Phone, Calendar, Wrench, Paperclip, FileText, Clock, UserCheck, Hourglass, Link2, Download, Truck } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
-import { getAvatarFromName } from '../../utils/format'
-import { getStatusColorKey } from '../../utils/status'
+import { useMissionTableData } from './useMissionTableData'
+import {
+  priorityColors,
+  statusColors,
+  interventionStatusColors,
+  getGroupedEmployeeNames,
+  getGroupedEmployeeStatuses,
+  truncateText,
+  getPriorityColor,
+  getStatusIcon,
+  getPriorityPrefix,
+  getMissionDisplayData,
+  getViewStatusColor,
+  validateMissionForm,
+  submitGroupMission,
+  submitSingleMission,
+} from './missionTable.helpers'
 import technicien from '../../assets/technicien.avif'
-
-const priorityColors = {
-  red: 'bg-red-100 text-red-700',
-  orange: 'bg-orange-100 text-orange-700',
-  yellow: 'bg-yellow-100 text-yellow-700',
-  green: 'bg-green-100 text-green-700',
-  blue: 'bg-blue-100 text-blue-700',
-  gray: 'bg-gray-100 text-gray-700',
-}
-
-const statusColors = {
-  red: 'bg-red-100 text-red-700',
-  orange: 'bg-orange-100 text-orange-700',
-  yellow: 'bg-yellow-100 text-yellow-700',
-  green: 'bg-green-100 text-green-700',
-  blue: 'bg-blue-100 text-blue-700',
-}
-
-const interventionStatusColors = {
-  PENDING: 'bg-amber-100 text-amber-700',
-  ASSIGNED: 'bg-blue-100 text-blue-700',
-}
-
-function getGroupedEmployeeNames(mission) {
-  const fromDisplay = String(mission?.employeeDisplay || '')
-    .split(',')
-    .map((name) => name.trim())
-    .filter(Boolean)
-  const fromArray = Array.isArray(mission?.groupedEmployees)
-    ? mission.groupedEmployees.map((name) => String(name || '').trim()).filter(Boolean)
-    : []
-  const primary = String(mission?.employee || '').trim()
-  return Array.from(new Set([...fromDisplay, ...fromArray, primary].filter(Boolean)))
-}
-
-function getGroupedEmployeeStatuses(mission) {
-  const rows = Array.isArray(mission?.groupedEmployeeStatuses) ? mission.groupedEmployeeStatuses : []
-  if (rows.length > 0) {
-    return rows
-      .map((row) => ({
-        name: String(row?.employeeName || '').trim(),
-        status: String(row?.status || '').trim() || 'À faire',
-        notes: String(row?.notes || '').trim(),
-      }))
-      .filter((row) => row.name)
-  }
-
-  const names = getGroupedEmployeeNames(mission)
-  return names.map((name) => ({
-    name,
-    status: String(mission?.status || 'À faire'),
-    notes: String(mission?.notes || '').trim(),
-  }))
-}
-
-function truncateText(value, max = 70) {
-  const text = String(value || '').trim()
-  if (!text) return ''
-  if (text.length <= max) return text
-  return `${text.slice(0, max)}....`
-}
-
-function getMissionDisplayData(mission) {
-  const IconComponent = mission.type === 'Intervention' ? Wrench : ClipboardList
-  const priorityColor = getPriorityColor(mission.priority)
-  const statusColor = getStatusColorKey(mission.status)
-  const employeeDisplay = mission.employeeDisplay || mission.employee
-  const groupedStatuses = getGroupedEmployeeStatuses(mission)
-  const isGroupedMission = groupedStatuses.length > 1
-  const avatar = getAvatarFromName(employeeDisplay)
-  return {
-    IconComponent,
-    priorityColor,
-    statusColor,
-    employeeDisplay,
-    groupedStatuses,
-    isGroupedMission,
-    avatar
-  }
-}
 
 function EmptyState() {
   return (
@@ -98,42 +33,6 @@ function EmptyState() {
   )
 }
 
-function getPriorityColor(priority) {
-  if (priority === 'Critique') return 'red'
-  if (priority === 'Haute') return 'orange'
-  if (priority === 'Moyenne') return 'yellow'
-  return 'gray'
-}
-
-function getStatusIcon(status) {
-  switch (status) {
-    case 'En cours':
-    case 'À faire':
-      return '● '
-    case 'Terminée':
-      return '✓ '
-    case 'Bloquée':
-      return '⊗ '
-    default:
-      return ''
-  }
-}
-
-function getPriorityPrefix(priority) {
-  switch (priority) {
-    case 'Critique':
-      return '⚠️ '
-    case 'Haute':
-      return '↗ '
-    case 'Moyenne':
-      return '– '
-    case 'Basse':
-      return '↘ '
-    default:
-      return ''
-  }
-}
-
 function MissionTableInner(props, ref) {
   const {
     missions: missionsProp,
@@ -142,9 +41,7 @@ function MissionTableInner(props, ref) {
     highlightMissionId,
     highlightAssignmentGroupId,
   } = props || {}
-  const [missions, setMissions] = useState([])
-  const [interventionsList, setInterventionsList] = useState([])
-  const [employeeUsers, setEmployeeUsers] = useState([])
+  const { missions, setMissions, fetchMissions, interventionsList, employeeUsers, fetchInterventions } = useMissionTableData(missionsProp)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState('create')
   const [formMissionId, setFormMissionId] = useState(null)
@@ -176,60 +73,6 @@ function MissionTableInner(props, ref) {
   const activeHighlightMissionId = String(highlightMissionId || '').trim()
   const activeHighlightGroupId = String(highlightAssignmentGroupId || '').trim()
   const hasHighlight = Boolean(activeHighlightMissionId || activeHighlightGroupId)
-
-  const fetchMissions = useCallback(async () => {
-    try {
-      const response = await apiFetch('/missions', { auth: true })
-      if (response.ok) {
-        const data = await response.json()
-        setMissions(data)
-      }
-    } catch (error) {
-      console.error('Error fetching missions:', error)
-    }
-  }, [])
-
-  const fetchInterventions = useCallback(async () => {
-    try {
-      const response = await apiFetch('/interventions', { auth: true })
-      if (response.ok) {
-        const data = await response.json()
-        setInterventionsList(data)
-      }
-    } catch (error) {
-      console.error('Error fetching interventions:', error)
-    }
-  }, [])
-
-  const fetchEmployees = useCallback(async () => {
-    try {
-      const response = await apiFetch('/users', { auth: true })
-      if (!response.ok) return
-      const data = await response.json().catch(() => [])
-      const users = Array.isArray(data) ? data : []
-      const normalized = users
-        .filter((u) => u && u.isActive !== false)
-        .map((u) => ({
-          id: u.id,
-          name: u.name,
-        }))
-      setEmployeeUsers(normalized)
-    } catch (error) {
-      console.error('Error fetching employees:', error)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const t = window.setTimeout(() => {
-      if (!Array.isArray(missionsProp)) {
-        fetchMissions()
-      }
-      fetchInterventions()
-      fetchEmployees()
-    }, 0)
-    return () => window.clearTimeout(t)
-  }, [fetchMissions, fetchInterventions, fetchEmployees, missionsProp])
 
   // Only show PENDING and ASSIGNED interventions in the "Lier à une intervention" dropdown
   const linkableInterventions = interventionsList.filter(i => i.status === 'PENDING' || i.status === 'ASSIGNED')
@@ -357,132 +200,35 @@ function MissionTableInner(props, ref) {
   const handleSubmitModal = async (event) => {
     event.preventDefault()
 
-    if (!formTitle || !formDescription) {
-      alert('Veuillez remplir le titre et la description.')
+    const validationError = validateMissionForm({
+      formTitle, formDescription, formEmployeeIds, formEmployee, missionType, selectedInterventionId,
+    })
+    if (validationError) {
+      alert(validationError)
       return
     }
 
-    // Support PLUSIEURS employés
+    const refreshAfterSave = () => {
+      if (typeof onMissionsChanged === 'function') onMissionsChanged()
+      else fetchMissions()
+    }
+
     const hasMultipleEmployees = Array.isArray(formEmployeeIds) && formEmployeeIds.length > 0
-    const hasSingleEmployee = formEmployee && String(formEmployee).trim() !== ''
-
-    if (!hasMultipleEmployees && !hasSingleEmployee) {
-      alert('Veuillez sélectionner au moins un employé.')
-      return
-    }
-
-    if (missionType === 'Intervention' && !selectedInterventionId) {
-      alert('Veuillez sélectionner une intervention.')
-      return
-    }
-
-    // CAS 1: PLUSIEURS employés
     if (hasMultipleEmployees) {
-      const groupMissionPayload = {
-        title: formTitle,
-        description: formDescription,
-        priority: formPriority,
-        status: 'À faire',
-        dueDate: formDueDate || "Aujourd'hui",
-        dueTime: formDueTime || null,
-        notes: formNotes,
-        type: missionType,
-        site: missionType === 'Normal' ? formSite : selectedIntervention?.client,
-        address: missionType === 'Normal' ? formAddress : 'N/A',
-        interventionId: missionType === 'Intervention' ? selectedInterventionId : null,
-        employeeUserIds: formEmployeeIds, // ← ARRAY D'IDs
-      }
-
-      try {
-        const response = await apiFetch('/missions', {
-          method: 'POST',
-          body: groupMissionPayload,
-          auth: true,
-        })
-
-        if (response.ok) {
-          if (typeof onMissionsChanged === 'function') onMissionsChanged()
-          else fetchMissions()
-          setIsModalOpen(false)
-        }
-      } catch (error) {
-        console.error('Error saving missions:', error)
-      }
+      await submitGroupMission({
+        formTitle, formDescription, formPriority, formDueDate, formDueTime, formNotes,
+        missionType, formSite, formAddress, selectedIntervention, selectedInterventionId, formEmployeeIds,
+        refreshAfterSave, setIsModalOpen,
+      })
       return
     }
 
-    // CAS 2: UN SEUL employé (backward compatible)
-    const selectedEmployee = employeeUsers.find((u) => String(u.id) === String(formEmployee)) || null
-    const selectedEmployeeName = selectedEmployee?.name || ''
-
-    const singleMissionPayload = {
-      title: formTitle,
-      description: formDescription,
-      employee: selectedEmployeeName,
-      employeeUserId: selectedEmployee ? Number(selectedEmployee.id) : null,
-      priority: formPriority,
-      status: modalMode === 'create' ? 'À faire' : formStatus,
-      // On create: fall back to "Aujourd'hui" if no date given.
-      // On edit: send only if the user actually filled the field; otherwise
-      // omit so the backend keeps the existing value.
-      ...(modalMode === 'create'
-        ? { dueDate: formDueDate || "Aujourd'hui" }
-        : formDueDate
-          ? { dueDate: formDueDate }
-          : {}),
-      dueTime: formDueTime || null,
-      notes: formNotes,
-      type: missionType,
-      site: missionType === 'Normal' ? formSite : selectedIntervention?.client,
-      address: missionType === 'Normal' ? formAddress : 'N/A',
-      interventionId: missionType === 'Intervention' ? selectedInterventionId : null,
-    }
-
-    try {
-      const response = await apiFetch(
-        modalMode === 'create' ? '/missions' : `/missions/${formMissionId}`,
-        {
-          method: modalMode === 'create' ? 'POST' : 'PATCH',
-          body: modalMode === 'edit' ? { ...singleMissionPayload, attachments: existingAttachments } : singleMissionPayload,
-          auth: true,
-        },
-      )
-
-      if (response.ok) {
-        const saved = await response.json().catch(() => null)
-        const missionId = saved?.id || formMissionId
-
-        if (missionId && newAttachments.length > 0) {
-          const form = new FormData()
-          for (const file of newAttachments) {
-            form.append('files', file)
-          }
-          const uploadRes = await apiFetch(`/missions/${missionId}/attachments`, {
-            method: 'POST',
-            body: form,
-            auth: true,
-          })
-          if (!uploadRes.ok) {
-            alert('Mission enregistrée, mais erreur lors de l’upload des fichiers.')
-          }
-        }
-
-        // Si c'est une intervention, on met à jour son statut dans le backend aussi
-        if (missionType === 'Intervention' && selectedInterventionId) {
-          await apiFetch(`/interventions/${selectedInterventionId}`, {
-            method: 'PATCH',
-            body: { status: 'ASSIGNED', assignedTo: selectedEmployeeName },
-            auth: true,
-          })
-          fetchInterventions()
-        }
-        if (typeof onMissionsChanged === 'function') onMissionsChanged()
-        else fetchMissions()
-        setIsModalOpen(false)
-      }
-    } catch (error) {
-      console.error('Error saving mission:', error)
-    }
+    await submitSingleMission({
+      formTitle, formDescription, formPriority, formStatus, formDueDate, formDueTime, formNotes,
+      missionType, formSite, formAddress, selectedIntervention, selectedInterventionId,
+      modalMode, formMissionId, formEmployee, employeeUsers,
+      existingAttachments, newAttachments, refreshAfterSave, fetchInterventions, setIsModalOpen,
+    })
   }
 
   useImperativeHandle(ref, () => ({
@@ -491,14 +237,7 @@ function MissionTableInner(props, ref) {
 
   const handleOpenViewModal = (mission) => {
     const priorityColor = getPriorityColor(mission.priority)
-    const statusColor =
-      mission.status === 'En cours'
-        ? 'yellow'
-        : mission.status === 'Terminée'
-          ? 'green'
-          : mission.status === 'Bloquée'
-            ? 'red'
-            : 'blue'
+    const statusColor = getViewStatusColor(mission.status)
     setViewMission({ ...mission, priorityColor, statusColor })
     setIsViewOpen(true)
   }

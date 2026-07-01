@@ -1,6 +1,7 @@
 ﻿import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../api/apiClient'
+import InterventionActions from './components/InterventionActions'
 import {
   Search, Plus, Eye, Edit2, Trash2, Wrench,
   CheckCircle2, Hourglass,
@@ -55,6 +56,45 @@ function isItemAssigned(item) {
 }
 
 /**
+ * Returns initials from a full name (e.g. "Jean Dupont" → "JD").
+ */
+function getInitials(name) {
+  if (!name) return ''
+  return name.split(' ').map(n => n[0]).join('')
+}
+
+/**
+ * Tracks employee names by their assignment group ID.
+ */
+function buildNamesByGroup(missionsData) {
+  const namesByGroup = new Map()
+  for (const mission of missionsData) {
+    const groupId = mission?.assignmentGroupId
+    const employeeName = String(mission?.employee || '').trim()
+    if (!groupId || !employeeName) continue
+    if (!namesByGroup.has(groupId)) namesByGroup.set(groupId, new Set())
+    namesByGroup.get(groupId).add(employeeName)
+  }
+  return namesByGroup
+}
+
+/**
+ * Consolidates grouped employee names into the agents map.
+ */
+function consolidateGroupedNames(missionsData, namesByGroup, agentsByIntervention) {
+  for (const [groupId, names] of namesByGroup.entries()) {
+    for (const mission of missionsData) {
+      if (mission?.assignmentGroupId !== groupId) continue
+      if (!mission?.interventionId) continue
+      const agents = agentsByIntervention.get(mission.interventionId)
+      if (!agents) continue
+      agents.clear()
+      for (const name of names) agents.add(name)
+    }
+  }
+}
+
+/**
  * Builds a map of interventionId -> Set of assigned employee names,
  * and a map of interventionId -> linked mission count from mission data.
  */
@@ -64,10 +104,7 @@ function buildMissionMaps(missionsData) {
 
   if (!Array.isArray(missionsData)) return { agentsByIntervention, linkedMissionCounts }
 
-  const namesByGroup = new Map()
-
   for (const mission of missionsData) {
-    const groupId = mission?.assignmentGroupId
     const employeeName = String(mission?.employee || '').trim()
     const interventionId = mission?.interventionId
 
@@ -75,38 +112,16 @@ function buildMissionMaps(missionsData) {
       linkedMissionCounts.set(interventionId, (linkedMissionCounts.get(interventionId) || 0) + 1)
     }
 
-    if (!employeeName) continue
+    if (!employeeName || !interventionId) continue
 
-    if (interventionId) {
-      if (!agentsByIntervention.has(interventionId)) {
-        agentsByIntervention.set(interventionId, new Set())
-      }
-      agentsByIntervention.get(interventionId).add(employeeName)
+    if (!agentsByIntervention.has(interventionId)) {
+      agentsByIntervention.set(interventionId, new Set())
     }
-
-    if (groupId) {
-      if (!namesByGroup.has(groupId)) {
-        namesByGroup.set(groupId, new Set())
-      }
-      namesByGroup.get(groupId).add(employeeName)
-    }
+    agentsByIntervention.get(interventionId).add(employeeName)
   }
 
-  // Consolidate grouped names within interventions
-  for (const [groupId, names] of namesByGroup.entries()) {
-    for (const mission of missionsData) {
-      if (mission?.assignmentGroupId === groupId && mission?.interventionId) {
-        const interventionId = mission.interventionId
-        if (agentsByIntervention.has(interventionId)) {
-          const agents = agentsByIntervention.get(interventionId)
-          agents.clear()
-          for (const name of names) {
-            agents.add(name)
-          }
-        }
-      }
-    }
-  }
+  const namesByGroup = buildNamesByGroup(missionsData)
+  consolidateGroupedNames(missionsData, namesByGroup, agentsByIntervention)
 
   return { agentsByIntervention, linkedMissionCounts }
 }
@@ -913,7 +928,7 @@ export default function InterventionList() {
                       {item.assignee ? (
                         <div className="flex items-center gap-2">
                           <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[10px] font-black shrink-0">
-                            {item.assignee.split(' ').map(n => n[0]).join('')}
+                            {getInitials(item.assignee)}
                           </div>
                           <span className="text-xs font-bold text-slate-800 truncate">{item.assignee}</span>
                         </div>
@@ -926,35 +941,7 @@ export default function InterventionList() {
                     </div>
 
                     <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleNavigate('details', item) }}
-                        className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white rounded-xl transition-all border border-[#004a77]/10 active:scale-95"
-                      >
-                        <Eye size={12} strokeWidth={3} /> Consulter
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleNavigate('edit', item) }}
-                        className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white rounded-xl transition-all border border-[#004a77]/10 active:scale-95"
-                      >
-                        <Edit2 size={12} strokeWidth={3} /> Modifier
-                      </button>
-                      <button
-                        disabled={isAssigned}
-                        onClick={(e) => { e.stopPropagation(); if (!isAssigned) handleNavigate('assign', item) }}
-                        className={`flex items-center justify-center gap-1.5 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all border active:scale-95 ${
-                          isAssigned
-                            ? 'text-slate-300 bg-slate-100 border-slate-200 cursor-not-allowed pointer-events-none'
-                            : 'text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white border-[#004a77]/10'
-                        }`}
-                      >
-                        <UserCheck2 size={12} strokeWidth={3} /> Affecter
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleNavigate('delete', item) }}
-                        className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-red-600 bg-red-50 hover:bg-red-600 hover:text-white rounded-xl transition-all border border-red-100 active:scale-95"
-                      >
-                        <Trash2 size={12} strokeWidth={3} /> Supprimer
-                      </button>
+                      <InterventionActions variant="card" item={item} isAssigned={isAssigned} onNavigate={handleNavigate} />
                     </div>
                   </div>
                 )
@@ -1042,7 +1029,7 @@ export default function InterventionList() {
                           {item.assignee ? (
                             <div className="flex items-center gap-2">
                               <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[10px] font-black shadow-md shadow-blue-100">
-                                {item.assignee.split(' ').map(n => n[0]).join('')}
+                                {getInitials(item.assignee)}
                               </div>
                               <span className="text-xs font-bold text-slate-800">{item.assignee}</span>
                             </div>
@@ -1055,39 +1042,7 @@ export default function InterventionList() {
                         </td>
                         <td className="px-4 py-4 w-[200px]">
                           <div className="grid grid-cols-2 gap-1.5 w-[184px] mx-auto">
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); handleNavigate('details', item) }}
-                              className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white rounded-xl transition-all shadow-sm border border-[#004a77]/10 active:scale-95"
-                            >
-                              <Eye size={12} strokeWidth={3} />
-                              Consulter
-                            </button>
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); handleNavigate('edit', item) }}
-                              className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white rounded-xl transition-all shadow-sm border border-[#004a77]/10 active:scale-95"
-                            >
-                              <Edit2 size={12} strokeWidth={3} />
-                              Modifier
-                            </button>
-                            <button 
-                              disabled={isItemAssigned(item)}
-                              onClick={(e) => { e.stopPropagation(); handleNavigate('assign', item) }}
-                              className={`flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-sm border active:scale-95 ${
-                                isItemAssigned(item)
-                                  ? 'text-slate-300 bg-slate-100 border-slate-200 cursor-not-allowed pointer-events-none'
-                                  : 'text-[#004a77] bg-[#004a77]/5 hover:bg-[#004a77] hover:text-white border-[#004a77]/10'
-                              }`}
-                            >
-                              <UserCheck2 size={12} strokeWidth={3} />
-                              Affecter
-                            </button>
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); handleNavigate('delete', item) }}
-                              className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-red-600 bg-red-50 hover:bg-red-600 hover:text-white rounded-xl transition-all shadow-sm border border-red-100 active:scale-95"
-                            >
-                              <Trash2 size={12} strokeWidth={3} />
-                              Supprimer
-                            </button>
+                            <InterventionActions variant="table" item={item} isAssigned={isItemAssigned(item)} onNavigate={handleNavigate} />
                           </div>
                         </td>
                       </tr>
@@ -1187,7 +1142,7 @@ export default function InterventionList() {
                             {item.assignee ? (
                               <div className="flex items-center gap-2">
                                 <div className="w-6 h-6 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center text-[8px] font-black border border-blue-100">
-                                  {item.assignee.split(' ').map(n => n[0]).join('')}
+                                  {getInitials(item.assignee)}
                                 </div>
                                 <span className="text-[10px] font-bold text-slate-600">{item.assignee.split(' ')[0]}</span>
                               </div>
