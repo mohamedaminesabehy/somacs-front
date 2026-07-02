@@ -154,8 +154,12 @@ export default function DevisSuiviDashboard() {
   }, [rows])
 
   const loadStats = useCallback(async (signal) => {
-    const nextStats = await fetchDevisSuiviStats(signal)
-    setStats({ ...emptyStats, ...(nextStats || {}) })
+    try {
+      const nextStats = await fetchDevisSuiviStats(signal)
+      setStats({ ...emptyStats, ...(nextStats || {}) })
+    } catch (err) {
+      if (err?.name === 'AbortError') return
+    }
   }, [])
 
   const loadData = useCallback(async (signal) => {
@@ -180,6 +184,7 @@ export default function DevisSuiviDashboard() {
         limit: Number(payload?.limit || payload?.meta?.limit || pageInfo.limit),
       })
     } catch (err) {
+      if (err?.name === 'AbortError') return
       setError(err?.message || 'Impossible de charger les suivis devis.')
     } finally {
       setLoading(false)
