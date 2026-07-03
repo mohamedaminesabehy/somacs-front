@@ -30,6 +30,7 @@ import ClientsList from './pages/clients/ClientsList'
 import ClientDetails360 from './pages/clients/ClientDetails360'
 import { NotificationsProvider } from './notifications/NotificationsProvider'
 import { getAuthToken, isAuthTokenUsable, logoutSession } from './api/apiClient'
+import { consumePendingNotificationUrl } from './utils/pendingNotification'
 
 function AppLayout({
   children,
@@ -59,6 +60,8 @@ function AppLayout({
 
 export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [pendingNotificationUrl, setPendingNotificationUrl] = useState(null)
+  const [pendingChecked, setPendingChecked] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     if (typeof window === 'undefined') {
       return false
@@ -87,6 +90,19 @@ export default function App() {
   const handleCloseSidebar = () => {
     setIsSidebarOpen(false)
   }
+
+  // ── On cold start: check if a notification click stored a pending URL ───────
+  useEffect(() => {
+    consumePendingNotificationUrl().then((url) => {
+      if (url) {
+        console.log('[App] Pending notification URL found:', url)
+        setPendingNotificationUrl(url)
+      }
+      setPendingChecked(true)
+    }).catch(() => {
+      setPendingChecked(true)
+    })
+  }, [])
 
   const handleLoginSuccess = (token, user) => {
     window.localStorage.setItem('auth_token', token)
@@ -199,6 +215,19 @@ export default function App() {
   const renderDevisSuiviPage = (children) => {
     if (!isLoggedIn) return <Navigate to="/" replace />
     return canAccessDevisSuivi ? renderInLayout(children) : <Navigate to="/dashboard" replace />
+  }
+
+  // ── Wait for pending notification check before rendering routes ──────────────
+  // This prevents the app from flashing login/dashboard before redirecting.
+  if (!pendingChecked) {
+    return null // Brief blank while IndexedDB is read (~5ms)
+  }
+
+  // ── If a pending notification URL was found, redirect immediately ────────────
+  if (pendingNotificationUrl) {
+    const target = pendingNotificationUrl
+    setPendingNotificationUrl(null) // consume it (one-shot)
+    return <Navigate to={target} replace />
   }
 
   return (

@@ -12,6 +12,40 @@ const firebaseConfig = {
   appId: '1:880227586325:web:0d537ac11c6c16b472d91c',
 }
 
+// ── IndexedDB helper (accessible from Service Worker) ─────────────────────────
+const IDB_NAME = 'somacs_notifications'
+const IDB_STORE = 'pending'
+const IDB_KEY = 'pending_notification_url'
+
+function openIDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(IDB_NAME, 1)
+    request.onupgradeneeded = () => {
+      const db = request.result
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE)
+      }
+    }
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+}
+
+function savePendingUrl(url) {
+  return openIDB().then((db) => {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite')
+      const store = tx.objectStore(IDB_STORE)
+      store.put({ url, timestamp: Date.now() }, IDB_KEY)
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+  }).catch((err) => {
+    console.warn('[SW] IndexedDB savePendingUrl failed:', err)
+  })
+}
+
+// ── Firebase init ─────────────────────────────────────────────────────────────
 try {
   firebase.initializeApp(firebaseConfig)
   const messaging = firebase.messaging()
@@ -19,14 +53,11 @@ try {
   messaging.onBackgroundMessage((payload) => {
     console.log('[SW] Background message received:', payload)
 
-    // If payload contains `notification`, Firebase SDK already shows
-    // the system notification automatically. Do NOT show it again manually.
     if (payload?.notification) {
-      console.log('[SW] Notification payload present — skipping manual display (handled by Firebase SDK)')
+      console.log('[SW] Notification payload present — skipping manual display')
       return
     }
 
-    // Data-only messages: show notification manually
     const title = payload?.data?.title || 'Notification'
     const body = payload?.data?.body || ''
     const data = payload?.data || {}
@@ -57,22 +88,21 @@ self.addEventListener('notificationclick', (event) => {
   console.log('[SW] missionId:', missionId, '| target:', missionUrl)
 
   event.waitUntil(
-    self.clients
-      .matchAll({ type: 'window', includeUncontrolled: true })
-      .then((clientsArr) => {
-        // Try to reuse existing PWA window
-        for (const client of clientsArr) {
-          if ('focus' in client) {
-            client.postMessage({ type: 'NOTIFICATION_CLICK', url: missionUrl, missionId })
-            return client.focus()
-          }
+    // STEP 1: Persist the target URL in IndexedDB (accessible from main thread)
+    savePendingUrl(missionUrl).then(() => {
+      return self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    }).then((clientsArr) => {
+      // STEP 2: If PWA window exists, send message and focus
+      for (const client of clientsArr) {
+        if ('focus' in client) {
+          client.postMessage({ type: 'NOTIFICATION_CLICK', url: missionUrl, missionId })
+          return client.focus()
         }
-        // No window open — open the mission URL directly.
-        // Also store in a way App.jsx can read on cold start (query param as fallback).
-        const origin = self.location.origin
-        const targetUrl = `${origin}${missionUrl}`
-        console.log('[SW] Opening new window:', targetUrl)
-        return self.clients.openWindow(targetUrl)
-      }),
+      }
+      // STEP 3: No window — open the PWA. Even if Android ignores the path,
+      // App.jsx will read the pending URL from IndexedDB on startup.
+      const origin = self.location.origin
+      return self.clients.openWindow(origin + missionUrl)
+    }),
   )
 })
