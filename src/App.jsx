@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './components/layout/Sidebar'
 import Header from './components/layout/Header'
@@ -62,6 +62,7 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [pendingNotificationUrl, setPendingNotificationUrl] = useState(null)
   const [pendingChecked, setPendingChecked] = useState(false)
+  const pendingConsumedRef = useRef(false)
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     if (typeof window === 'undefined') {
       return false
@@ -93,15 +94,20 @@ export default function App() {
 
   // ── On cold start: check if a notification click stored a pending URL ───────
   useEffect(() => {
-    consumePendingNotificationUrl().then((url) => {
-      if (url) {
-        console.log('[App] Pending notification URL found:', url)
-        setPendingNotificationUrl(url)
-      }
-      setPendingChecked(true)
-    }).catch(() => {
-      setPendingChecked(true)
-    })
+    // Small delay to ensure the SW IndexedDB write completes before we read.
+    // On cold start, openWindow and savePendingUrl run in parallel.
+    const timer = setTimeout(() => {
+      consumePendingNotificationUrl().then((url) => {
+        if (url) {
+          console.log('[App] Pending notification URL found:', url)
+          setPendingNotificationUrl(url)
+        }
+        setPendingChecked(true)
+      }).catch(() => {
+        setPendingChecked(true)
+      })
+    }, 100) // 100ms is enough for IDB write to complete
+    return () => clearTimeout(timer)
   }, [])
 
   const handleLoginSuccess = (token, user) => {
@@ -218,16 +224,15 @@ export default function App() {
   }
 
   // ── Wait for pending notification check before rendering routes ──────────────
-  // This prevents the app from flashing login/dashboard before redirecting.
   if (!pendingChecked) {
-    return null // Brief blank while IndexedDB is read (~5ms)
+    return null
   }
 
   // ── If a pending notification URL was found, redirect immediately ────────────
-  if (pendingNotificationUrl) {
-    const target = pendingNotificationUrl
-    setPendingNotificationUrl(null) // consume it (one-shot)
-    return <Navigate to={target} replace />
+  // Use a ref to avoid calling setState during render (which would cause loops).
+  if (pendingNotificationUrl && !pendingConsumedRef.current) {
+    pendingConsumedRef.current = true
+    return <Navigate to={pendingNotificationUrl} replace />
   }
 
   return (
