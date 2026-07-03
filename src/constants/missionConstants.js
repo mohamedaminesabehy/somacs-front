@@ -1,8 +1,8 @@
 import { CheckCircle2, ClipboardList, Loader2, XCircle } from 'lucide-react'
 
-export const MISSION_STATUS_LIST = ['Ã€ faire', 'En cours', 'TerminÃ©e', 'BloquÃ©e']
+export const MISSION_STATUS_LIST = ['À faire', 'En cours', 'Terminée', 'Bloquée']
 
-export const MISSION_STATUS_STEPS = ['Ã€ faire', 'En cours', 'TerminÃ©e']
+export const MISSION_STATUS_STEPS = ['À faire', 'En cours', 'Terminée']
 
 export const MISSION_PRIORITY_ORDER = { Critique: 1, Haute: 2, Moyenne: 3, Basse: 4 }
 
@@ -23,14 +23,14 @@ export const MISSION_PRIORITY_COLORS = {
 }
 
 export const MISSION_STATUS_COLORS = {
-  'Ã€ faire': 'bg-blue-100 text-blue-700',
+  'À faire': 'bg-blue-100 text-blue-700',
   'En cours': 'bg-yellow-100 text-yellow-700',
-  'TerminÃ©e': 'bg-green-100 text-green-700',
-  'BloquÃ©e': 'bg-red-100 text-red-700',
+  'Terminée': 'bg-green-100 text-green-700',
+  'Bloquée': 'bg-red-100 text-red-700',
 }
 
 export const MISSION_STATUS_CONFIG = {
-  'Ã€ faire': {
+  'À faire': {
     icon: ClipboardList,
     color: 'text-blue-600',
     bg: 'bg-blue-50',
@@ -48,7 +48,7 @@ export const MISSION_STATUS_CONFIG = {
     dot: 'bg-amber-500',
     calBg: 'bg-amber-100 border-amber-300 text-amber-800',
   },
-  'TerminÃ©e': {
+  'Terminée': {
     icon: CheckCircle2,
     color: 'text-green-600',
     bg: 'bg-green-50',
@@ -57,7 +57,7 @@ export const MISSION_STATUS_CONFIG = {
     dot: 'bg-green-500',
     calBg: 'bg-green-100 border-green-300 text-green-800',
   },
-  'BloquÃ©e': {
+  'Bloquée': {
     icon: XCircle,
     color: 'text-red-600',
     bg: 'bg-red-50',
@@ -84,7 +84,7 @@ export function getMissionPriorityColor(priority) {
 
 export function getMissionStatusColorKey(status) {
   if (status === 'En cours') return 'yellow'
-  if (status === 'TerminÃ©e') return 'green'
-  if (status === 'BloquÃ©e') return 'red'
+  if (status === 'Terminée') return 'green'
+  if (status === 'Bloquée') return 'red'
   return 'blue'
 }
