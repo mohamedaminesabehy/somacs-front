@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import { API_BASE_URL, getAuthToken, isAuthTokenUsable } from '../api/apiClient'
 import {
@@ -45,6 +46,48 @@ export function NotificationsProvider({ children }) {
   const [toast, setToast] = useState(null)
   const socketRef = useRef(null)
   const toastTimerRef = useRef(null)
+  const navigateRef = useRef(null)
+
+  // Keep a ref to the navigate function for use in event handlers
+  const navigate = useNavigate()
+  useEffect(() => { navigateRef.current = navigate }, [navigate])
+
+  // Navigation from notification click (SW posts message)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const handler = (event) => {
+      const { type, url, missionId } = event.data || {}
+      if (type !== 'NOTIFICATION_CLICK') return
+      console.log('[Notifications] SW click received — url:', url, 'missionId:', missionId)
+
+      const token = getAuthToken()
+      if (token && isAuthTokenUsable(token)) {
+        // User is authenticated — navigate directly
+        const target = url || (missionId ? `/missions/${missionId}` : '/')
+        console.log('[Notifications] Navigating authenticated user to:', target)
+        if (navigateRef.current) {
+          navigateRef.current(target)
+        } else {
+          window.location.href = target
+        }
+      } else {
+        // User not authenticated — store pending mission for after login
+        const pendingMissionId = missionId || ''
+        if (pendingMissionId) {
+          console.log('[Notifications] User not authenticated — storing pending missionId:', pendingMissionId)
+          try {
+            window.sessionStorage.setItem('pending_notification_mission', pendingMissionId)
+          } catch { /* best-effort */ }
+        }
+        // Navigate to login or pending notification preview
+        if (navigateRef.current) {
+          navigateRef.current(pendingMissionId ? `/notification-preview/${pendingMissionId}` : '/login')
+        }
+      }
+    }
+    navigator.serviceWorker?.addEventListener('message', handler)
+    return () => navigator.serviceWorker?.removeEventListener('message', handler)
+  }, [])
 
   const refresh = useCallback(async () => {
     const [items, count] = await Promise.all([fetchNotifications(30), fetchUnreadCount()])

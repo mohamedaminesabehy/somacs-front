@@ -19,15 +19,23 @@ try {
   messaging.onBackgroundMessage((payload) => {
     console.log('[SW] Background message received:', payload)
 
-    const title = payload?.notification?.title || 'Notification'
-    const body = payload?.notification?.body || ''
+    // If payload contains `notification`, Firebase SDK already shows
+    // the system notification automatically. Do NOT show it again manually.
+    if (payload?.notification) {
+      console.log('[SW] Notification payload present — skipping manual display (handled by Firebase SDK)')
+      return
+    }
+
+    // Data-only messages: show notification manually
+    const title = payload?.data?.title || 'Notification'
+    const body = payload?.data?.body || ''
     const data = payload?.data || {}
 
     return self.registration.showNotification(title, {
       body,
       icon: '/icon.svg',
       badge: '/icon.svg',
-      tag: data.notificationId || 'notification',
+      tag: data.notificationId || `notification-${Date.now()}`,
       requireInteraction: false,
       vibrate: [200, 100, 200],
       data,
@@ -37,24 +45,31 @@ try {
   console.error('[SW] Firebase init error:', err)
 }
 
+// ── Notification click handler ────────────────────────────────────────────────
 self.addEventListener('notificationclick', (event) => {
   console.log('[SW] Notification clicked:', event.notification)
   event.notification.close()
 
   const data = event.notification?.data || {}
-  const url = data.url || '/'
+  const missionId = data.missionId || ''
+  const url = data.url || (missionId ? `/missions/${missionId}` : '/')
+
+  console.log('[SW] Navigating to:', url, '| missionId:', missionId)
 
   event.waitUntil(
     self.clients
       .matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientsArr) => {
-        for (const c of clientsArr) {
-          if (c.url.includes(self.registration.scope) && 'focus' in c) {
-            c.postMessage({ type: 'NAVIGATE', url })
-            return c.focus()
+        // Try to reuse an existing window/tab
+        for (const client of clientsArr) {
+          if (client.url.includes(self.registration.scope) && 'focus' in client) {
+            client.postMessage({ type: 'NOTIFICATION_CLICK', url, missionId })
+            return client.focus()
           }
         }
-        return self.clients.openWindow(url)
+        // No existing window — open a new one with the target URL
+        const fullUrl = self.registration.scope.replace(/\/$/, '') + url
+        return self.clients.openWindow(fullUrl)
       }),
   )
 })

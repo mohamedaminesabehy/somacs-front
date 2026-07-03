@@ -54,7 +54,15 @@ export default function LoginForm({ onLoginSuccess }) {
       }
 
       if (onLoginSuccess) onLoginSuccess(result.data.accessToken, result.data.user)
-      navigate('/', { replace: true })
+
+      // Check for pending notification redirect (mission opened while not logged in)
+      const pendingMission = window.sessionStorage.getItem('pending_notification_mission')
+      if (pendingMission) {
+        window.sessionStorage.removeItem('pending_notification_mission')
+        navigate(`/missions/${pendingMission}`, { replace: true })
+      } else {
+        navigate('/', { replace: true })
+      }
     } catch {
       setError(LOGIN_ERROR_MESSAGES.serverUnavailable)
     } finally {
