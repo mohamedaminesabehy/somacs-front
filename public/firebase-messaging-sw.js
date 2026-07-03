@@ -52,27 +52,23 @@ self.addEventListener('notificationclick', (event) => {
 
   const data = event.notification?.data || {}
   const missionId = data.missionId || ''
-  const url = data.url || (missionId ? `/missions/${missionId}` : '/')
+  // Always navigate to the notification-aware mission URL
+  const missionUrl = missionId ? `/missions/${missionId}/notification` : '/'
 
-  console.log('[SW] Navigating to:', url, '| missionId:', missionId)
+  console.log('[SW] missionId:', missionId, '| target:', missionUrl)
 
   event.waitUntil(
     self.clients
       .matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientsArr) => {
-        // Try to reuse an existing window/tab
         for (const client of clientsArr) {
           if (client.url.includes(self.registration.scope) && 'focus' in client) {
-            client.postMessage({ type: 'NOTIFICATION_CLICK', url, missionId })
+            client.postMessage({ type: 'NOTIFICATION_CLICK', url: missionUrl, missionId })
             return client.focus()
           }
         }
-        // No existing window — open login with redirect param
-        // (user may not be authenticated when app loads cold)
         const base = self.registration.scope.replace(/\/$/, '')
-        const redirectPath = missionId ? `/missions/${missionId}` : url
-        const openUrl = `${base}/login?redirect=${encodeURIComponent(redirectPath)}`
-        return self.clients.openWindow(openUrl)
+        return self.clients.openWindow(base + missionUrl)
       }),
   )
 })

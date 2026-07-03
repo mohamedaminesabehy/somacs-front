@@ -14,6 +14,8 @@ import {
   MISSION_STATUS_CONFIG as STATUS_CONFIG,
   MISSION_STATUS_STEPS as STATUS_STEPS,
 } from '../../constants/missionConstants'
+import { getAuthToken, isAuthTokenUsable } from '../../api/apiClient'
+import LoginRequiredModal from '../../components/auth/LoginRequiredModal'
 import { useMissionDetailsData } from './hooks/useMissionDetailsData'
 import { useMissionStatusActions } from './hooks/useMissionStatusActions'
 
@@ -65,10 +67,23 @@ function downloadDocument(url, filename) {
   document.body.removeChild(link)
 }
 
-export default function MissionDetails() {
+export default function MissionDetails({ allowUnauthenticated = false }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
+
+  // ── Authentication gate ─────────────────────────────────────────────────────
+  const [isAuthenticated, setIsAuthenticated] = useState(() => isAuthTokenUsable(getAuthToken()))
+  const [showLoginModal, setShowLoginModal] = useState(() => allowUnauthenticated && !isAuthTokenUsable(getAuthToken()))
+
+  const handleModalLoginSuccess = (token, user) => {
+    setIsAuthenticated(true)
+    setShowLoginModal(false)
+    try { window.dispatchEvent(new CustomEvent('auth:login', { detail: { token, user } })) } catch { /* best-effort */ }
+    navigate(`/missions/${id}`, { replace: true })
+  }
+
+  // ── Authenticated: normal mission details below ─────────────────────────────
 
   const data = useMissionDetailsData(id)
   const {
@@ -129,6 +144,48 @@ export default function MissionDetails() {
       statusAttentionTimerRef.current = null
     }, 3500)
   }, [status, intervention?.status])
+
+  // ── Unauthenticated preview (notification flow) ──────────────────────────────
+  if (!isAuthenticated && allowUnauthenticated) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-6">
+        <LoginRequiredModal
+          isOpen={showLoginModal}
+          onLoginSuccess={handleModalLoginSuccess}
+          message="Connectez-vous pour accéder aux détails complets de cette mission."
+        />
+        <div className="w-full max-w-lg bg-white rounded-3xl border border-slate-200 shadow-xl p-8 text-center">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center mb-5">
+            <ClipboardList size={28} className="text-blue-600" />
+          </div>
+          <h1 className="text-xl font-black text-slate-900 mb-2">Nouvelle mission reçue</h1>
+          <p className="text-sm text-slate-500 mb-6">
+            Vous avez reçu une notification pour la mission <span className="font-bold text-slate-700">#{id}</span>.
+          </p>
+          <div className="bg-slate-50 rounded-2xl border border-slate-100 p-5 mb-6 text-left space-y-3">
+            <div className="flex items-center gap-3">
+              <Hash size={14} className="text-slate-400" />
+              <span className="text-sm font-semibold text-slate-700">Référence : #{id}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Calendar size={14} className="text-slate-400" />
+              <span className="text-sm text-slate-600">Date : {new Date().toLocaleDateString('fr-FR')}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <AlertTriangle size={14} className="text-amber-500" />
+              <span className="text-sm text-slate-600">Connectez-vous pour voir tous les détails</span>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowLoginModal(true)}
+            className="w-full px-6 py-3.5 bg-[#0052CC] hover:bg-[#0042a3] text-white rounded-xl text-sm font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-200"
+          >
+            Se connecter pour voir les détails
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   // Loading and error states
   if (!mission && !isLoadingMission) {

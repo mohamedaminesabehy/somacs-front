@@ -145,8 +145,20 @@ export default function App() {
       clearLocalAuth()
     }
 
+    const onAuthLogin = (event) => {
+      const { token, user } = event.detail || {}
+      if (token) {
+        setIsAuthenticated(true)
+        if (user) setCurrentUser(user)
+      }
+    }
+
     window.addEventListener('auth:invalid', onAuthInvalid)
-    return () => window.removeEventListener('auth:invalid', onAuthInvalid)
+    window.addEventListener('auth:login', onAuthLogin)
+    return () => {
+      window.removeEventListener('auth:invalid', onAuthInvalid)
+      window.removeEventListener('auth:login', onAuthLogin)
+    }
   }, [])
 
   const isLoggedIn = isAuthenticated
@@ -219,6 +231,7 @@ export default function App() {
       <Route path="/missions/my" element={renderProtectedPage(<EmployeeMissions />)} />
       <Route path="/missions/assign" element={renderProtectedPage(<AssignMission />)} />
       <Route path="/missions/:id" element={renderProtectedPage(<MissionDetails />)} />
+      <Route path="/missions/:id/notification" element={<MissionDetails allowUnauthenticated />} />
       <Route path="/interventions" element={renderProtectedPage(<InterventionList />)} />
       <Route path="/interventions/create" element={renderProtectedPage(<CreateIntervention />)} />
       <Route path="/interventions/:id" element={renderProtectedPage(<InterventionDetails />)} />
