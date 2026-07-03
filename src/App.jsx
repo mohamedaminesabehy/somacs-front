@@ -164,7 +164,7 @@ export default function App() {
       />
       <Route
         path="/login"
-        element={<Navigate to="/" replace />}
+        element={isLoggedIn ? <Navigate to="/" replace /> : <LoginForm onLoginSuccess={handleLoginSuccess} />}
       />
       <Route
         path="/dashboard"

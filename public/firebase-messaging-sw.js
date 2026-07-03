@@ -67,9 +67,12 @@ self.addEventListener('notificationclick', (event) => {
             return client.focus()
           }
         }
-        // No existing window — open a new one with the target URL
-        const fullUrl = self.registration.scope.replace(/\/$/, '') + url
-        return self.clients.openWindow(fullUrl)
+        // No existing window — open login with redirect param
+        // (user may not be authenticated when app loads cold)
+        const base = self.registration.scope.replace(/\/$/, '')
+        const redirectPath = missionId ? `/missions/${missionId}` : url
+        const openUrl = `${base}/login?redirect=${encodeURIComponent(redirectPath)}`
+        return self.clients.openWindow(openUrl)
       }),
   )
 })

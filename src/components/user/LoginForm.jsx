@@ -1,5 +1,5 @@
 ﻿import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Eye, EyeOff, AlertCircle, ArrowRight } from 'lucide-react'
 import logo from '../../assets/logo.jpg'
 import machines from '../../assets/login.jpg'
@@ -34,6 +34,32 @@ async function loginRequest(username, password) {
   return { data }
 }
 
+/**
+ * Determines where to navigate after a successful login.
+ * Priority: 1) ?redirect= URL param  2) pending_notification_mission in storage  3) /
+ */
+function getPostLoginRedirect(searchParams) {
+  // Priority 1: explicit redirect URL param
+  const redirectParam = searchParams.get('redirect')
+  if (redirectParam && redirectParam.startsWith('/')) {
+    console.log('[LoginForm] Redirect from URL param:', redirectParam)
+    return redirectParam
+  }
+
+  // Priority 2: pending notification from sessionStorage
+  try {
+    const pendingMission = window.sessionStorage.getItem('pending_notification_mission')
+    if (pendingMission) {
+      window.sessionStorage.removeItem('pending_notification_mission')
+      console.log('[LoginForm] Redirect from pending notification — missionId:', pendingMission)
+      return `/missions/${pendingMission}`
+    }
+  } catch { /* storage may be unavailable */ }
+
+  // Priority 3: default home
+  return '/'
+}
+
 export default function LoginForm({ onLoginSuccess }) {
   const [showPassword, setShowPassword] = useState(false)
   const [username, setUsername] = useState('')
@@ -41,6 +67,7 @@ export default function LoginForm({ onLoginSuccess }) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -55,14 +82,10 @@ export default function LoginForm({ onLoginSuccess }) {
 
       if (onLoginSuccess) onLoginSuccess(result.data.accessToken, result.data.user)
 
-      // Check for pending notification redirect (mission opened while not logged in)
-      const pendingMission = window.sessionStorage.getItem('pending_notification_mission')
-      if (pendingMission) {
-        window.sessionStorage.removeItem('pending_notification_mission')
-        navigate(`/missions/${pendingMission}`, { replace: true })
-      } else {
-        navigate('/', { replace: true })
-      }
+      // Post-login redirect: priority 1 = URL param, priority 2 = sessionStorage, priority 3 = default
+      const redirectTarget = getPostLoginRedirect(searchParams)
+      console.log('[LoginForm] Post-login redirect target:', redirectTarget)
+      navigate(redirectTarget, { replace: true })
     } catch {
       setError(LOGIN_ERROR_MESSAGES.serverUnavailable)
     } finally {

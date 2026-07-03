@@ -79,9 +79,14 @@ export function NotificationsProvider({ children }) {
             window.sessionStorage.setItem('pending_notification_mission', pendingMissionId)
           } catch { /* best-effort */ }
         }
-        // Navigate to login or pending notification preview
+        // Navigate to login with redirect param
+        const redirectPath = pendingMissionId ? `/missions/${pendingMissionId}` : ''
+        const loginUrl = redirectPath ? `/login?redirect=${encodeURIComponent(redirectPath)}` : '/login'
+        console.log('[Notifications] Redirecting to login:', loginUrl)
         if (navigateRef.current) {
-          navigateRef.current(pendingMissionId ? `/notification-preview/${pendingMissionId}` : '/login')
+          navigateRef.current(loginUrl)
+        } else {
+          window.location.href = loginUrl
         }
       }
     }
