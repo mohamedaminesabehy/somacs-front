@@ -3,7 +3,7 @@ import React from 'react'
 const FIELD_LABEL_STYLE = { fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', margin: 0 }
 const FIELD_VALUE_STYLE = { fontSize: '9px', fontWeight: '400' }
 const TABLE_FONT = { fontFamily: 'Arial, Helvetica, sans-serif' }
-const TYPES = ['Devis', 'Livraison', 'Formation', 'Installation', 'RÃ©paration', 'Garantie']
+const TYPES = ['Devis', 'Livraison', 'Formation', 'Installation', 'Réparation', 'Garantie']
 
 function formatDate(value) {
   return value ? value.split('-').reverse().join('/') : '....../....../2026'
@@ -41,7 +41,7 @@ function Header({ logo }) {
       </div>
       <div className="text-center flex-1 px-2">
         <h2 style={{ fontSize: '16px', fontWeight: '700', textTransform: 'uppercase', margin: '0 0 3px 0', letterSpacing: '0.02em' }}>Fiche d'intervention de S.A.V</h2>
-        <p style={{ fontSize: '10px', fontStyle: 'italic', color: '#555', margin: '0 0 2px 0' }}>Nous vous garantissons la qualitÃ©</p>
+        <p style={{ fontSize: '10px', fontStyle: 'italic', color: '#555', margin: '0 0 2px 0' }}>Nous vous garantissons la qualité</p>
         <p style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>SOMACS SERVICE S.A.R.L</p>
       </div>
       <div className="w-16 h-16 shrink-0">
@@ -58,7 +58,7 @@ function TimingTable({ data }) {
         <tr>
           <LabelCell className="w-[22%]">Date de l'intervention</LabelCell>
           <ValueCell className="text-center w-[20%]">{formatDate(data.interventionDate)}</ValueCell>
-          <LabelCell className="w-[15%]">Heure d'entrÃ©e</LabelCell>
+          <LabelCell className="w-[15%]">Heure d'entrée</LabelCell>
           <ValueCell className="text-center w-[13%]">{data.startTime || '........h..........'}</ValueCell>
           <td className="border border-slate-900 bg-slate-50 p-1 text-center" rowSpan="3" style={{ width: '18%', verticalAlign: 'top' }}>
             <p style={FIELD_LABEL_STYLE}>Prise en charge par</p>
@@ -66,7 +66,7 @@ function TimingTable({ data }) {
           </td>
         </tr>
         <tr>
-          <LabelCell>NumÃ©ro de la fiche</LabelCell>
+          <LabelCell>Numéro de la fiche</LabelCell>
           <ValueCell className="text-center">{data.ficheNumber}</ValueCell>
           <LabelCell>Heure de sortie</LabelCell>
           <ValueCell className="text-center">{data.endTime || '........h..........'}</ValueCell>
@@ -115,16 +115,16 @@ function ReservedTable({ data }) {
   const rows = [
     ['Client', data.clientName || '', 'Code client', data.clientCode || ''],
     ['Adresse', data.clientAddress || '', null, null],
-    ['Demandeur', data.requestorName || '', 'TÃ©lÃ©phone', data.clientPhone || ''],
+    ['Demandeur', data.requestorName || '', 'Téléphone', data.clientPhone || ''],
     ['E-mail', data.clientEmail || '', null, null],
     ['Equipement', data.machineType || '', null, null],
     ['Marque', data.machineBrand || '', null, null],
-    ['ModÃ¨le', data.machineModel || '', null, null],
+    ['Modèle', data.machineModel || '', null, null],
   ]
 
   return (
     <div className="flex border border-slate-900 mb-[6px]" style={TABLE_FONT}>
-      <SectionRail>RÃ©servÃ© Ã�  SOMACS SERVICE</SectionRail>
+      <SectionRail>Réservé À SOMACS SERVICE</SectionRail>
       <table className="flex-1 border-collapse">
         <tbody>
           {rows.map(([label, value, secondLabel, secondValue]) => (
@@ -140,7 +140,7 @@ function ReservedTable({ data }) {
             </tr>
           ))}
           <tr>
-            <td className="border-b border-r border-slate-900 bg-slate-50 p-1"><p style={FIELD_LABEL_STYLE}>NumÃ©ro de sÃ©rie</p></td>
+            <td className="border-b border-r border-slate-900 bg-slate-50 p-1"><p style={FIELD_LABEL_STYLE}>Numéro de série</p></td>
             <td className="border-b border-slate-900 p-1" colSpan="3"><span style={{ ...FIELD_VALUE_STYLE, fontFamily: 'monospace', letterSpacing: '0.05em' }}>{data.serialNumber || ''}</span></td>
           </tr>
           <tr>
@@ -157,11 +157,11 @@ function DetailSection({ data }) {
   return (
     <div className="border border-slate-900 mb-[6px]" style={TABLE_FONT}>
       <div className="bg-slate-50 border-b border-slate-900 p-1 text-center">
-        <p style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', margin: 0, letterSpacing: '0.05em' }}>DÃ©tail de l'intervention</p>
+        <p style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', margin: 0, letterSpacing: '0.05em' }}>Détail de l'intervention</p>
       </div>
       <div className="border-b border-slate-900 p-1 bg-white">
         <p style={{ ...FIELD_LABEL_STYLE, textDecoration: 'underline' }}>
-          Diagnostic tÃ©lÃ©phonique : <span style={{ fontWeight: '400', textTransform: 'none', textDecoration: 'none', marginLeft: '5px' }}>{data.telephoneDiagnostic || ''}</span>
+          Diagnostic téléphonique : <span style={{ fontWeight: '400', textTransform: 'none', textDecoration: 'none', marginLeft: '5px' }}>{data.telephoneDiagnostic || ''}</span>
         </p>
       </div>
       <div className="relative h-[125px]" style={{ background: 'repeating-linear-gradient(to bottom, white 0px, white 13px, #cbd5e1 13px, #cbd5e1 13.5px)' }}>
@@ -201,13 +201,13 @@ function DetailSection({ data }) {
 function PartsTable({ parts }) {
   return (
     <div className="flex border border-slate-900 mb-[6px]" style={TABLE_FONT}>
-      <SectionRail>Les articles utilisÃ©s</SectionRail>
+      <SectionRail>Les articles utilisés</SectionRail>
       <table className="flex-1 border-collapse">
         <thead>
           <tr>
-            <th className="border-b border-r border-slate-900 bg-slate-50 p-1 text-center w-[30%]"><p style={FIELD_LABEL_STYLE}>RÃ©fÃ©rence</p></th>
-            <th className="border-b border-r border-slate-900 bg-slate-50 p-1 text-center"><p style={FIELD_LABEL_STYLE}>DÃ©signation</p></th>
-            <th className="border-b border-slate-900 bg-slate-50 p-1 text-center w-[18%]"><p style={FIELD_LABEL_STYLE}>QuantitÃ©</p></th>
+            <th className="border-b border-r border-slate-900 bg-slate-50 p-1 text-center w-[30%]"><p style={FIELD_LABEL_STYLE}>Référence</p></th>
+            <th className="border-b border-r border-slate-900 bg-slate-50 p-1 text-center"><p style={FIELD_LABEL_STYLE}>Désignation</p></th>
+            <th className="border-b border-slate-900 bg-slate-50 p-1 text-center w-[18%]"><p style={FIELD_LABEL_STYLE}>Quantité</p></th>
           </tr>
         </thead>
         <tbody>
@@ -285,7 +285,7 @@ export default function FicheContent({ interventionData, parts, laborPrice, logo
       <LaborPrice value={laborPrice} />
       <Signatures data={data} technicianSignatureUrl={technicianSignatureUrl} clientSignatureUrl={clientSignatureUrl} />
       <div className="absolute bottom-3 left-7 right-7 border-t border-slate-300 pt-1.5 flex justify-between items-center" style={TABLE_FONT}>
-        <p style={{ fontSize: '7px', fontWeight: '600', color: '#64748b', margin: 0 }}>Adresse : 2/2 Rue El Fouledh , Z.I  MÃ©grine Riadh | Tel : 71296493</p>
+        <p style={{ fontSize: '7px', fontWeight: '600', color: '#64748b', margin: 0 }}>Adresse : 2/2 Rue El Fouledh , Z.I  Mégrine Riadh | Tel : 71296493</p>
         <p style={{ fontSize: '7px', fontWeight: '700', color: '#64748b', margin: 0 }}>MF : 1420197A/A/M/000</p>
       </div>
     </>

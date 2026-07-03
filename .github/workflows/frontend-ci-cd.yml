@@ -61,11 +61,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup Node.js 20 for SonarQube
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: SonarQube scan
-        uses: sonarsource/sonarqube-scan-action@v6
+        uses: sonarsource/sonarqube-scan-action@v4
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_SCANNER_OPTS: '-Xmx4096m'
 
   docker:
     name: Docker Build & Push
