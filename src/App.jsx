@@ -94,8 +94,35 @@ export default function App() {
       window.localStorage.setItem('auth_user', JSON.stringify(user))
       setCurrentUser(user)
     }
+
+    // CRITICAL: Read the pending redirect SYNCHRONOUSLY before setting auth state.
+    // This prevents the race condition where route re-evaluation happens before
+    // the useEffect can read sessionStorage.
+    let pendingRedirect = null
+    try {
+      pendingRedirect = window.sessionStorage.getItem('post_login_redirect')
+      if (pendingRedirect) window.sessionStorage.removeItem('post_login_redirect')
+    } catch { /* best-effort */ }
+    if (!pendingRedirect) {
+      try {
+        const pendingMission = window.sessionStorage.getItem('pending_notification_mission')
+        if (pendingMission) {
+          window.sessionStorage.removeItem('pending_notification_mission')
+          pendingRedirect = `/missions/${pendingMission}`
+        }
+      } catch { /* best-effort */ }
+    }
+    if (pendingRedirect) {
+      setPostLoginRedirect(pendingRedirect)
+    }
+
     setIsAuthenticated(true)
   }
+
+  // Consume post-login redirect stored by LoginForm (survives the re-render race)
+  const [postLoginRedirect, setPostLoginRedirect] = useState(null)
+
+  // postLoginRedirect is now set synchronously in handleLoginSuccess — no useEffect needed
 
   const clearLocalAuth = () => {
     if (typeof window !== 'undefined') {
@@ -146,6 +173,12 @@ export default function App() {
 
   const renderHomePage = (loginFallback = false) => {
     if (!isLoggedIn) return loginFallback ? <LoginForm onLoginSuccess={handleLoginSuccess} /> : <Navigate to="/" replace />
+    // If there's a pending post-login redirect, use it (one-shot)
+    if (postLoginRedirect) {
+      const target = postLoginRedirect
+      setPostLoginRedirect(null)
+      return <Navigate to={target} replace />
+    }
     if (normalizedRole === 'technicien') return <Navigate to="/missions/my" replace />
     if (normalizedRole === 'commerciale') return <Navigate to="/devis" replace />
     return renderInLayout(<OperationsDashboard currentUser={currentUser} />)
@@ -164,7 +197,17 @@ export default function App() {
       />
       <Route
         path="/login"
-        element={isLoggedIn ? <Navigate to="/" replace /> : <LoginForm onLoginSuccess={handleLoginSuccess} />}
+        element={isLoggedIn
+          ? (() => {
+              if (postLoginRedirect) {
+                const target = postLoginRedirect
+                setPostLoginRedirect(null)
+                return <Navigate to={target} replace />
+              }
+              return <Navigate to="/" replace />
+            })()
+          : <LoginForm onLoginSuccess={handleLoginSuccess} />
+        }
       />
       <Route
         path="/dashboard"
@@ -215,6 +258,11 @@ export default function App() {
         path="*"
         element={(() => {
           if (!isLoggedIn) return <Navigate to="/" replace />
+          if (postLoginRedirect) {
+            const target = postLoginRedirect
+            setPostLoginRedirect(null)
+            return <Navigate to={target} replace />
+          }
           if (normalizedRole === 'technicien') return <Navigate to="/missions/my" replace />
           if (normalizedRole === 'commerciale') return <Navigate to="/devis" replace />
           return <Navigate to="/dashboard" replace />

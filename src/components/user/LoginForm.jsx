@@ -85,6 +85,13 @@ export default function LoginForm({ onLoginSuccess }) {
       // Post-login redirect: priority 1 = URL param, priority 2 = sessionStorage, priority 3 = default
       const redirectTarget = getPostLoginRedirect(searchParams)
       console.log('[LoginForm] Post-login redirect target:', redirectTarget)
+
+      // Store redirect target in sessionStorage so App.jsx can use it after re-render
+      // (the navigate() below may be overridden by React re-render unmounting this component)
+      if (redirectTarget !== '/') {
+        try { window.sessionStorage.setItem('post_login_redirect', redirectTarget) } catch { /* best-effort */ }
+      }
+
       navigate(redirectTarget, { replace: true })
     } catch {
       setError(LOGIN_ERROR_MESSAGES.serverUnavailable)
