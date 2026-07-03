@@ -79,8 +79,10 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
   const handleModalLoginSuccess = (token, user) => {
     setIsAuthenticated(true)
     setShowLoginModal(false)
-    try { window.dispatchEvent(new CustomEvent('auth:login', { detail: { token, user } })) } catch { /* best-effort */ }
-    navigate(`/missions/${id}`, { replace: true })
+    // Use hard navigation to ensure the PWA reloads with the fresh auth token.
+    // React Router navigate() fails in PWA mode because App.jsx state hasn't
+    // re-rendered yet and the protected route still sees isAuthenticated=false.
+    window.location.replace(`/missions/${id}`)
   }
 
   // ── Authenticated: normal mission details below ─────────────────────────────

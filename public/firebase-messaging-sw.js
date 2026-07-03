@@ -52,7 +52,6 @@ self.addEventListener('notificationclick', (event) => {
 
   const data = event.notification?.data || {}
   const missionId = data.missionId || ''
-  // Always navigate to the notification-aware mission URL
   const missionUrl = missionId ? `/missions/${missionId}/notification` : '/'
 
   console.log('[SW] missionId:', missionId, '| target:', missionUrl)
@@ -61,14 +60,19 @@ self.addEventListener('notificationclick', (event) => {
     self.clients
       .matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientsArr) => {
+        // Try to reuse existing PWA window
         for (const client of clientsArr) {
-          if (client.url.includes(self.registration.scope) && 'focus' in client) {
+          if ('focus' in client) {
             client.postMessage({ type: 'NOTIFICATION_CLICK', url: missionUrl, missionId })
             return client.focus()
           }
         }
-        const base = self.registration.scope.replace(/\/$/, '')
-        return self.clients.openWindow(base + missionUrl)
+        // No window open — open the mission URL directly.
+        // Also store in a way App.jsx can read on cold start (query param as fallback).
+        const origin = self.location.origin
+        const targetUrl = `${origin}${missionUrl}`
+        console.log('[SW] Opening new window:', targetUrl)
+        return self.clients.openWindow(targetUrl)
       }),
   )
 })
