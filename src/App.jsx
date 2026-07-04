@@ -94,20 +94,15 @@ export default function App() {
 
   // ── On cold start: check if a notification click stored a pending URL ───────
   useEffect(() => {
-    // Small delay to ensure the SW IndexedDB write completes before we read.
-    // On cold start, openWindow and savePendingUrl run in parallel.
-    const timer = setTimeout(() => {
-      consumePendingNotificationUrl().then((url) => {
-        if (url) {
-          console.log('[App] Pending notification URL found:', url)
-          setPendingNotificationUrl(url)
-        }
-        setPendingChecked(true)
-      }).catch(() => {
-        setPendingChecked(true)
-      })
-    }, 100) // 100ms is enough for IDB write to complete
-    return () => clearTimeout(timer)
+    consumePendingNotificationUrl().then((url) => {
+      if (url) {
+        console.log('[App] Pending notification URL found:', url)
+        setPendingNotificationUrl(url)
+      }
+      setPendingChecked(true)
+    }).catch(() => {
+      setPendingChecked(true)
+    })
   }, [])
 
   const handleLoginSuccess = (token, user) => {
@@ -225,7 +220,7 @@ export default function App() {
 
   // ── Wait for pending notification check before rendering routes ──────────────
   if (!pendingChecked) {
-    return null
+    return <div className="min-h-screen bg-[#F8FAFC]" />
   }
 
   // ── If a pending notification URL was found, redirect immediately ────────────
