@@ -6,7 +6,7 @@ import {
   Search, Plus, Eye, Edit2, Trash2, Settings, RefreshCw,
   LayoutGrid, LayoutList, Building2, Tag, AlertCircle,
   MoreHorizontal, X, Cpu, FileText,
-  CheckCircle2,
+  CheckCircle2, AlertTriangle,
   Truck, CalendarDays,
 } from 'lucide-react'
 
@@ -135,6 +135,56 @@ function MachineCard({ machine, onView, onEdit, onDelete, canManage }) {
   )
 }
 
+function DeleteMachineModal({ machine, deleting, onCancel, onConfirm }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onCancel() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onCancel])
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
+        <button
+          onClick={onCancel}
+          disabled={deleting}
+          className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50"
+        >
+          <X size={18} />
+        </button>
+        <div className="flex flex-col items-center text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-500">
+            <AlertTriangle size={28} />
+          </div>
+          <h3 className="mt-4 text-lg font-black text-slate-900">Confirmer la suppression</h3>
+          <p className="mt-2 text-sm text-slate-500">
+            Êtes-vous sûr de vouloir supprimer <span className="font-bold text-slate-800">{machine.designation}</span>
+            {machine.code && <span className="font-mono text-slate-500"> ({machine.code})</span>} ?<br />
+            Cette action est irréversible.
+          </p>
+          <div className="mt-6 flex w-full gap-3">
+            <button
+              onClick={onCancel}
+              disabled={deleting}
+              className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 disabled:opacity-50"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={deleting}
+              className="flex-1 rounded-2xl bg-red-600 px-4 py-3 text-sm font-bold text-white transition-all hover:bg-red-700 disabled:opacity-50"
+            >
+              {deleting ? 'Suppression...' : 'Supprimer'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function MachineList({ currentUser }) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -144,6 +194,8 @@ export default function MachineList({ currentUser }) {
   const [viewMode, setViewMode] = useState('list')
   const [currentPage, setCurrentPage] = useState(1)
   const [toast, setToast] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
   const toastRef = useRef(null)
   const ITEMS_PER_PAGE = 10
   const normalizedRole = normalizeRole(currentUser?.role || getStoredRole())
@@ -183,17 +235,34 @@ export default function MachineList({ currentUser }) {
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
   const paginated = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
 
-  const handleDelete = async (machine) => {
-    if (!window.confirm(`Supprimer la machine "${machine.designation}" ?`)) return
+  const handleDelete = (machine) => {
+    setDeleteTarget(machine)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget || deleting) return
+    setDeleting(true)
     try {
-      const res = await apiFetch(`/machines/${machine.id}`, { method: 'DELETE', auth: true })
+      const res = await apiFetch(`/machines/${deleteTarget.id}`, { method: 'DELETE', auth: true })
       if (res.ok) {
+        setDeleteTarget(null)
         setToast({ type: 'success', message: 'Machine supprimée avec succès.' })
         if (toastRef.current) clearTimeout(toastRef.current)
         toastRef.current = setTimeout(() => setToast(null), 3000)
         fetchMachines()
+      } else {
+        setToast({ type: 'error', message: 'Erreur lors de la suppression.' })
+        if (toastRef.current) clearTimeout(toastRef.current)
+        toastRef.current = setTimeout(() => setToast(null), 3500)
       }
-    } catch (e) { console.error(e) }
+    } catch (e) {
+      console.error(e)
+      setToast({ type: 'error', message: 'Impossible de supprimer la machine.' })
+      if (toastRef.current) clearTimeout(toastRef.current)
+      toastRef.current = setTimeout(() => setToast(null), 3500)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const listSummary = useMemo(() => {
@@ -448,6 +517,16 @@ export default function MachineList({ currentUser }) {
           </div>
         )}
       </main>
+
+      {/* Modale de confirmation de suppression */}
+      {deleteTarget && (
+        <DeleteMachineModal
+          machine={deleteTarget}
+          deleting={deleting}
+          onCancel={() => !deleting && setDeleteTarget(null)}
+          onConfirm={handleDeleteConfirm}
+        />
+      )}
     </div>
   )
 }

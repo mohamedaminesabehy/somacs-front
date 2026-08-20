@@ -195,6 +195,9 @@ export default function UserDetails() {
   const startOfMonth = getStartOfMonth(today)
   const [dateStart, setDateStart] = useState(formatDateToISO(startOfMonth))
   const [dateEnd, setDateEnd] = useState(formatDateToISO(today))
+  // Committed dates: only these are sent to the API
+  const [committedDateStart, setCommittedDateStart] = useState(formatDateToISO(startOfMonth))
+  const [committedDateEnd, setCommittedDateEnd] = useState(formatDateToISO(today))
 
   const [auditPage, setAuditPage] = useState(1)
   const [auditLogs, setAuditLogs] = useState({ items: [], total: 0, page: 1, totalPages: 1 })
@@ -203,6 +206,7 @@ export default function UserDetails() {
   const [auditError, setAuditError] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
   const [tablePage, setTablePage] = useState(1)
+  const [dateError, setDateError] = useState('')
   const tableRowsPerPage = 6
 
   useEffect(() => {
@@ -235,7 +239,9 @@ export default function UserDetails() {
       setAuditPage(1)
 
       try {
-        const baseParams = `&dateStart=${dateStart}&dateEnd=${dateEnd}`
+        let baseParams = ''
+        if (committedDateStart) baseParams += `&dateStart=${committedDateStart}`
+        if (committedDateEnd) baseParams += `&dateEnd=${committedDateEnd}`
 
         const [logsResponse, statsResponse] = await Promise.all([
           apiFetch(`/audit-logs/user/${id}?page=1&limit=20${baseParams}`, { auth: true }),
@@ -267,7 +273,7 @@ export default function UserDetails() {
     }
 
     fetchAudit()
-  }, [id, dateStart, dateEnd, refreshKey])
+  }, [id, committedDateStart, committedDateEnd, refreshKey])
 
   useEffect(() => {
     if (auditPage === 1) return
@@ -277,7 +283,9 @@ export default function UserDetails() {
       setIsLoadingAudit(true)
 
       try {
-        const baseParams = `&dateStart=${dateStart}&dateEnd=${dateEnd}`
+        let baseParams = ''
+        if (committedDateStart) baseParams += `&dateStart=${committedDateStart}`
+        if (committedDateEnd) baseParams += `&dateEnd=${committedDateEnd}`
         const response = await apiFetch(`/audit-logs/user/${id}?page=${auditPage}&limit=20${baseParams}`, { auth: true })
 
         if (!response.ok) return
@@ -297,7 +305,7 @@ export default function UserDetails() {
     }
 
     fetchNextPage()
-  }, [auditPage, id, dateStart, dateEnd])
+  }, [auditPage, id, committedDateStart, committedDateEnd])
 
   const counts = useMemo(() => {
     const map = auditStats?.actionsByType || {}
@@ -369,7 +377,7 @@ export default function UserDetails() {
 
   useEffect(() => {
     setTablePage(1)
-  }, [logsForTable.length, dateStart, dateEnd, refreshKey])
+  }, [logsForTable.length, committedDateStart, committedDateEnd, refreshKey])
 
   useEffect(() => {
     if (tablePage > totalTablePages) {
@@ -377,13 +385,60 @@ export default function UserDetails() {
     }
   }, [tablePage, totalTablePages])
 
-  const handleDateStartChange = (e) => setDateStart(e.target.value)
-  const handleDateEndChange = (e) => setDateEnd(e.target.value)
+  const handleDateStartChange = (e) => {
+    setDateStart(e.target.value)
+    setDateError('')
+  }
+  const handleDateEndChange = (e) => {
+    setDateEnd(e.target.value)
+    setDateError('')
+  }
+
+  /**
+   * Validates a date string: must be a complete YYYY-MM-DD with year in SQL Server range (1753-9999).
+   */
+  const isValidDate = (dateStr) => {
+    if (!dateStr || dateStr.trim() === '') return false
+    const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (!match) return false
+    const year = parseInt(match[1], 10)
+    if (year < 1753 || year > 9999) return false
+    const d = new Date(dateStr + 'T00:00:00')
+    return !Number.isNaN(d.getTime())
+  }
+
+  const handleSearch = () => {
+    setDateError('')
+    // Allow both empty (no filter) or both valid
+    const startEmpty = !dateStart || dateStart.trim() === ''
+    const endEmpty = !dateEnd || dateEnd.trim() === ''
+
+    if (!startEmpty && !isValidDate(dateStart)) {
+      setDateError('La date de début est invalide (format attendu : AAAA-MM-JJ, année entre 1753 et 9999).')
+      return
+    }
+    if (!endEmpty && !isValidDate(dateEnd)) {
+      setDateError('La date de fin est invalide (format attendu : AAAA-MM-JJ, année entre 1753 et 9999).')
+      return
+    }
+    if (!startEmpty && !endEmpty && dateStart > dateEnd) {
+      setDateError('La date de début doit être antérieure ou égale à la date de fin.')
+      return
+    }
+
+    setCommittedDateStart(startEmpty ? '' : dateStart)
+    setCommittedDateEnd(endEmpty ? '' : dateEnd)
+  }
 
   const handleResetDates = () => {
     const now = new Date()
-    setDateStart(formatDateToISO(getStartOfMonth(now)))
-    setDateEnd(formatDateToISO(now))
+    const start = formatDateToISO(getStartOfMonth(now))
+    const end = formatDateToISO(now)
+    setDateStart(start)
+    setDateEnd(end)
+    setDateError('')
+    setCommittedDateStart(start)
+    setCommittedDateEnd(end)
   }
 
   const handleRefresh = () => setRefreshKey((v) => v + 1)
@@ -394,8 +449,8 @@ export default function UserDetails() {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
     const pageWidth = doc.internal.pageSize.getWidth()
     const pageHeight = doc.internal.pageSize.getHeight()
-    const periodStart = formatDateForDisplay(dateStart)
-    const periodEnd = formatDateForDisplay(dateEnd)
+    const periodStart = formatDateForDisplay(committedDateStart)
+    const periodEnd = formatDateForDisplay(committedDateEnd)
 
     const primaryColor = [0, 82, 204]
     const lightGrey = [248, 250, 252]
@@ -671,7 +726,7 @@ export default function UserDetails() {
       })
     }
 
-    doc.save(`rapport-tracabilite-${userDetails.name || 'user'}-${dateStart}-to-${dateEnd}.pdf`)
+    doc.save(`rapport-tracabilite-${userDetails.name || 'user'}-${committedDateStart}-to-${committedDateEnd}.pdf`)
   }
 
   const noActivity = totalActions === 0
@@ -785,18 +840,28 @@ export default function UserDetails() {
                 </div>
                 <button
                   type="button"
+                  onClick={handleSearch}
+                  className="mt-4 mr-2 inline-flex items-center gap-2 rounded-lg bg-[#0052CC] px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-sm transition hover:bg-[#0042a3]"
+                >
+                  Rechercher
+                </button>
+                <button
+                  type="button"
                   onClick={handleResetDates}
                   className="mt-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700 transition hover:bg-slate-50"
                 >
                   <RotateCcw size={14} />
                   Reinitialiser
                 </button>
+                {dateError && (
+                  <p className="mt-2 text-xs font-medium text-red-600">{dateError}</p>
+                )}
               </div>
 
               <div className="rounded-xl border border-[#0052CC]/25 bg-[#0052CC]/8 p-4">
                 <p className="text-xs font-black uppercase tracking-widest text-[#0052CC]">Periode analysee</p>
                 <p className="mt-1 text-sm font-bold text-slate-900">
-                  du {formatDateForDisplay(dateStart)} au {formatDateForDisplay(dateEnd)}
+                  du {formatDateForDisplay(committedDateStart)} au {formatDateForDisplay(committedDateEnd)}
                 </p>
               </div>
             </div>

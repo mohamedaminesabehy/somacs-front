@@ -153,35 +153,42 @@ export default function DevisSuiviDashboard() {
     return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b))
   }, [rows])
 
-  const loadStats = useCallback(async (signal) => {
+  const loadStats = useCallback(async (filters, signal) => {
     try {
-      const nextStats = await fetchDevisSuiviStats(signal)
+      const nextStats = await fetchDevisSuiviStats(filters, signal)
       setStats({ ...emptyStats, ...(nextStats || {}) })
     } catch (err) {
       if (err?.name === 'AbortError') return
     }
   }, [])
 
+  const buildFilters = useCallback(() => {
+    const filters = {}
+    if (search?.trim()) filters.search = search.trim()
+    if (statusFilter && statusFilter !== 'ALL') filters.status = statusFilter
+    if (commercialFilter && commercialFilter !== 'ALL') filters.commercialCode = commercialFilter
+    if (dateFrom) filters.dateFrom = dateFrom
+    if (dateTo) filters.dateTo = dateTo
+    return filters
+  }, [search, statusFilter, commercialFilter, dateFrom, dateTo])
+
   const loadData = useCallback(async (signal) => {
     setLoading(true)
     setError('')
     try {
+      const filters = buildFilters()
       const payload = await fetchDevisSuiviList({
         page,
         limit: pageInfo.limit,
-        search,
-        status: statusFilter === 'ALL' ? '' : statusFilter,
-        commercial: commercialFilter === 'ALL' ? '' : commercialFilter,
-        dateFrom,
-        dateTo,
+        ...filters,
       }, signal)
-      const rawItems = payload?.items ?? payload
+      const rawItems = payload?.data ?? payload?.items ?? payload
       const items = Array.isArray(rawItems) ? rawItems : []
       setRows(items)
       setPageInfo({
-        total: Number(payload?.total || payload?.meta?.total || 0),
-        totalPages: Number(payload?.totalPages || payload?.meta?.totalPages || 1),
-        limit: Number(payload?.limit || payload?.meta?.limit || pageInfo.limit),
+        total: Number(payload?.total || 0),
+        totalPages: Number(payload?.totalPages || 1),
+        limit: Number(payload?.limit || pageInfo.limit),
       })
     } catch (err) {
       if (err?.name === 'AbortError') return
@@ -189,7 +196,7 @@ export default function DevisSuiviDashboard() {
     } finally {
       setLoading(false)
     }
-  }, [commercialFilter, dateFrom, dateTo, page, pageInfo.limit, search, statusFilter])
+  }, [buildFilters, page, pageInfo.limit])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -199,13 +206,19 @@ export default function DevisSuiviDashboard() {
 
   useEffect(() => {
     const controller = new AbortController()
-    loadStats(controller.signal)
+    const filters = buildFilters()
+    loadStats(filters, controller.signal)
     return () => controller.abort()
-  }, [loadStats])
+  }, [buildFilters, loadStats])
 
-  const refreshAll = async () => {
-    await Promise.all([loadData(), loadStats()])
-  }
+  const refreshAll = useCallback(async () => {
+    const controller = new AbortController()
+    const filters = buildFilters()
+    await Promise.all([
+      loadData(controller.signal),
+      loadStats(filters, controller.signal)
+    ])
+  }, [buildFilters, loadData, loadStats])
 
   const handlePurchased = async (row) => {
     if (!row?.id) return

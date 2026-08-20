@@ -92,8 +92,10 @@ export async function fetchDevisSuiviRelancesOverdue(signal) {
   return readJsonResponse(response, 'Impossible de charger les relances en retard.')
 }
 
-export async function fetchDevisSuiviStats(signal) {
-  const response = await apiFetch('/devis-suivi/stats', { auth: true, signal })
+export async function fetchDevisSuiviStats(params, signal) {
+  const query = buildQuery(params ?? {})
+  const path = query ? `/devis-suivi/stats?${query}` : '/devis-suivi/stats'
+  const response = await apiFetch(path, { auth: true, signal })
   return readJsonResponse(response, 'Impossible de charger les statistiques.')
 }
 

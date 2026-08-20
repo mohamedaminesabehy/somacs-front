@@ -125,6 +125,8 @@ export default function InterventionDetails() {
     [machines, interventionData.machineId],
   )
 
+  const [parts, setParts] = useState(dbEntry?.parts || [])
+
   const { isSaving, handleSave } = useInterventionSave({
     id, interventionData, parts, laborPrice, status, completedUpTo, sections, missionId,
     setDbEntry, setStatus, setIsEditing, navigate,
@@ -148,8 +150,6 @@ export default function InterventionDetails() {
     const { name, value } = e.target
     setInterventionData(prev => ({ ...prev, [name]: value }))
   }
-
-  const [parts, setParts] = useState(dbEntry?.parts || [])
 
 
   useEffect(() => {

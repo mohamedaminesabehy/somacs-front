@@ -706,7 +706,7 @@ export default function ClientDetails360() {
   }
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 space-y-6">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 space-y-4">
       {toast && (
         <div className="fixed top-4 right-4 z-[10000] rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 shadow-lg">
           {toast}
@@ -810,7 +810,7 @@ export default function ClientDetails360() {
       </div>
 
       {/* Informations client */}
-      <section>
+      <section className="bg-blue-50/40 border border-blue-100/60 rounded-2xl p-4 sm:p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-base font-black text-slate-900">Informations client</h2>
@@ -888,11 +888,8 @@ export default function ClientDetails360() {
         )}
       </section>
 
-      {/* ── Separator ── */}
-      <div className="border-t border-slate-200 lg:hidden" />
-
       {/* Équipements du client */}
-      <section>
+      <section className="bg-emerald-50/30 border border-emerald-100/50 rounded-2xl p-4 sm:p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
@@ -922,11 +919,8 @@ export default function ClientDetails360() {
         )}
       </section>
 
-      {/* -- Separator -- */}
-      <div className="border-t border-slate-200 lg:hidden" />
-
       {/* Suivi SAV du client */}
-      <section>
+      <section className="bg-violet-50/30 border border-violet-100/50 rounded-2xl p-4 sm:p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-base font-black text-slate-900 flex items-center gap-2">

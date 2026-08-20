@@ -163,7 +163,7 @@ export default function VehicleList() {
               <Truck size={24} className="text-white" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-xl font-black text-slate-900 tracking-tight truncate">Parc Véhicules</h1>
+              <h1 className="text-xl font-black text-slate-900 tracking-tight truncate">Gestion Des Véhicules</h1>
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded uppercase tracking-wider">{vehicles.length} véhicules</span>
                 <div className="w-1 h-1 bg-slate-300 rounded-full" />
