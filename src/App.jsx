@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './components/layout/Sidebar'
 import Header from './components/layout/Header'
@@ -62,7 +62,7 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [pendingNotificationUrl, setPendingNotificationUrl] = useState(null)
   const [pendingChecked, setPendingChecked] = useState(false)
-  const pendingConsumedRef = useRef(false)
+  const [pendingConsumed, setPendingConsumed] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     if (typeof window === 'undefined') {
       return false
@@ -98,6 +98,7 @@ export default function App() {
       if (url) {
         console.log('[App] Pending notification URL found:', url)
         setPendingNotificationUrl(url)
+        setPendingConsumed(false) // Allow navigation
       }
       setPendingChecked(true)
     }).catch(() => {
@@ -224,9 +225,9 @@ export default function App() {
   }
 
   // ── If a pending notification URL was found, redirect immediately ────────────
-  // Use a ref to avoid calling setState during render (which would cause loops).
-  if (pendingNotificationUrl && !pendingConsumedRef.current) {
-    pendingConsumedRef.current = true
+  if (pendingNotificationUrl && !pendingConsumed) {
+    // Mark as consumed before rendering Navigate to avoid re-renders
+    setPendingConsumed(true)
     return <Navigate to={pendingNotificationUrl} replace />
   }
 

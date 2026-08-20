@@ -76,7 +76,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
   const [isAuthenticated, setIsAuthenticated] = useState(() => isAuthTokenUsable(getAuthToken()))
   const [showLoginModal, setShowLoginModal] = useState(() => allowUnauthenticated && !isAuthTokenUsable(getAuthToken()))
 
-  const handleModalLoginSuccess = (token, user) => {
+  const handleModalLoginSuccess = (_token, _user) => {
     setIsAuthenticated(true)
     setShowLoginModal(false)
     // Use hard navigation to ensure the PWA reloads with the fresh auth token.
