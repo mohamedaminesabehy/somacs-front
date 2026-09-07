@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { Sparkles, Plus, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react'
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+import { apiFetch, getAuthToken } from '../../api/apiClient'
 
 /**
  * Displays ML-powered article recommendations inside CreateDevis.
@@ -42,11 +41,12 @@ const ArticleRecommendations = ({ currentArticles, onAddArticle }) => {
         setLoading(true)
         setAddError(null)
 
-        const token = localStorage.getItem('auth_token')
-        const url = `${API_BASE_URL}/recommendations?articles=${encodeURIComponent(codes.join(','))}&limit=5`
+        const token = getAuthToken()
+        console.log('[ArticleRecommendations] auth token present:', Boolean(token))
+        const path = `/recommendations?articles=${encodeURIComponent(codes.join(','))}&limit=5`
 
-        const response = await fetch(url, {
-          headers: { Authorization: `Bearer ${token}` },
+        const response = await apiFetch(path, {
+          auth: true,
           signal: controller.signal,
         })
 
@@ -93,10 +93,11 @@ const ArticleRecommendations = ({ currentArticles, onAddArticle }) => {
         return
       }
 
-      const token = localStorage.getItem('auth_token')
-      const response = await fetch(
-        `${API_BASE_URL}/articles/${encodeURIComponent(code)}/detail`,
-        { headers: { Authorization: `Bearer ${token}` } }
+      const token = getAuthToken()
+      console.log('[ArticleRecommendations] detail auth token present:', Boolean(token))
+      const response = await apiFetch(
+        `/articles/${encodeURIComponent(code)}/detail`,
+        { auth: true }
       )
 
       if (!response.ok) {
