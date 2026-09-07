@@ -57,8 +57,26 @@ function createUnauthorizedResponse(message = 'Unauthorized') {
   })
 }
 
-function applyAuthHeader(finalHeaders) {
+function shouldLogAuthDiagnostic(path) {
+  return typeof path === 'string' && path.startsWith('/recommendations')
+}
+
+function logAuthDiagnostic(path, details) {
+  if (!shouldLogAuthDiagnostic(path)) return
+  try {
+    console.log('[apiFetch] auth diagnostic:', details)
+  } catch {
+    // Console logging is diagnostic-only.
+  }
+}
+
+function applyAuthHeader(finalHeaders, path, auth) {
   const token = getAuthToken()
+  logAuthDiagnostic(path, {
+    authRequested: Boolean(auth),
+    tokenExists: Boolean(token),
+    tokenLooksLikeJwt: typeof token === 'string' && token.trim().startsWith('eyJ'),
+  })
   if (!token) {
     return createUnauthorizedResponse('Missing authorization token')
   }
@@ -67,7 +85,7 @@ function applyAuthHeader(finalHeaders) {
     dispatchAuthInvalid('expired-token')
     return createUnauthorizedResponse('Expired authorization token')
   }
-  finalHeaders.Authorization = `Bearer ${token}`
+  finalHeaders.set('Authorization', `Bearer ${token.trim()}`)
   return null
 }
 
@@ -75,7 +93,9 @@ function prepareRequestBody(body, finalHeaders) {
   if (body === undefined || body === null || typeof body !== 'object' || body instanceof FormData) {
     return body
   }
-  finalHeaders['Content-Type'] = finalHeaders['Content-Type'] || 'application/json'
+  if (!finalHeaders.has('Content-Type')) {
+    finalHeaders.set('Content-Type', 'application/json')
+  }
   return JSON.stringify(body)
 }
 
@@ -115,13 +135,19 @@ export async function apiFetch(path, options = {}) {
     ...rest
   } = options
 
-  const finalHeaders = { ...headers }
+  const finalHeaders = new Headers(headers)
   if (auth) {
-    const unauthorizedResponse = applyAuthHeader(finalHeaders)
+    const unauthorizedResponse = applyAuthHeader(finalHeaders, path, auth)
     if (unauthorizedResponse) return unauthorizedResponse
   }
 
   const finalBody = prepareRequestBody(body, finalHeaders)
+  logAuthDiagnostic(path, {
+    authorizationHeaderAdded: finalHeaders.has('Authorization'),
+    authorizationHeaderStartsWithBearer: finalHeaders
+      .get('Authorization')
+      ?.startsWith('Bearer ') || false,
+  })
 
   // Timeout client : si le backend met plus de N ms, on annule la requête
   // pour ne JAMAIS laisser un loader bloqué côté UI.
