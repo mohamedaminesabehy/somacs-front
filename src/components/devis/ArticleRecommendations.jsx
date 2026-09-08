@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { Sparkles, Plus, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react'
+import { Sparkles, Plus, TrendingUp, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react'
 import { apiFetch, getAuthToken } from '../../api/apiClient'
 
 /**
@@ -15,6 +15,7 @@ const ArticleRecommendations = ({ currentArticles, onAddArticle }) => {
   const [collapsed, setCollapsed] = useState(false)
   const [addingCode, setAddingCode] = useState(null)
   const [addError, setAddError] = useState(null)
+  const [fetchError, setFetchError] = useState(null)
   const lastFetchKeyRef = useRef('')
   const detailCacheRef = useRef(new Map())
 
@@ -25,6 +26,7 @@ const ArticleRecommendations = ({ currentArticles, onAddArticle }) => {
 
     if (codes.length === 0) {
       setRecommendations([])
+      setFetchError(null)
       lastFetchKeyRef.current = ''
       return
     }
@@ -40,6 +42,7 @@ const ArticleRecommendations = ({ currentArticles, onAddArticle }) => {
       try {
         setLoading(true)
         setAddError(null)
+        setFetchError(null)
 
         const token = getAuthToken()
         console.log('[ArticleRecommendations] auth token present:', Boolean(token))
@@ -51,6 +54,13 @@ const ArticleRecommendations = ({ currentArticles, onAddArticle }) => {
         })
 
         if (!response.ok) {
+          if (response.status === 503) {
+            setFetchError('Service de recommandation temporairement indisponible.')
+          } else if (response.status >= 500) {
+            setFetchError('Erreur serveur lors de la récupération des recommandations.')
+          } else {
+            setFetchError('Impossible de charger les recommandations.')
+          }
           setRecommendations([])
           return
         }
@@ -59,6 +69,8 @@ const ArticleRecommendations = ({ currentArticles, onAddArticle }) => {
         setRecommendations(data.recommendations || [])
       } catch (err) {
         if (err.name === 'AbortError') return
+        console.error('[ArticleRecommendations] Fetch error:', err)
+        setFetchError('Erreur réseau lors de la récupération des recommandations.')
         setRecommendations([])
       } finally {
         setLoading(false)
@@ -135,8 +147,9 @@ const ArticleRecommendations = ({ currentArticles, onAddArticle }) => {
     }
   }
 
-  // Don't render if no recommendations and not loading
-  if (recommendations.length === 0 && !loading) return null
+  // Only hide component if no articles selected (empty state)
+  const codes = currentArticles.map((a) => a.Code).filter(Boolean)
+  if (codes.length === 0) return null
 
   return (
     <section className="overflow-hidden rounded-[28px] border border-purple-100 bg-gradient-to-br from-purple-50/80 to-white shadow-[0_18px_60px_rgba(147,51,234,0.06)]">
@@ -173,6 +186,18 @@ const ArticleRecommendations = ({ currentArticles, onAddArticle }) => {
             <div className="flex items-center gap-3 px-4 py-6 text-purple-400">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-purple-300 border-t-purple-600" />
               <span className="text-xs font-bold">Analyse en cours...</span>
+            </div>
+          ) : fetchError ? (
+            <div className="flex items-center gap-3 rounded-xl bg-red-50 border border-red-100 px-4 py-3">
+              <AlertCircle size={18} className="text-red-500 flex-shrink-0" />
+              <p className="text-xs font-bold text-red-600">{fetchError}</p>
+            </div>
+          ) : recommendations.length === 0 ? (
+            <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
+              <AlertCircle size={18} className="text-slate-400 flex-shrink-0" />
+              <p className="text-xs font-medium text-slate-600">
+                Aucune recommandation disponible pour les articles sélectionnés.
+              </p>
             </div>
           ) : (
             <>
