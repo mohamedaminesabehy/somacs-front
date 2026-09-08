@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { AlertCircle } from 'lucide-react'
 import { apiFetch } from '../api/apiClient'
 
@@ -11,14 +11,13 @@ export default function VehicleSelector({ value, onChange, disabled = false, req
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  useEffect(() => {
-    const fetchAvailable = async () => {
+  const fetchAvailable = useCallback(async () => {
       try {
         setLoading(true)
-        const response = await apiFetch('/vehicles/available', { auth: true })
+        const response = await apiFetch('/vehicles/available', { auth: true, cache: 'no-store' })
         if (!response.ok) throw new Error('Erreur lors du chargement')
         const data = await response.json()
-        setVehicles(data || [])
+        setVehicles(Array.isArray(data) ? data : [])
         setError(null)
       } catch (err) {
         console.error(err)
@@ -26,10 +25,19 @@ export default function VehicleSelector({ value, onChange, disabled = false, req
       } finally {
         setLoading(false)
       }
-    }
+    }, [])
 
-    fetchAvailable()
-  }, [])
+  useEffect(() => {
+    void fetchAvailable()
+  }, [fetchAvailable])
+
+  useEffect(() => {
+    const handleFocus = () => {
+      void fetchAvailable()
+    }
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [fetchAvailable])
 
   if (error) {
     return (

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { apiFetch } from '../../../api/apiClient'
 import { formatClientAddress, getInterventionStatusLabel as getStatusLabel } from '../../../utils/intervention'
 
@@ -63,22 +63,32 @@ export function useAssignMissionData() {
   const [availableVehicles, setAvailableVehicles] = useState([])
   const [availableVehiclesLoading, setAvailableVehiclesLoading] = useState(true)
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        setAvailableVehiclesLoading(true)
-        const response = await apiFetch('/vehicles/available', { auth: true })
-        if (!response.ok) return
-        const data = await response.json()
-        const items = Array.isArray(data) ? data : []
-        setAvailableVehicles(items.map(normalizeVehicle).filter((v) => Boolean(v.id)))
-      } catch {
-        setAvailableVehicles([])
-      } finally {
-        setAvailableVehiclesLoading(false)
-      }
-    })()
+  const loadAvailableVehicles = useCallback(async () => {
+    try {
+      setAvailableVehiclesLoading(true)
+      const response = await apiFetch('/vehicles/available', { auth: true, cache: 'no-store' })
+      if (!response.ok) return
+      const data = await response.json()
+      const items = Array.isArray(data) ? data : []
+      setAvailableVehicles(items.map(normalizeVehicle).filter((v) => Boolean(v.id)))
+    } catch {
+      setAvailableVehicles([])
+    } finally {
+      setAvailableVehiclesLoading(false)
+    }
   }, [])
+
+  useEffect(() => {
+    void loadAvailableVehicles()
+  }, [loadAvailableVehicles])
+
+  useEffect(() => {
+    const handleFocus = () => {
+      void loadAvailableVehicles()
+    }
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [loadAvailableVehicles])
 
   useEffect(() => {
     void (async () => {
@@ -108,5 +118,5 @@ export function useAssignMissionData() {
     })()
   }, [])
 
-  return { interventionsList, employeeList, availableVehicles, availableVehiclesLoading }
+  return { interventionsList, employeeList, availableVehicles, availableVehiclesLoading, refreshAvailableVehicles: loadAvailableVehicles }
 }
