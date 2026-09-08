@@ -118,6 +118,10 @@ function SidebarContent({ onClose, currentUser, onLogout }) {
     canAccessOperationsDashboard,
   } = getSidebarRoleFlags(currentUser)
 
+  // Vérifier si l'utilisateur peut accéder au menu Devis
+  const normalizedRole = String(currentUser?.role || '').trim().toLowerCase()
+  const canAccessDevis = normalizedRole === 'administrateur' || isCommerciale
+
   const menuLinkClass = ({ isActive }) =>
     `flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-300 group ${
       isActive
@@ -157,10 +161,12 @@ function SidebarContent({ onClose, currentUser, onLogout }) {
             <SubLink to="/interventions/create" icon={PlusCircle} label="Nouvelle intervention" onClick={onClose} />
           </SubMenu>
 
-          <NavLink to="/devis" className={menuLinkClass} onClick={onClose}>
-            <FileText size={20} className="group-hover:scale-110 transition-transform" />
-            <span className="font-medium">Devis</span>
-          </NavLink>
+          {canAccessDevis && (
+            <NavLink to="/devis" className={menuLinkClass} onClick={onClose}>
+              <FileText size={20} className="group-hover:scale-110 transition-transform" />
+              <span className="font-medium">Devis</span>
+            </NavLink>
+          )}
 
           {canAccessDevisSuivi && (
             <SubMenu icon={ClipboardList} label="Suivi commercial" matchPaths={["/devis-suivi"]}>
