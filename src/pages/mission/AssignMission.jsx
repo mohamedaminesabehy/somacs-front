@@ -92,7 +92,13 @@ export default function AssignMission() {
 
   const { interventionsList, employeeList, availableVehicles, availableVehiclesLoading } = useAssignMissionData()
 
-  const form = useAssignMissionForm({ interventionsList, employeeList, navigate, prefillInterventionId })
+  // Filtrer uniquement les techniciens
+  const techniciansList = employeeList.filter(emp => {
+    const normalizedRole = String(emp.role || '').trim().toLowerCase()
+    return normalizedRole === 'technicien'
+  })
+
+  const form = useAssignMissionForm({ interventionsList, employeeList: techniciansList, navigate, prefillInterventionId })
 
   const {
     currentStep, missionType, setMissionType, formData, handleChange,
@@ -198,8 +204,8 @@ export default function AssignMission() {
               <div>
                 <p className="text-sm font-bold text-slate-700 mb-1">Comment ca fonctionne ?</p>
                 <ul className="text-xs font-medium text-slate-500 space-y-1 list-none">
-                  <li className="flex items-center gap-2"><ArrowRight size={12} className="text-[#0052CC]" /> <strong>Mission Normale</strong> � tache libre affectee directement a un technicien.</li>
-                  <li className="flex items-center gap-2"><ArrowRight size={12} className="text-[#0052CC]" /> <strong>Intervention SAV</strong> � lie la mission a un dossier. Le statut du dossier passe automatiquement a "Affectee".</li>
+                  <li className="flex items-center gap-2"><ArrowRight size={12} className="text-[#0052CC]" /> <strong>Mission Normale</strong> • tache libre affectee directement a un technicien.</li>
+                  <li className="flex items-center gap-2"><ArrowRight size={12} className="text-[#0052CC]" /> <strong>Intervention SAV</strong> • lie la mission a un dossier. Le statut du dossier passe automatiquement a "Affectee".</li>
                 </ul>
               </div>
             </div>
@@ -242,7 +248,7 @@ export default function AssignMission() {
                     <optgroup label="En attente (non assignees)">
                       {linkableInterventions.filter((i) => i.status === 'PENDING').map((inv) => (
                         <option key={inv.id} value={inv.id}>
-                          {inv.id} � {inv.client} � {inv.machine}
+                          {inv.id} • {inv.client} • {inv.machine}
                         </option>
                       ))}
                     </optgroup>
@@ -284,8 +290,8 @@ export default function AssignMission() {
                       </div>
                       <div>
                         <p className="text-[10px] font-black text-blue-400 uppercase tracking-wider mb-1">Site</p>
-                        <p className="text-sm font-medium text-slate-700">{selectedIntervention.site || '�'}</p>
-                        <p className="text-xs text-slate-600 mt-1 break-words">{selectedIntervention.address || '�'}</p>
+                        <p className="text-sm font-medium text-slate-700">{selectedIntervention.site || '—'}</p>
+                        <p className="text-xs text-slate-600 mt-1 break-words">{selectedIntervention.address || '—'}</p>
                       </div>
                       <div>
                         <p className="text-[10px] font-black text-blue-400 uppercase tracking-wider mb-1">Date creation</p>
@@ -394,7 +400,7 @@ export default function AssignMission() {
                 </div>
               )}
 
-              {/* Pi�ces jointes */}
+              {/* Pieces jointes */}
               <div
                 className="border-2 border-dashed border-slate-200 rounded-2xl p-6 text-center hover:border-[#0052CC] hover:bg-blue-50/30 transition-all cursor-pointer group bg-slate-50/30"
                 onClick={openFilePicker}
@@ -418,7 +424,7 @@ export default function AssignMission() {
                   >
                     Ajouter des pieces jointes
                   </button>
-                  <p className="text-xs text-slate-400">PDF, JPG, PNG � Max 10MB</p>
+                  <p className="text-xs text-slate-400">PDF, JPG, PNG • Max 10MB</p>
                 </div>
                 {attachments.length > 0 && (
                   <div className="mt-4 w-full max-w-md mx-auto text-left space-y-2">
@@ -472,7 +478,7 @@ export default function AssignMission() {
                 Choisir les techniciens (max 3)
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {employeeList.map((emp) => {
+                {techniciansList.map((emp) => {
                   const isSelected = selectedEmployees.includes(emp.name)
                   return (
                     <button
@@ -572,21 +578,21 @@ export default function AssignMission() {
               </div>
             </div>
 
-            {/* V�hicule */}
+            {/* Vehicule */}
             <div className="space-y-3">
               <label className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
                 <Settings size={14} className="text-[#0052CC]" />
-                V�hicule affect� (optionnel)
+                Vehicule affecte (optionnel)
               </label>
               {availableVehiclesLoading ? (
                 <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-500">
                   <Loader2 size={16} className="text-slate-400 shrink-0 animate-spin" />
-                  Chargement des v�hicules disponibles...
+                  Chargement des vehicules disponibles...
                 </div>
               ) : availableVehicles.length === 0 ? (
                 <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-500">
                   <AlertCircle size={16} className="text-slate-400 shrink-0" />
-                  Aucun v�hicule disponible actuellement
+                  Aucun vehicule disponible actuellement
                 </div>
               ) : (
                 <select
@@ -596,10 +602,10 @@ export default function AssignMission() {
                   className="w-full px-5 py-4 bg-white border-2 border-slate-200 rounded-xl focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all font-semibold text-slate-700 appearance-none cursor-pointer shadow-sm hover:border-slate-300"
                   style={{ backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")", backgroundPosition: 'right 0.75rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em' }}
                 >
-                  <option value="">-- Aucun v�hicule --</option>
+                  <option value="">-- Aucun vehicule --</option>
                   {availableVehicles.map((v) => (
                     <option key={v.id} value={v.id}>
-                      {v.matricule} � {v.marque} {v.modele}
+                      {v.matricule} • {v.marque} {v.modele}
                     </option>
                   ))}
                 </select>
@@ -607,13 +613,13 @@ export default function AssignMission() {
               {selectedEmployees.length > 1 && (
                 <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-700">
                   <AlertCircle size={13} className="shrink-0" />
-                  Le v�hicule est d�sactiv� pour une affectation multi-techniciens.
+                  Le vehicule est desactive pour une affectation multi-techniciens.
                 </div>
               )}
               {vehicleId && (
                 <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-xs font-bold text-blue-700">
                   <Truck size={13} />
-                  V�hicule s�lectionn� � deviendra "Affect�" apr�s confirmation
+                  Vehicule selectionne • deviendra « Affecte » apres confirmation
                 </div>
               )}
             </div>
@@ -648,18 +654,18 @@ export default function AssignMission() {
                 <div className="space-y-3">
                   <div>
                     <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-1">Titre</p>
-                    <p className="text-sm font-bold text-slate-900">{formData.title || '�'}</p>
+                    <p className="text-sm font-bold text-slate-900">{formData.title || '—'}</p>
                   </div>
                   <div>
                     <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-1">Description</p>
-                    <p className="text-xs font-medium text-slate-600 leading-relaxed">{formData.description || '�'}</p>
+                    <p className="text-xs font-medium text-slate-600 leading-relaxed">{formData.description || '—'}</p>
                   </div>
                   {missionType === 'Intervention' && selectedIntervention && (
                     <div>
                       <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-1">Dossier lie</p>
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-xs font-black text-[#0052CC] bg-blue-100 px-2.5 py-1 rounded-lg">{selectedIntervention.id}</span>
-                        <span className="text-xs text-slate-600 font-semibold">{selectedIntervention.client} � {selectedIntervention.machine}</span>
+                        <span className="text-xs text-slate-600 font-semibold">{selectedIntervention.client} • {selectedIntervention.machine}</span>
                       </div>
                     </div>
                   )}
@@ -706,7 +712,7 @@ export default function AssignMission() {
                       <p className="text-[10px] font-bold text-orange-500 uppercase tracking-wider mb-1">Date</p>
                       <div className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
                         <Calendar size={13} className="text-orange-300" />
-                        {dueDate ? dueDate.split('-').reverse().join('/') : '�'}
+                        {dueDate ? dueDate.split('-').reverse().join('/') : '—'}
                       </div>
                     </div>
                     {dueTime && (
@@ -720,12 +726,12 @@ export default function AssignMission() {
                     )}
                     {vehicleId && (
                       <div className="col-span-2">
-                        <p className="text-[10px] font-bold text-orange-500 uppercase tracking-wider mb-1">V�hicule affect�</p>
+                        <p className="text-[10px] font-bold text-orange-500 uppercase tracking-wider mb-1">Vehicule affecte</p>
                         <div className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
                           <Truck size={13} className="text-orange-300" />
                           {availableVehicles.find(v => String(v.id) === String(vehicleId))
-                            ? `${availableVehicles.find(v => String(v.id) === String(vehicleId)).matricule} � ${availableVehicles.find(v => String(v.id) === String(vehicleId)).marque} ${availableVehicles.find(v => String(v.id) === String(vehicleId)).modele}`
-                            : '�'}
+                            ? `${availableVehicles.find(v => String(v.id) === String(vehicleId)).matricule} • ${availableVehicles.find(v => String(v.id) === String(vehicleId)).marque} ${availableVehicles.find(v => String(v.id) === String(vehicleId)).modele}`
+                            : '—'}
                         </div>
                       </div>
                     )}
@@ -810,9 +816,9 @@ export default function AssignMission() {
               <div className="min-w-0">
                 <h1 className="text-base sm:text-2xl font-black text-slate-900 tracking-tight truncate">Affecter une mission</h1>
                 <p className="hidden sm:block text-xs text-slate-500 font-semibold">
-                  {missionType === '' && 'Etape 1 sur 4 � Choisissez le type de mission'}
-                  {missionType === 'Normal' && currentStep > 1 && ('Mission normale � ' + getStepLabel(currentStep))}
-                  {missionType === 'Intervention' && currentStep > 1 && ('Intervention SAV � ' + getStepLabel(currentStep))}
+                  {missionType === '' && 'Etape 1 sur 4 • Choisissez le type de mission'}
+                  {missionType === 'Normal' && currentStep > 1 && ('Mission normale • ' + getStepLabel(currentStep))}
+                  {missionType === 'Intervention' && currentStep > 1 && ('Intervention SAV • ' + getStepLabel(currentStep))}
                 </p>
               </div>
             </div>
