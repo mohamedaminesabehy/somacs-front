@@ -365,7 +365,7 @@ export default function InterventionDetails() {
     <div className="space-y-6 sm:space-y-10 animate-in fade-in zoom-in-95 duration-500">
       <div className="pb-4 sm:pb-6 border-b-2 border-slate-100">
         <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-1 sm:mb-2 flex items-center gap-2 sm:gap-3">
-          <Building2 className="text-[#0052CC]" size={24} />
+          <Building2 className="text-brand-600" size={24} />
           Informations Client & \u00c9quipement
         </h2>
         <p className="text-xs sm:text-sm text-slate-500 font-medium">Coordonnées du client et identification de l'équipement concerné</p>
@@ -423,9 +423,9 @@ export default function InterventionDetails() {
 
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 overflow-x-hidden overflow-hidden">
+    <div className="flex min-h-screen flex-col overflow-hidden bg-canvas">
       {/* --- HEADER --- */}
-      <div className="bg-white border-b-2 border-slate-200 px-4 sm:px-8 py-4 sm:py-6 flex items-center justify-between shrink-0 shadow-sm z-30">
+      <header className="z-30 flex shrink-0 items-center justify-between gap-3 border-b border-line bg-white px-4 py-3 sm:px-6 sm:py-4">
         <div className="flex items-center gap-3 sm:gap-6">
           <button 
             onClick={() => {
@@ -439,7 +439,7 @@ export default function InterventionDetails() {
               }
               navigate('/interventions')
             }}
-            className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 rounded-xl transition-all active:scale-95 shadow-sm"
+            className="ui-icon-btn h-10 w-10 shrink-0"
           >
             <ChevronLeft size={20} className="sm:hidden" strokeWidth={2.5} />
             <ChevronLeft size={24} className="hidden sm:block" strokeWidth={2.5} />
@@ -449,7 +449,7 @@ export default function InterventionDetails() {
               <h1 className="text-lg sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight truncate">
                 <span className="hidden sm:inline">Dossier </span>{interventionData.ficheNumber}
               </h1>
-              <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider shadow-sm w-fit ${statusConfig[status].color}`}>
+              <span className={`ui-badge w-fit ${statusConfig[status].color}`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${statusConfig[status].dot}`}></span>
                 {statusConfig[status].label}
               </span>
@@ -471,7 +471,7 @@ export default function InterventionDetails() {
             <button
               type="button"
               onClick={handlePrint}
-              className="flex items-center justify-center gap-2 px-3 sm:px-5 py-2.5 sm:py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm hover:shadow-md active:scale-95"
+              className="ui-btn-secondary px-3 sm:px-4"
             >
               <Printer size={18} />
               <span className="hidden md:inline">Imprimer</span>
@@ -480,7 +480,7 @@ export default function InterventionDetails() {
               type="button"
               onClick={handleDownloadPdf}
               disabled={isDownloadingPdf}
-              className="flex items-center justify-center gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-[#0052CC] hover:bg-blue-700 text-white rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-wider transition-all shadow-sm hover:shadow-md active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="ui-btn-primary px-3 sm:px-4 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <FileText size={16} />
               <span>{isDownloadingPdf ? 'Generation...' : 'PDF'}</span>
@@ -493,7 +493,7 @@ export default function InterventionDetails() {
                 type="button"
                 onClick={() => handleSave({ exitEdit: true, returnTo })}
                 disabled={isSaving}
-                className="flex items-center justify-center gap-2 px-3 sm:px-6 py-2.5 sm:py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg active:scale-95 bg-gradient-to-r from-[#0052CC] to-blue-600 hover:from-blue-700 hover:to-blue-800 text-white shadow-blue-200 hover:shadow-blue-300"
+                className="ui-btn-primary px-3 sm:px-5"
               >
                 <PenTool size={18} />
                 <span className="hidden md:inline">Modifier</span>
@@ -506,20 +506,16 @@ export default function InterventionDetails() {
                 handleSave()
               }}
               disabled={isSaving || status === 'CLOSED'}
-              className={`flex items-center justify-center gap-2 px-3 sm:px-6 py-2.5 sm:py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg active:scale-95 ${
-                status === 'CLOSED'
-                  ? 'bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-slate-300'
-                  : 'bg-gradient-to-r from-[#0052CC] to-blue-600 hover:from-blue-700 hover:to-blue-800 text-white shadow-blue-200 hover:shadow-blue-300'
-              }`}
+className={`ui-btn-primary px-3 sm:px-5 ${status === 'CLOSED' ? 'opacity-70' : ''}`}
             >
               <Save size={18} />
               <span className="hidden md:inline">{status === 'CLOSED' ? 'Clôturée' : 'Enregistrer'}</span>
             </button>
           )}
         </div>
-      </div>
+      </header>
 
-      <div className="flex flex-1 overflow-hidden flex-col min-w-0">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* --- HORIZONTAL STEPPER (MOBILE/TABLET) --- */}
         <HorizontalStepper steps={sections} currentStep={activeSection} alwaysVisible={useHorizontalProgress} />
 
@@ -529,12 +525,12 @@ export default function InterventionDetails() {
         <VerticalStepper steps={sections} currentStep={activeSection} hidden={useHorizontalProgress} />
 
         {/* --- MAIN CONTENT --- */}
-        <div className="flex-1 overflow-y-auto no-scrollbar bg-white flex flex-col relative min-w-0">
-          <div className="flex-1 px-4 sm:px-8 md:px-12 py-8 sm:py-12 md:py-16 max-w-4xl mx-auto w-full min-w-0">
+        <div className="relative flex min-w-0 flex-1 flex-col overflow-y-auto bg-canvas">
+          <div className="mx-auto w-full max-w-4xl min-w-0 flex-1 px-4 py-5 sm:px-7 sm:py-7">
             <div className="h-full flex flex-col">
               <div className="flex-1">
-                <fieldset disabled={isReadOnlyView || (status === 'CLOSED' && !isEditing)} className="contents">
-                  {renderSectionContent()}
+<fieldset disabled={isReadOnlyView || (status === 'CLOSED' && !isEditing)} className="contents">
+                  <div className="ui-card p-4 sm:p-6">{renderSectionContent()}</div>
                 </fieldset>
               </div>
 
@@ -549,7 +545,7 @@ export default function InterventionDetails() {
                       type="button"
                       onClick={() => handleSave({ exitEdit: true, returnTo })}
                       disabled={isSaving}
-                      className="w-full sm:w-72 flex items-center justify-center gap-2 px-8 sm:px-10 py-4 sm:py-4.5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-lg active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed bg-gradient-to-r from-[#0052CC] to-blue-600 hover:from-blue-700 hover:to-blue-800 text-white shadow-blue-200 hover:shadow-blue-300"
+                      className="w-full sm:w-72 flex items-center justify-center gap-2 px-8 sm:px-10 py-4 sm:py-4.5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-lg active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed bg-gradient-to-r from-brand-600 to-blue-600 hover:from-blue-700 hover:to-blue-800 text-white shadow-blue-200 hover:shadow-blue-300"
                     >
                       <PenTool size={18} />
                       Modifier
@@ -566,7 +562,7 @@ export default function InterventionDetails() {
                   </div>
                 </div>
               ) : (
-                <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t-2 border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
+                <div className="mt-6 flex shrink-0 flex-col items-center justify-between gap-3 border-t border-line pt-5 sm:flex-row">
                   <div className="order-2 sm:order-1">
                     <NavigationLeftButtons activeSection={activeSection} setActiveSection={setActiveSection} setShowMobilePreview={setShowMobilePreview} />
                   </div>
@@ -575,7 +571,7 @@ export default function InterventionDetails() {
                     <button
                       type="button"
                       onClick={() => setActiveSection(prev => Math.min(prev + 1, sections.length))}
-                      className="w-full sm:w-auto order-1 sm:order-2 group flex items-center justify-center gap-3 bg-gradient-to-r from-slate-900 to-slate-800 hover:from-[#0052CC] hover:to-blue-700 text-white px-8 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-xl shadow-slate-300 hover:shadow-blue-300 active:scale-95"
+                      className="w-full sm:w-auto order-1 sm:order-2 group flex items-center justify-center gap-3 bg-gradient-to-r from-slate-900 to-slate-800 hover:from-brand-600 hover:to-blue-700 text-white px-8 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-xl shadow-slate-300 hover:shadow-blue-300 active:scale-95"
                     >
                       Continuer
                       <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" strokeWidth={3} />
@@ -601,7 +597,7 @@ export default function InterventionDetails() {
                         className={`w-full sm:w-auto order-1 sm:order-2 flex items-center justify-center gap-2 px-8 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-lg active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed ${
                           status === 'CLOSED'
                             ? 'bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-slate-300'
-                            : 'bg-gradient-to-r from-[#0052CC] to-blue-600 hover:from-blue-700 hover:to-blue-800 text-white shadow-blue-200 hover:shadow-blue-300'
+                            : 'bg-gradient-to-r from-brand-600 to-blue-600 hover:from-blue-700 hover:to-blue-800 text-white shadow-blue-200 hover:shadow-blue-300'
                         }`}
                       >
                         <Save size={18} />
@@ -621,7 +617,7 @@ export default function InterventionDetails() {
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Aperçu de la fiche officielle</h4>
               <div className="flex gap-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-[#0052CC]"></div>
+                <div className="w-1.5 h-1.5 rounded-full bg-brand-600"></div>
               </div>
             </div>
             

@@ -108,7 +108,7 @@ function MissionRow({ mission, onStatusChange, onOpen }) {
 
   return (
     <div
-      className="bg-white rounded-xl border border-slate-100 hover:border-[#0052CC]/30 hover:shadow-sm transition-all duration-200 overflow-hidden cursor-pointer group"
+      className="bg-white rounded-xl border border-slate-100 hover:border-brand-600/30 hover:shadow-sm transition-all duration-200 overflow-hidden cursor-pointer group"
       onClick={() => onOpen(mission.id)}
     >
       {/* Priority bar */}
@@ -117,7 +117,7 @@ function MissionRow({ mission, onStatusChange, onOpen }) {
       <div className="px-3 py-2.5 flex items-center gap-3">
         {/* Icon */}
         <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-          mission.type === 'Intervention' ? 'bg-[#0052CC] text-white' : 'bg-slate-100 text-slate-500'
+          mission.type === 'Intervention' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-500'
         }`}>
           {mission.type === 'Intervention' ? <Wrench size={14} /> : <ClipboardList size={14} />}
         </div>
@@ -128,7 +128,7 @@ function MissionRow({ mission, onStatusChange, onOpen }) {
             <span
               className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${
                 mission.type === 'Intervention'
-                  ? 'bg-[#0052CC]/10 text-[#0052CC]'
+                  ? 'bg-brand-600/10 text-brand-600'
                   : 'bg-slate-100 text-slate-700'
               }`}
             >
@@ -170,7 +170,7 @@ function MissionRow({ mission, onStatusChange, onOpen }) {
         </div>
 
         {/* Arrow */}
-        <ChevronRight size={13} className="text-slate-300 group-hover:text-[#0052CC] transition-colors shrink-0" />
+        <ChevronRight size={13} className="text-slate-300 group-hover:text-brand-600 transition-colors shrink-0" />
       </div>
     </div>
   )
@@ -247,7 +247,7 @@ function MissionCalendar({ missions, interventions = [], onOpen }) {
         {/* Nav */}
         <div className="px-3 sm:px-6 py-3 sm:py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between bg-white gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-[#0052CC] rounded-xl flex items-center justify-center shadow-md shadow-blue-200 shrink-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-brand-600 rounded-xl flex items-center justify-center shadow-md shadow-blue-200 shrink-0">
               <CalendarDays size={18} className="text-white w-[16px] h-[16px] sm:w-[18px] sm:h-[18px]" />
             </div>
             <div>
@@ -260,19 +260,19 @@ function MissionCalendar({ missions, interventions = [], onOpen }) {
           <div className="flex items-center gap-1.5 self-end sm:self-auto">
             <button
               onClick={prevMonth}
-              className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 border border-slate-200 hover:border-[#0052CC]/40 hover:bg-[#0052CC]/5 text-slate-600 hover:text-[#0052CC] transition-all active:scale-95"
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 border border-slate-200 hover:border-brand-600/40 hover:bg-brand-600/5 text-slate-600 hover:text-brand-600 transition-all active:scale-95"
             >
               <ChevronLeft size={15} strokeWidth={2.5} />
             </button>
             <button
               onClick={() => { setCalYear(today.getFullYear()); setCalMonth(today.getMonth()); setSelected(today) }}
-              className="px-3 py-1.5 rounded-lg text-[10px] sm:text-[11px] font-black text-[#0052CC] bg-[#0052CC]/10 hover:bg-[#0052CC]/20 transition-all uppercase tracking-wider border border-[#0052CC]/30"
+              className="px-3 py-1.5 rounded-lg text-[10px] sm:text-[11px] font-black text-brand-600 bg-brand-600/10 hover:bg-brand-600/20 transition-all uppercase tracking-wider border border-brand-600/30"
             >
               Aujourd'hui
             </button>
             <button
               onClick={nextMonth}
-              className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 border border-slate-200 hover:border-[#0052CC]/40 hover:bg-[#0052CC]/5 text-slate-600 hover:text-[#0052CC] transition-all active:scale-95"
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 border border-slate-200 hover:border-brand-600/40 hover:bg-brand-600/5 text-slate-600 hover:text-brand-600 transition-all active:scale-95"
             >
               <ChevronRight size={15} strokeWidth={2.5} />
             </button>
@@ -313,9 +313,9 @@ function MissionCalendar({ missions, interventions = [], onOpen }) {
                   <>
                     <span className={`w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded-full text-[11px] sm:text-xs font-black mb-1 sm:mb-1.5 mx-auto transition-all ${
                       isToday
-                        ? 'bg-[#0052CC] text-white shadow-md shadow-blue-200'
+                        ? 'bg-brand-600 text-white shadow-md shadow-blue-200'
                         : isSelected
-                          ? 'bg-[#0052CC]/20 text-[#0052CC] font-black'
+                          ? 'bg-brand-600/20 text-brand-600 font-black'
                           : 'text-slate-700 hover:bg-slate-200'
                     }`}>
                       {date.getDate()}
@@ -455,7 +455,7 @@ function MissionCalendar({ missions, interventions = [], onOpen }) {
                               <span
                                 className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${
                                   m.type === 'Intervention'
-                                    ? 'bg-[#0052CC]/10 text-[#0052CC]'
+                                    ? 'bg-brand-600/10 text-brand-600'
                                     : 'bg-slate-100 text-slate-700'
                                 }`}
                               >
@@ -717,13 +717,13 @@ export default function EmployeeMissions() {
       {/* ═══════════════════ HEADER ═══════════════════ */}
       <div className="bg-white border-b-2 border-slate-200 px-4 lg:px-6 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shrink-0 shadow-sm z-10">
         <div className="flex items-center gap-4">
-          <div className="w-10 h-10 bg-gradient-to-br from-[#0052CC] to-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 shrink-0">
+          <div className="w-10 h-10 bg-gradient-to-br from-brand-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 shrink-0">
             <ClipboardList size={18} className="text-white" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-lg font-black text-slate-900 tracking-tight">Mes Missions</h1>
-              <span className="px-2 py-0.5 bg-[#0052CC]/10 text-[#0052CC] text-[10px] font-black rounded-full uppercase tracking-wider">
+              <span className="px-2 py-0.5 bg-brand-600/10 text-brand-600 text-[10px] font-black rounded-full uppercase tracking-wider">
                 Technicien
               </span>
               <span className="lg:hidden flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 border border-blue-100 rounded-lg">
@@ -795,11 +795,11 @@ export default function EmployeeMissions() {
           <div className="px-4 pt-4 pb-3 border-b border-slate-100 shrink-0 bg-white sm:bg-slate-50/60 transition-all sticky top-0 z-10 lg:static">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-black text-slate-800 flex items-center gap-2 tracking-tight">
-                <div className="w-6 h-6 bg-[#0052CC] rounded-md flex items-center justify-center shrink-0">
+                <div className="w-6 h-6 bg-brand-600 rounded-md flex items-center justify-center shrink-0">
                   <LayoutList size={13} className="text-white" />
                 </div>
                 Missions d'aujourd'hui
-                <span className="px-2 py-0.5 bg-[#0052CC]/10 text-[#0052CC] rounded-md text-[10px] font-black">{todayFiltered.length}</span>
+                <span className="px-2 py-0.5 bg-brand-600/10 text-brand-600 rounded-md text-[10px] font-black">{todayFiltered.length}</span>
               </h2>
               {(filterStatus !== 'Tous' || filterType !== 'Tous') && (
                 <button
@@ -817,7 +817,7 @@ export default function EmployeeMissions() {
               <select
                 value={filterType}
                 onChange={(e) => { setFilterType(e.target.value) }}
-                className="flex-1 px-2 py-1.5 border-2 border-slate-200 rounded-xl text-xs bg-white focus:border-[#0052CC] outline-none font-bold text-slate-600 hover:border-slate-300 transition-all"
+                className="flex-1 px-2 py-1.5 border-2 border-slate-200 rounded-xl text-xs bg-white focus:border-brand-600 outline-none font-bold text-slate-600 hover:border-slate-300 transition-all"
               >
                 <option value="Tous">Toutes priorités</option>
                 <option value="Prioritaire">Prioritaire</option>
@@ -825,7 +825,7 @@ export default function EmployeeMissions() {
               <select
                 value={filterStatus}
                 onChange={(e) => { setFilterStatus(e.target.value) }}
-                className="flex-1 px-2 py-1.5 border-2 border-slate-200 rounded-xl text-xs bg-white focus:border-[#0052CC] outline-none font-bold text-slate-600 hover:border-slate-300 transition-all"
+                className="flex-1 px-2 py-1.5 border-2 border-slate-200 rounded-xl text-xs bg-white focus:border-brand-600 outline-none font-bold text-slate-600 hover:border-slate-300 transition-all"
               >
                 <option value="Tous">Tous statuts</option>
                 {statusList.map((s) => <option key={s} value={s}>{s}</option>)}

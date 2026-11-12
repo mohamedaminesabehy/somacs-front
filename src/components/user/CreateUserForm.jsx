@@ -1,8 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Users } from 'lucide-react'
+import { UserPlus, AlertTriangle, Lock, KeyRound } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
+import Modal from '../ui/Modal'
+import { Field } from '../ui/DataKit'
+import { InlineAlert } from '../ui/Feedback'
+import { roleStyle } from './roleStyles'
 
-export default function CreateUserForm({ currentUser, onUserCreated, onAction, fallbackRoles = [] }) {
+const ROLE_DESCRIPTIONS = {
+  Administrateur: 'Accès complet, gestion des comptes',
+  'Responsable technicien': 'Supervise les techniciens et valide les SAV',
+  Coordinateur: 'Planifie et affecte les missions',
+  Technicien: 'Réalise les interventions terrain',
+}
+
+export default function CreateUserForm({ open, onClose, currentUser, onUserCreated, onAction, fallbackRoles = [] }) {
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [role, setRole] = useState('')
@@ -11,67 +22,65 @@ export default function CreateUserForm({ currentUser, onUserCreated, onAction, f
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [availableRoles, setAvailableRoles] = useState([])
-  const [isLoadingRoles, setIsLoadingRoles] = useState(false)
 
   const isAdmin = currentUser?.role === 'Administrateur'
 
   useEffect(() => {
+    if (!open) return
     const fetchRoles = async () => {
-      setIsLoadingRoles(true)
       try {
         const response = await apiFetch('/roles', { auth: true })
-        if (!response.ok) {
-          return
-        }
+        if (!response.ok) return
         const data = await response.json()
         if (Array.isArray(data)) {
-          const normalized = data
-            .map((item) => (typeof item === 'string' ? { name: item } : item))
-            .filter((item) => item && typeof item.name === 'string' && item.name.trim().length > 0)
-          setAvailableRoles(normalized)
+          setAvailableRoles(
+            data
+              .map((item) => (typeof item === 'string' ? { name: item } : item))
+              .filter((item) => item && typeof item.name === 'string' && item.name.trim().length > 0),
+          )
         }
-      } finally {
-        setIsLoadingRoles(false)
+      } catch {
+        setAvailableRoles([])
       }
     }
-
     fetchRoles()
-  }, [])
+  }, [open])
 
   const roleOptions = useMemo(() => {
-    const apiRoleNames = availableRoles
-      .map((item) => item?.name)
-      .filter((name) => typeof name === 'string' && name.trim().length > 0)
-    const combined = [...fallbackRoles, ...apiRoleNames]
-    const seen = new Set()
-    const unique = []
-    for (const name of combined) {
-      if (typeof name !== 'string') continue
-      const trimmed = name.trim()
-      if (!trimmed || seen.has(trimmed)) continue
-      seen.add(trimmed)
-      unique.push(trimmed)
-    }
-    return unique
+    const combined = [...fallbackRoles, ...availableRoles.map((item) => item?.name)]
+    return [...new Set(combined.filter((name) => typeof name === 'string' && name.trim()).map((name) => name.trim()))]
   }, [availableRoles, fallbackRoles])
+
+  const resetForm = () => {
+    setEmail('')
+    setUsername('')
+    setRole('')
+    setDepartment('')
+    setPassword('')
+    setConfirmPassword('')
+    setError('')
+  }
+
+  const handleClose = () => {
+    resetForm()
+    onClose?.()
+  }
+
+  const passwordMismatch = confirmPassword.length > 0 && password !== confirmPassword
 
   const handleSubmit = async (event) => {
     event.preventDefault()
     setError('')
-    setSuccess('')
 
     if (!isAdmin) {
-      setError("Seul un administrateur peut créer un utilisateur.")
+      setError('Seul un administrateur peut créer un utilisateur.')
       return
     }
-
     if (!email || !username || !role || !department || !password || !confirmPassword) {
       setError('Tous les champs obligatoires doivent être remplis.')
       return
     }
-
     if (password !== confirmPassword) {
       setError('Les mots de passe ne correspondent pas.')
       return
@@ -79,48 +88,32 @@ export default function CreateUserForm({ currentUser, onUserCreated, onAction, f
 
     const token = typeof window !== 'undefined' ? window.localStorage.getItem('auth_token') : null
     if (!token) {
-      setError("Session expirée. Veuillez vous reconnecter.")
+      setError('Session expirée. Veuillez vous reconnecter.')
       return
     }
 
     setIsSubmitting(true)
     try {
-      const autoName = (username || '').trim() || (email || '').split('@')[0] || 'Utilisateur'
+      const autoName = username.trim() || email.split('@')[0] || 'Utilisateur'
       const response = await apiFetch('/users', {
         method: 'POST',
-        body: {
-          name: autoName,
-          department,
-          email,
-          username,
-          password,
-          role,
-        },
+        body: { name: autoName, department, email, username, password, role },
         auth: true,
       })
 
       if (!response.ok) {
-        const message =
+        setError(
           response.status === 403
-            ? "Vous n'avez pas l'autorisation pour créer un utilisateur."
-            : "Impossible de créer l'utilisateur. Vérifiez les informations ou réessayez."
-        setError(message)
+            ? "Vous n'avez pas l'autorisation de créer un utilisateur."
+            : "Impossible de créer l'utilisateur. Vérifiez les informations ou réessayez.",
+        )
         return
       }
 
-      setSuccess("L'utilisateur a été créé avec succès.")
-      setEmail('')
-      setUsername('')
-      setRole('')
-      setDepartment('')
-      setPassword('')
-      setConfirmPassword('')
-      if (onUserCreated) {
-        onUserCreated()
-      }
-      if (onAction) {
-        onAction("Utilisateur ajouté")
-      }
+      resetForm()
+      onUserCreated?.()
+      onAction?.('Utilisateur ajouté')
+      onClose?.()
     } catch {
       setError("Erreur lors de la création de l'utilisateur.")
     } finally {
@@ -128,142 +121,91 @@ export default function CreateUserForm({ currentUser, onUserCreated, onAction, f
     }
   }
 
+  const disabled = !isAdmin || isSubmitting
+
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 bg-[#E6F0FF] rounded-lg flex items-center justify-center">
-          <Users size={24} className="text-[#0052CC]" />
-        </div>
-        <div>
-          <h2 className="text-lg font-bold text-gray-900">Créer un utilisateur</h2>
-          <p className="text-sm text-gray-600">Ajouter un nouveau membre à l'équipe</p>
-        </div>
-      </div>
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title="Nouvel utilisateur"
+      description="Créez un compte et attribuez son rôle dans l'équipe SOMACS."
+      icon={UserPlus}
+      size="lg"
+      footer={
+        <>
+          <button type="button" onClick={handleClose} className="ui-btn-secondary">Annuler</button>
+          <button type="submit" form="create-user-form" disabled={disabled} className="ui-btn-primary">
+            {isSubmitting ? 'Création…' : 'Créer le compte'}
+          </button>
+        </>
+      }
+    >
+      <form id="create-user-form" onSubmit={handleSubmit} className="flex flex-col gap-6">
+        {!isAdmin && (
+          <InlineAlert tone="warning" icon={Lock}>
+            Seul un <strong>Administrateur</strong> peut créer de nouveaux comptes.
+          </InlineAlert>
+        )}
+        {error && <InlineAlert tone="error" icon={AlertTriangle}>{error}</InlineAlert>}
 
-      {!isAdmin && (
-        <div className="mb-4 px-3 py-2 rounded-md bg-gray-50 border border-gray-200 text-xs sm:text-sm text-gray-700">
-          Seul un utilisateur avec le rôle <span className="font-semibold">Administrateur</span> peut
-          créer de nouveaux comptes.
-        </div>
-      )}
-
-      {error && (
-        <div className="mb-3 px-3 py-2 rounded-md bg-red-50 border border-red-200 text-xs sm:text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="mb-3 px-3 py-2 rounded-md bg-emerald-50 border border-emerald-200 text-xs sm:text-sm text-emerald-700">
-          {success}
-        </div>
-      )}
-
-      <form className="space-y-4" onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email professionnel <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="email"
-              placeholder="marie@somacs.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]"
-              disabled={!isAdmin || isSubmitting}
-            />
+        <fieldset className="flex flex-col gap-3" disabled={disabled}>
+          <legend className="ui-label">Rôle <span className="text-red-500" aria-hidden="true">*</span></legend>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {roleOptions.map((roleName) => {
+              const style = roleStyle(roleName)
+              const Icon = style.icon
+              const selected = role === roleName
+              return (
+                <label
+                  key={roleName}
+                  className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${
+                    selected ? 'border-brand-600 bg-brand-50/70 ring-1 ring-brand-600' : 'border-line hover:border-slate-300'
+                  }`}
+                >
+                  <input type="radio" name="create-role" value={roleName} checked={selected} onChange={() => setRole(roleName)} className="sr-only" />
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${style.avatar}`}>
+                    <Icon size={16} aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-ink">{roleName}</span>
+                    <span className="block text-xs leading-snug text-ink-muted">{ROLE_DESCRIPTIONS[roleName] || 'Rôle personnalisé'}</span>
+                  </span>
+                </label>
+              )
+            })}
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Département <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={department}
-              onChange={(event) => setDepartment(event.target.value)}
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC] bg-white"
-              disabled={!isAdmin || isSubmitting}
-            >
+        </fieldset>
+
+        <fieldset className="grid grid-cols-1 gap-4 sm:grid-cols-2" disabled={disabled}>
+          <legend className="sr-only">Identité</legend>
+          <Field label="Email professionnel" htmlFor="create-email" required>
+            <input id="create-email" type="email" placeholder="prenom.nom@somacs.ma" value={email} onChange={(event) => setEmail(event.target.value)} className="ui-input" autoComplete="off" />
+          </Field>
+          <Field label="Nom d'utilisateur" htmlFor="create-username" required hint="Sert aussi de nom affiché.">
+            <input id="create-username" type="text" placeholder="ex. mcurie" value={username} onChange={(event) => setUsername(event.target.value)} className="ui-input" autoComplete="off" />
+          </Field>
+          <Field label="Département" htmlFor="create-department" required full>
+            <select id="create-department" value={department} onChange={(event) => setDepartment(event.target.value)} className="ui-select">
               <option value="">Sélectionner un département</option>
-              <option value="SOMACS Commercial">SOMACS Commercial</option>
               <option value="SOMACS Service">SOMACS Service</option>
+              <option value="SOMACS Commercial">SOMACS Commercial</option>
             </select>
-          </div>
-        </div>
+          </Field>
+        </fieldset>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Nom d'utilisateur <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              placeholder="Ex: mcurie"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]"
-              disabled={!isAdmin || isSubmitting}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Rôle <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={role}
-              onChange={(event) => setRole(event.target.value)}
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC] bg-white"
-              disabled={!isAdmin || isSubmitting}
-            >
-              <option value="">
-                {isLoadingRoles ? 'Chargement des rôles...' : 'Sélectionner un rôle'}
-              </option>
-              {roleOptions.map((roleName) => (
-                <option key={roleName} value={roleName}>
-                  {roleName}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Mot de passe <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="password"
-              placeholder="Mot de passe"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]"
-              disabled={!isAdmin || isSubmitting}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Confirmer le mot de passe <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="password"
-              placeholder="Confirmer le mot de passe"
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]"
-              disabled={!isAdmin || isSubmitting}
-            />
-          </div>
-        </div>
-
-        <button
-          type="submit"
-          disabled={!isAdmin || isSubmitting}
-          className="w-full mt-6 px-4 py-2 bg-[#0052CC] text-white rounded-lg hover:bg-[#0042a3] font-medium transition disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {isSubmitting ? "Création en cours..." : "Créer l'utilisateur"}
-        </button>
+        <fieldset className="grid grid-cols-1 gap-4 rounded-2xl bg-slate-50 p-4 sm:grid-cols-2" disabled={disabled}>
+          <legend className="sr-only">Mot de passe</legend>
+          <p className="flex items-center gap-2 text-xs font-semibold text-ink-muted sm:col-span-2">
+            <KeyRound size={14} aria-hidden="true" /> Mot de passe initial
+          </p>
+          <Field label="Mot de passe" htmlFor="create-password" required>
+            <input id="create-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="ui-input bg-white" autoComplete="new-password" />
+          </Field>
+          <Field label="Confirmation" htmlFor="create-confirm" required error={passwordMismatch ? 'Les mots de passe ne correspondent pas.' : undefined}>
+            <input id="create-confirm" type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className="ui-input bg-white" autoComplete="new-password" aria-invalid={passwordMismatch} />
+          </Field>
+        </fieldset>
       </form>
-    </div>
+    </Modal>
   )
 }

@@ -10,11 +10,11 @@ import {
 } from 'lucide-react'
 
 const tabs = [
-  { key: 'general', label: 'Informations generales' },
+  { key: 'general', label: 'Informations' },
   { key: 'documents', label: 'Documents' },
   { key: 'gallery', label: 'Galerie' },
-  { key: 'intervention', label: 'Historique des pannes' },
-  { key: 'assistant', label: 'Assistant IA de diagnostic' },
+  { key: 'intervention', label: 'Historique' },
+  { key: 'assistant', label: 'Assistant IA' },
 ]
 
 function normalizeRole(raw) {
@@ -46,9 +46,9 @@ function formatDate(value) {
 function DetailField({ label, value, mono = false }) {
   const display = value === null || value === undefined || value === '' ? '—' : value
   return (
-    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3.5 min-w-0">
-      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
-      <p className={`mt-1.5 text-sm font-semibold text-slate-800 break-words ${mono ? 'font-mono break-all' : ''}`}>{display}</p>
+    <div className="min-w-0 rounded-xl bg-slate-50 px-4 py-3">
+      <p className="text-xs font-medium text-ink-muted">{label}</p>
+      <p className={`mt-0.5 break-words text-sm font-semibold text-ink ${mono ? 'break-all font-mono' : ''}`}>{display}</p>
     </div>
   )
 }
@@ -57,8 +57,9 @@ function TabButton({ active, label, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`relative rounded-xl px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all shrink-0 ${
-        active ? 'bg-[#0052CC] text-white shadow-md shadow-blue-200' : 'bg-white text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+      aria-current={active ? 'page' : undefined}
+      className={`-mb-px border-b-2 px-3 py-3 text-sm font-semibold transition-colors ${
+        active ? 'border-brand-600 text-brand-700' : 'border-transparent text-ink-muted hover:text-ink'
       }`}
     >
       {label}
@@ -321,19 +322,19 @@ export default function MachineDetails({ currentUser }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-canvas flex items-center justify-center">
+        <div className="h-9 w-9 animate-spin rounded-full border-4 border-brand-600 border-t-transparent" role="status" aria-label="Chargement" />
       </div>
     )
   }
 
   if (error || !machine) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
+      <div className="min-h-screen bg-canvas flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-center">
           <AlertCircle size={40} className="text-red-400" />
           <p className="text-slate-600 font-semibold">{error || 'Machine introuvable.'}</p>
-          <button onClick={() => navigate('/machines')} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">
+          <button onClick={() => navigate('/machines')} className="ui-btn-primary">
             Retour
           </button>
         </div>
@@ -342,146 +343,123 @@ export default function MachineDetails({ currentUser }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#F6F9FC] overflow-x-hidden">
-      <div className="max-w-[1500px] mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+    <div className="min-h-screen bg-canvas overflow-x-hidden">
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
         <Motion.section
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35 }}
-          className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white"
+          transition={{ duration: 0.3 }}
+          className="flex flex-col gap-5"
         >
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(37,99,235,0.12),_transparent_48%),radial-gradient(circle_at_bottom_left,_rgba(15,23,42,0.06),_transparent_42%)]" />
-          <div className="relative p-5 sm:p-7 lg:p-8">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              <div className="lg:col-span-4 min-w-0">
-                <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-                  <div className="relative aspect-[16/11] min-h-[220px] sm:min-h-[250px] bg-gradient-to-b from-slate-100 to-slate-200/70 p-3 sm:p-4 flex items-center justify-center">
-                    {selectedImage?.url
-                      ? <img src={selectedImage.url} alt={machine.designation} className="max-w-full max-h-full rounded-xl object-contain bg-white shadow-sm" />
-                      : <Cpu size={56} className="text-slate-300" />
-                    }
-                    {images.length > 1 && (
-                      <>
-                        <button onClick={previousImage} className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-white/90 hover:bg-white text-slate-600 transition-colors">
-                          <ChevronLeft size={16} />
-                        </button>
-                        <button onClick={nextImage} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-white/90 hover:bg-white text-slate-600 transition-colors">
-                          <ChevronRight size={16} />
-                        </button>
-                      </>
-                    )}
-                  </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <button onClick={() => navigate('/machines')} className="ui-btn-ghost -ml-2 px-2">
+              <ChevronLeft size={16} aria-hidden="true" /> Parc machines
+            </button>
+            {canManageMachines && (
+              <div className="flex items-center gap-2">
+                <button onClick={handleDelete} disabled={deleting} className="ui-btn-secondary text-red-600 hover:border-red-200 hover:bg-red-50">
+                  <Trash2 size={15} aria-hidden="true" /> {deleting ? 'Suppression…' : 'Supprimer'}
+                </button>
+                <button onClick={() => navigate(`/machines/${id}/edit`)} className="ui-btn-primary">
+                  <Edit2 size={15} aria-hidden="true" /> Modifier
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="ui-card overflow-hidden">
+            <div className="grid grid-cols-1 lg:grid-cols-12">
+              <div className="min-w-0 border-b border-line lg:col-span-5 lg:border-b-0 lg:border-r">
+                <div className="relative flex aspect-[4/3] items-center justify-center bg-slate-50 p-4">
+                  {selectedImage?.url
+                    ? <img src={selectedImage.url} alt={machine.designation} className="max-h-full max-w-full rounded-lg object-contain" />
+                    : <Cpu size={56} className="text-slate-300" aria-hidden="true" />}
                   {images.length > 1 && (
-                    <div className="p-3 border-t border-slate-100 grid grid-cols-4 sm:grid-cols-6 gap-2">
-                      {images.slice(0, 6).map((img) => {
-                        const active = (selectedImage?.publicId || selectedImage?.url) === (img.publicId || img.url)
-                        return (
-                          <button
-                            key={img.publicId || img.url}
-                            onClick={() => setSelectedImage(img)}
-                            className={`aspect-square rounded-lg overflow-hidden border ${active ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-200 hover:border-slate-300'}`}
-                          >
-                            <img src={img.url} alt={img.name || machine.designation} className="w-full h-full object-cover" />
-                          </button>
-                        )
-                      })}
-                    </div>
+                    <>
+                      <button onClick={previousImage} aria-label="Image précédente" className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/95 p-2 text-ink shadow-sm ring-1 ring-line hover:bg-white">
+                        <ChevronLeft size={16} />
+                      </button>
+                      <button onClick={nextImage} aria-label="Image suivante" className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/95 p-2 text-ink shadow-sm ring-1 ring-line hover:bg-white">
+                        <ChevronRight size={16} />
+                      </button>
+                    </>
                   )}
                 </div>
+                {images.length > 1 && (
+                  <div className="grid grid-cols-6 gap-2 border-t border-line p-3">
+                    {images.slice(0, 6).map((img) => {
+                      const active = (selectedImage?.publicId || selectedImage?.url) === (img.publicId || img.url)
+                      return (
+                        <button
+                          key={img.publicId || img.url}
+                          onClick={() => setSelectedImage(img)}
+                          aria-label={`Afficher ${img.name || 'image'}`}
+                          aria-pressed={active}
+                          className={`aspect-square overflow-hidden rounded-lg ring-2 ${active ? 'ring-brand-600' : 'ring-transparent hover:ring-line'}`}
+                        >
+                          <img src={img.url} alt="" className="h-full w-full object-cover" />
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
-              <div className="lg:col-span-8 min-w-0 flex flex-col gap-4">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <button onClick={() => navigate('/machines')} className="mt-0.5 p-2.5 rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition-colors">
-                      <ChevronLeft size={18} />
-                    </button>
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-black uppercase tracking-[0.22em] text-blue-700">Machine profile</p>
-                      <h1 className="mt-1 text-2xl sm:text-3xl font-black tracking-tight text-slate-900 break-words">{machine.designation}</h1>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <span className="px-2.5 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-mono">{machine.code}</span>
-                        <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-semibold">{machine.category || 'Categorie non renseignee'}</span>
-                        {warrantyActive !== null && (
-                          <span className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold ${warrantyActive ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-                            Garantie {warrantyActive ? 'active' : 'expiree'}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center justify-end gap-2 w-full sm:w-auto">
-                    {canManageMachines && (
-                      <>
-                        <button
-                          onClick={handleDelete}
-                          disabled={deleting}
-                          className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-black border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-60 transition-colors"
-                        >
-                          <Trash2 size={14} /> {deleting ? 'Suppression...' : 'Supprimer'}
-                        </button>
-                        <button
-                          onClick={() => navigate(`/machines/${id}/edit`)}
-                          className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2.5 bg-[#0052CC] text-white rounded-xl text-xs font-black shadow-lg shadow-blue-200 hover:bg-[#0042a3] transition-all"
-                        >
-                          <Edit2 size={14} /> Modifier
-                        </button>
-                      </>
+              <div className="flex min-w-0 flex-col gap-6 p-5 sm:p-7 lg:col-span-7">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="ui-badge bg-ink font-mono text-white ring-ink">{machine.code}</span>
+                    <span className="ui-badge bg-slate-100 text-ink-muted ring-line">{machine.category || 'Catégorie non renseignée'}</span>
+                    {warrantyActive !== null && (
+                      <span className={`ui-badge ${warrantyActive ? 'bg-teal-50 text-teal-700 ring-teal-200' : 'bg-amber-50 text-amber-700 ring-amber-200'}`}>
+                        <ShieldCheck size={12} aria-hidden="true" /> Garantie {warrantyActive ? 'active' : 'expirée'}
+                      </span>
                     )}
                   </div>
+                  <h1 className="mt-3 break-words font-display text-2xl font-bold tracking-tight text-ink text-balance sm:text-3xl">{machine.designation}</h1>
+                  {(machine.brand || machine.model) && (
+                    <p className="mt-1 text-sm text-ink-muted">{[machine.brand, machine.model].filter(Boolean).join(' · ')}</p>
+                  )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Fournisseur</p>
-                    <p className="mt-1 text-sm font-bold text-slate-800 flex items-center gap-1.5 min-w-0"><Building2 size={14} className="text-slate-400 shrink-0" /><span className="min-w-0 break-words">{machine.supplier || 'Non renseigne'}</span></p>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Reception</p>
-                    <p className="mt-1 text-sm font-bold text-slate-800 flex items-center gap-1.5 min-w-0"><CalendarDays size={14} className="text-slate-400 shrink-0" /><span className="min-w-0 break-words">{formatDate(machine.receptionDate)}</span></p>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Reference</p>
-                    <p className="mt-1 text-sm font-bold text-slate-800 flex items-center gap-1.5 min-w-0"><Hash size={14} className="text-slate-400 shrink-0" /><span className="min-w-0 break-words">{machine.purchaseOrderNumber || machine.serialNumber || 'Non renseignee'}</span></p>
-                  </div>
-                </div>
+                <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
+                  {[
+                    { icon: Building2, label: 'Fournisseur', value: machine.supplier || 'Non renseigné' },
+                    { icon: CalendarDays, label: 'Réception', value: formatDate(machine.receptionDate) },
+                    { icon: Hash, label: 'Référence', value: machine.purchaseOrderNumber || machine.serialNumber || 'Non renseignée' },
+                  ].map((item) => (
+                    <div key={item.label} className="min-w-0">
+                      <dt className="flex items-center gap-1.5 text-xs font-medium text-ink-muted"><item.icon size={13} aria-hidden="true" /> {item.label}</dt>
+                      <dd className="mt-1 break-words text-sm font-semibold text-ink">{item.value}</dd>
+                    </div>
+                  ))}
+                </dl>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-center">
-                    <p className="text-lg font-black text-slate-900">{imageCount}</p>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Images</p>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-center">
-                    <p className="text-lg font-black text-slate-900">{docCount}</p>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Documents</p>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-center">
-                    <p className="text-lg font-black text-slate-900">{createdAtLabel}</p>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Cree le</p>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-center">
-                    <p className="text-lg font-black text-slate-900">{updatedAtLabel}</p>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Mise a jour</p>
-                  </div>
+                <div className="mt-auto grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-line ring-1 ring-line sm:grid-cols-4">
+                  {[
+                    { label: 'Images', value: imageCount },
+                    { label: 'Documents', value: docCount },
+                    { label: 'Créée le', value: createdAtLabel },
+                    { label: 'Mise à jour', value: updatedAtLabel },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="bg-white px-3 py-3">
+                      <p className="text-xs text-ink-muted">{label}</p>
+                      <p className="mt-0.5 truncate font-display text-base font-bold text-ink">{value}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
           </div>
         </Motion.section>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-3 sm:p-4">
-          <div className="flex flex-wrap gap-2">
+        <nav aria-label="Sections de la fiche machine" className="-mx-4 overflow-x-auto border-b border-line px-4 sm:mx-0 sm:px-0">
+          <div className="flex min-w-max gap-1">
             {tabs.map((tab) => (
-              <TabButton
-                key={tab.key}
-                label={tab.label}
-                active={activeTab === tab.key}
-                onClick={() => setActiveTab(tab.key)}
-              />
+              <TabButton key={tab.key} label={tab.label} active={activeTab === tab.key} onClick={() => setActiveTab(tab.key)} />
             ))}
           </div>
-        </section>
+        </nav>
 
         <AnimatePresence mode="wait">
           {activeTab === 'general' && (
@@ -494,14 +472,14 @@ export default function MachineDetails({ currentUser }) {
               className="space-y-6"
             >
               {/* Identification Machine */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+              <div className="ui-card p-5 sm:p-6">
                 <div className="flex items-center gap-3 mb-5">
-                  <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                  <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center">
                     <Cpu size={16} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-black text-slate-900">Identification Machine</h3>
-                    <p className="text-[11px] text-slate-500">Code interne, caractéristiques et statut</p>
+                    <h3 className="font-display text-[15px] font-bold text-ink">Identification Machine</h3>
+                    <p className="text-xs text-ink-muted">Code interne, caractéristiques et statut</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -517,14 +495,14 @@ export default function MachineDetails({ currentUser }) {
               </div>
 
               {/* Origine & Fournisseur */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+              <div className="ui-card p-5 sm:p-6">
                 <div className="flex items-center gap-3 mb-5">
-                  <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
+                  <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center">
                     <Truck size={16} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-black text-slate-900">Origine & Fournisseur</h3>
-                    <p className="text-[11px] text-slate-500">Provenance, réception et garantie</p>
+                    <h3 className="font-display text-[15px] font-bold text-ink">Origine & Fournisseur</h3>
+                    <p className="text-xs text-ink-muted">Provenance, réception et garantie</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -546,14 +524,14 @@ export default function MachineDetails({ currentUser }) {
               </div>
 
               {/* Contrôle avant livraison */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+              <div className="ui-card p-5 sm:p-6">
                 <div className="flex items-center gap-3 mb-5">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                  <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center">
                     <ShieldCheck size={16} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-black text-slate-900">Contrôle Avant Livraison</h3>
-                    <p className="text-[11px] text-slate-500">Vérification technique et validation</p>
+                    <h3 className="font-display text-[15px] font-bold text-ink">Contrôle Avant Livraison</h3>
+                    <p className="text-xs text-ink-muted">Vérification technique et validation</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -576,14 +554,14 @@ export default function MachineDetails({ currentUser }) {
               </div>
 
               {/* Traçabilité */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+              <div className="ui-card p-5 sm:p-6">
                 <div className="flex items-center gap-3 mb-5">
-                  <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
+                  <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center">
                     <Layers3 size={16} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-black text-slate-900">Traçabilité</h3>
-                    <p className="text-[11px] text-slate-500">Historique de création et modification</p>
+                    <h3 className="font-display text-[15px] font-bold text-ink">Traçabilité</h3>
+                    <p className="text-xs text-ink-muted">Historique de création et modification</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -613,7 +591,7 @@ export default function MachineDetails({ currentUser }) {
             >
               <div className="xl:col-span-4 min-w-0 space-y-4">
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Liste des PDF</h3>
+                  <h3 className="ui-eyebrow mb-3">Liste des PDF</h3>
                   {pdfDocs.length === 0 ? (
                     <p className="text-sm text-slate-400">Aucun PDF disponible.</p>
                   ) : (
@@ -632,7 +610,7 @@ export default function MachineDetails({ currentUser }) {
 
                 {docs.length > pdfDocs.length && (
                   <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Autres fichiers</h3>
+                    <h3 className="ui-eyebrow mb-3">Autres fichiers</h3>
                     <div className="space-y-2.5">
                       {docs.filter((doc) => !pdfDocs.some((pdf) => pdf.publicId === doc.publicId || pdf.url === doc.url)).map((doc) => (
                         <DocCard key={doc.publicId || doc.url} doc={doc} onPreview={setPdfDoc} active={false} />
@@ -644,7 +622,7 @@ export default function MachineDetails({ currentUser }) {
 
               <div className="xl:col-span-8 min-w-0 rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
                 <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <h3 className="min-w-0 text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                  <h3 className="min-w-0 ui-eyebrow flex items-center gap-2">
                     <ShieldCheck size={13} /> Consultation du manuel PDF
                   </h3>
                   {pdfDoc && (
@@ -675,7 +653,7 @@ export default function MachineDetails({ currentUser }) {
             >
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
                 <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <h3 className="min-w-0 text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                  <h3 className="min-w-0 ui-eyebrow flex items-center gap-2">
                     <ImageIcon size={13} /> Galerie machine
                   </h3>
                   {canManageMachines && (
@@ -726,7 +704,7 @@ export default function MachineDetails({ currentUser }) {
               <div className="xl:col-span-12 rounded-2xl border border-slate-200 bg-white p-5 md:p-6">
                 <div className="flex items-start justify-between gap-3 mb-4">
                   <div>
-                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                    <h3 className="ui-eyebrow flex items-center gap-2">
                       <Settings size={13} /> Historique des pannes
                     </h3>
                     <p className="mt-2 text-sm text-slate-600">Consultez les pannes enregistrées, les diagnostics et les solutions associées.</p>
@@ -858,7 +836,7 @@ export default function MachineDetails({ currentUser }) {
             >
                 <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
                   <div>
-                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                    <h3 className="ui-eyebrow flex items-center gap-2">
                       <Bot size={13} /> Assistant IA de diagnostic
                     </h3>
                     <p className="mt-2 text-sm text-slate-600">Saisissez un probleme ou un type de panne pour obtenir des causes possibles et des solutions recommandees.</p>
@@ -880,7 +858,7 @@ export default function MachineDetails({ currentUser }) {
                     />
                     <button
                       onClick={analyzeIssue}
-                      className="rounded-xl w-full sm:w-auto px-4 py-2.5 text-xs font-black uppercase tracking-wider bg-[#0052CC] text-white hover:bg-[#0042a3] transition-colors"
+                      className="rounded-xl w-full sm:w-auto px-4 py-2.5 text-xs font-black uppercase tracking-wider bg-brand-600 text-white hover:bg-brand-700 transition-colors"
                     >
                       Analyser
                     </button>

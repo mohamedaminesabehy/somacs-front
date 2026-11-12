@@ -2,6 +2,7 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../api/apiClient'
 import InterventionActions from './components/InterventionActions'
+import PageHeader from '../../components/ui/PageHeader'
 import {
   Search, Plus, Eye, Edit2, Trash2, Wrench,
   CheckCircle2, Hourglass,
@@ -16,18 +17,18 @@ import {
 // ─── Configuration ────────────────────────────────────────────────────────────
 const statusConfig = {
   PENDING:     { label: "En attente d'affectation", color: 'bg-amber-50 text-amber-700 border-amber-100',    dot: 'bg-amber-500',  icon: Hourglass,    bar: 'bg-amber-400'  },
-  ASSIGNED:    { label: 'Affectée technicien',    color: 'bg-blue-50 text-blue-700 border-blue-100',       dot: 'bg-blue-500',   icon: UserCheck2,   bar: 'bg-blue-500'   },
-  IN_PROGRESS: { label: 'En cours',                color: 'bg-orange-50 text-orange-700 border-orange-100', dot: 'bg-orange-500', icon: PlayCircle,   bar: 'bg-orange-500' },
-  CLOSED:      { label: 'Intervention Clôturée',   color: 'bg-green-50 text-green-700 border-green-100',   dot: 'bg-green-500',  icon: CheckCircle2, bar: 'bg-green-500'  },
+  ASSIGNED:    { label: 'Affectée technicien',    color: 'bg-slate-100 text-slate-700 border-slate-200',       dot: 'bg-blue-500',   icon: UserCheck2,   bar: 'bg-blue-500'   },
+  IN_PROGRESS: { label: 'En cours',                color: 'bg-brand-50 text-brand-700 border-brand-100', dot: 'bg-orange-500', icon: PlayCircle,   bar: 'bg-orange-500' },
+  CLOSED:      { label: 'Intervention Clôturée',   color: 'bg-teal-50 text-teal-700 border-teal-100',   dot: 'bg-green-500',  icon: CheckCircle2, bar: 'bg-green-500'  },
 }
 
 const typeConfig = {
-  DEVIS:        { label: 'Devis',        color: 'bg-[#004a77]/5 text-[#004a77] border-[#004a77]/10', icon: FileSearch     },
-  LIVRAISON:    { label: 'Livraison',    color: 'bg-[#004a77]/5 text-[#004a77] border-[#004a77]/10', icon: Truck          },
-  FORMATION:    { label: 'Formation',    color: 'bg-[#004a77]/5 text-[#004a77] border-[#004a77]/10', icon: GraduationCap },
-  INSTALLATION: { label: 'Installation',  color: 'bg-[#004a77]/5 text-[#004a77] border-[#004a77]/10', icon: Plus           },
-  REPARATION:   { label: 'Réparation',    color: 'bg-[#004a77]/5 text-[#004a77] border-[#004a77]/10', icon: Wrench         },
-  GARANTIE:     { label: 'Garantie',     color: 'bg-[#004a77]/5 text-[#004a77] border-[#004a77]/10', icon: ShieldAlert    },
+  DEVIS:        { label: 'Devis',        color: 'bg-brand-800/5 text-brand-800 border-brand-800/10', icon: FileSearch     },
+  LIVRAISON:    { label: 'Livraison',    color: 'bg-brand-800/5 text-brand-800 border-brand-800/10', icon: Truck          },
+  FORMATION:    { label: 'Formation',    color: 'bg-brand-800/5 text-brand-800 border-brand-800/10', icon: GraduationCap },
+  INSTALLATION: { label: 'Installation',  color: 'bg-brand-800/5 text-brand-800 border-brand-800/10', icon: Plus           },
+  REPARATION:   { label: 'Réparation',    color: 'bg-brand-800/5 text-brand-800 border-brand-800/10', icon: Wrench         },
+  GARANTIE:     { label: 'Garantie',     color: 'bg-brand-800/5 text-brand-800 border-brand-800/10', icon: ShieldAlert    },
 }
 
 const fallbackStatus = statusConfig.PENDING
@@ -174,8 +175,8 @@ function StatCard({ label, count, total, icon, active, onClick, colorClass }) {
   return (
     <button
       onClick={onClick}
-      className={`w-full min-w-0 bg-white border-2 rounded-2xl p-3 sm:p-5 text-left transition-all relative overflow-hidden group
-        ${active ? 'border-[#0052CC] shadow-xl shadow-blue-100/50 translate-y-[-4px]' : 'border-slate-100 hover:border-slate-300 hover:shadow-lg hover:translate-y-[-2px]'}`}
+      className={`w-full min-w-0 bg-white border rounded-2xl p-3 sm:p-5 text-left transition-all relative overflow-hidden group
+        ${active ? 'border-brand-500 shadow-raised ring-2 ring-brand-100' : 'border-line shadow-card hover:border-brand-200 hover:shadow-raised'}`}
     >
       <div className={`absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 rounded-full opacity-[0.05] transition-transform group-hover:scale-110 ${colorClass}`} />
       <div className="flex items-center justify-between mb-2 sm:mb-4 relative z-10">
@@ -225,11 +226,11 @@ function ActionMenu({ item, onNavigate }) {
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Actions dossier</p>
           </div>
           <button onClick={() => { onNavigate('details', item); setOpen(false) }}
-            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-[#0052CC] transition-colors">
+            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-brand-600 transition-colors">
             <Eye size={14} /> Consulter le dossier
           </button>
           <button onClick={() => { onNavigate('edit', item); setOpen(false) }}
-            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-[#0052CC] transition-colors">
+            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-brand-600 transition-colors">
             <Edit2 size={14} /> Modifier les infos
           </button>
           <button
@@ -242,7 +243,7 @@ function ActionMenu({ item, onNavigate }) {
             className={`flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold transition-colors ${
               isAlreadyAssigned
                 ? 'text-slate-300 cursor-not-allowed'
-                : 'text-slate-700 hover:bg-blue-50 hover:text-[#0052CC]'
+                : 'text-slate-700 hover:bg-blue-50 hover:text-brand-600'
             }`}
           >
             <UserCheck2 size={14} /> Affecter technicien
@@ -681,7 +682,7 @@ export default function InterventionList() {
   }, [filtered, currentPage])
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
+    <div className="min-h-screen bg-canvas flex flex-col">
       <DeleteConfirmationModal
         open={deleteDialog.open}
         item={deleteDialog.item}
@@ -731,45 +732,39 @@ export default function InterventionList() {
         </div>
       )}
       {/* ── Top Bar ── */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200">
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 sm:py-0 sm:h-20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4 min-w-0">
-            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-100">
-              <Wrench size={24} className="text-white" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-xl font-black text-slate-900 tracking-tight truncate">Liste des Interventions</h1>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded uppercase tracking-wider">{total} dossiers</span>
-                <div className="w-1 h-1 bg-slate-300 rounded-full" />
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Gestion SAV</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-end gap-3 w-full sm:w-auto">
-            <button
-              onClick={fetchInterventions}
-              className="hidden sm:flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all"
-              disabled={loading}
-            >
-              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Actualiser
-            </button>
-            <button
-              onClick={() => navigate('/interventions/create')}
-              className="flex items-center justify-center gap-2 w-full sm:w-auto px-5 sm:px-6 py-3 bg-[#0052CC] text-white rounded-xl text-xs font-black shadow-lg shadow-blue-200 hover:bg-[#0042a3] transition-all active:scale-95"
-            >
-              <Plus size={18} strokeWidth={3} /> Nouvelle Intervention
-            </button>
-          </div>
-        </div>
-      </header>
+  <div className="ui-page pb-0 pt-5 sm:pt-7">
+  <PageHeader
+  eyebrow="Service après-vente"
+  title="Interventions"
+  description={`${total} dossier(s) · suivi des demandes, affectations et clôtures.`}
+  icon={Wrench}
+  actions={
+  <>
+  <button
+  type="button"
+  onClick={fetchInterventions}
+  className="ui-btn-secondary hidden sm:inline-flex"
+  disabled={loading}
+  >
+  <RefreshCw size={16} className={loading ? 'animate-spin' : ''} aria-hidden="true" /> Actualiser
+  </button>
+  <button
+  type="button"
+  onClick={() => navigate('/interventions/create')}
+  className="ui-btn-primary"
+  >
+  <Plus size={18} strokeWidth={2.25} aria-hidden="true" /> Nouvelle intervention
+  </button>
+  </>
+  }
+  />
+  </div>
 
       {/* ── Main Content ── */}
-      <main className="flex-1 max-w-[1600px] mx-auto w-full px-4 sm:px-6 py-6 sm:py-8 space-y-8">
+      <main className="ui-page flex-1 space-y-5 sm:space-y-6 pt-5 sm:pt-6">
         
         {/* KPI Stats Grid */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 sm:gap-4">
           <StatCard
             label="Tout"
             count={total}
@@ -794,7 +789,7 @@ export default function InterventionList() {
         </div>
 
         {/* Filters & Actions Bar */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="ui-card p-4 sm:p-5">
           <div className="flex flex-wrap items-center gap-4">
             {/* Search */}
             <div className="relative w-full lg:flex-1 min-w-0">
@@ -804,7 +799,7 @@ export default function InterventionList() {
                 placeholder="Rechercher par ID, client ou machine..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all"
+                className="ui-input w-full pl-11"
               />
             </div>
             
@@ -820,7 +815,7 @@ export default function InterventionList() {
               <select 
                 value={typeFilter}
                 onChange={e => setTypeFilter(e.target.value)}
-                className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-600 outline-none cursor-pointer hover:bg-white hover:border-blue-200 transition-all appearance-none"
+                className="ui-input w-full appearance-none pl-9 pr-8 text-sm font-semibold"
               >
                 <option value="ALL">Tous les types</option>
                 {Object.entries(typeConfig).map(([key, cfg]) => (
@@ -840,7 +835,7 @@ export default function InterventionList() {
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all w-full min-w-0"
+                    className="ui-input w-full min-w-0 pl-9 text-sm"
                   />
                   {!startDate && (
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium pointer-events-none sm:hidden">JJ/MM/AAAA</span>
@@ -856,7 +851,7 @@ export default function InterventionList() {
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:border-blue-300 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all w-full min-w-0"
+                    className="ui-input w-full min-w-0 pl-9 text-sm"
                   />
                   {!endDate && (
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium pointer-events-none sm:hidden">JJ/MM/AAAA</span>
@@ -879,7 +874,7 @@ export default function InterventionList() {
               <div className="h-8 w-px bg-slate-100 mx-2" />
               <button 
                 onClick={() => setViewMode('list')}
-                className={`p-2.5 rounded-xl transition-all ${viewMode === 'list' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:bg-slate-100'}`}
+                className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all ${viewMode === 'list' ? 'bg-brand-600 text-white shadow-card' : 'text-ink-muted hover:bg-slate-100'}`}
               >
                 <LayoutList size={18} />
               </button>
@@ -895,9 +890,9 @@ export default function InterventionList() {
 
         {/* List View */}
         {viewMode === 'list' && (
-          <div className="-mx-4 px-4 py-4 sm:-mx-6 sm:px-6 lg:mx-0 lg:p-0 bg-slate-50 lg:bg-white lg:rounded-2xl lg:border-2 lg:border-slate-200 lg:shadow-lg lg:shadow-slate-100/50 lg:overflow-hidden">
+          <div className="ui-card overflow-hidden p-0">
             {/* Mobile / tablet cards */}
-            <div className="lg:hidden space-y-4 sm:space-y-5">
+            <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:hidden">
               {paginatedData.map((item) => {
                 const { st, ty, TyIcon, isHighlighted } = getItemDisplayData(item, highlightId)
                 const isAssigned = isItemAssigned(item)
@@ -905,7 +900,7 @@ export default function InterventionList() {
                   <div
                     key={item.id}
                     ref={isHighlighted ? highlightRowRef : null}
-                    className={`bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-4 sm:p-5 transition active:scale-[0.99] sm:hover:shadow-md ${isHighlighted ? 'ring-2 ring-emerald-200 animate-pulse' : ''}`}
+                    className={`ui-card flex flex-col overflow-hidden p-4 transition-shadow hover:shadow-raised ${isHighlighted ? 'ring-2 ring-teal-200' : ''}`}
                   >
                     <div className="flex items-start gap-3">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${ty.color}`}>
@@ -916,7 +911,7 @@ export default function InterventionList() {
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span className="text-[10px] font-mono font-bold text-slate-400 uppercase truncate">{item.id}</span>
                           <span className="w-1 h-1 bg-slate-200 rounded-full" />
-                          <span className="text-[9px] font-black uppercase text-[#004a77] truncate">{ty.label}</span>
+                          <span className="text-[9px] font-black uppercase text-brand-800 truncate">{ty.label}</span>
                         </div>
                       </div>
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black border-2 uppercase tracking-wider shrink-0 ${st.color}`}>
@@ -973,7 +968,7 @@ export default function InterventionList() {
 
             {/* Desktop table */}
             <div className="hidden lg:block overflow-x-auto no-scrollbar">
-              <table className="w-full min-w-[860px] text-left border-collapse">
+              <table className="ui-table w-full min-w-[860px] text-left">
                 <thead>
                   <tr className="bg-slate-50 border-b-2 border-slate-100">
                     <th className="px-6 py-5 text-[11px] font-black text-slate-500 uppercase tracking-widest border-r border-slate-100 last:border-0">ID / Machine</th>
@@ -1007,7 +1002,7 @@ export default function InterventionList() {
                               <div className="flex items-center gap-1.5">
                                 <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-tight truncate">{item.id}</span>
                                 <span className="w-1 h-1 bg-slate-200 rounded-full" />
-                                <span className="text-[9px] font-black uppercase text-[#004a77] truncate">{ty.label}</span>
+                                <span className="text-[9px] font-black uppercase text-brand-800 truncate">{ty.label}</span>
                               </div>
                             </div>
                           </div>
@@ -1092,7 +1087,7 @@ export default function InterventionList() {
                   <button
                     disabled={currentPage === totalPages}
                     onClick={() => setCurrentPage(prev => prev + 1)}
-                    className="flex items-center gap-2 px-6 py-2 bg-[#0052CC] text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-100 hover:bg-blue-700 disabled:opacity-30 disabled:pointer-events-none transition-all group"
+                    className="flex items-center gap-2 px-6 py-2 bg-brand-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-100 hover:bg-blue-700 disabled:opacity-30 disabled:pointer-events-none transition-all group"
                   >
                     Suivant <ChevronRightIcon size={14} strokeWidth={3} className="group-hover:translate-x-1 transition-transform" />
                   </button>

@@ -114,7 +114,7 @@ export default function LoginRequiredModal({ isOpen, onLoginSuccess, message }) 
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-[#0052CC] hover:bg-[#0042a3] text-white rounded-xl text-sm font-black uppercase tracking-wider transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-lg shadow-blue-200"
+            className="w-full flex items-center justify-center gap-2 px-6 py-3.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-black uppercase tracking-wider transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-lg shadow-blue-200"
           >
             {isLoading ? 'Connexion...' : 'Se connecter'}
           </button>

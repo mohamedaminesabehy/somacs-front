@@ -92,7 +92,7 @@ export default function CreateVehicle() {
   )
 
   return (
-    <div className="min-h-screen bg-[#F6F9FC]">
+    <div className="min-h-screen bg-canvas">
       {headerContent}
       <VehicleForm
         mode="create"

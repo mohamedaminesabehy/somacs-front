@@ -97,7 +97,7 @@ export default function VehicleDetails() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
+      <div className="min-h-screen bg-canvas flex items-center justify-center">
         <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
       </div>
     )
@@ -105,7 +105,7 @@ export default function VehicleDetails() {
 
   if (error || !vehicle) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
+      <div className="min-h-screen bg-canvas flex items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-center">
           <AlertCircle size={40} className="text-red-400" />
           <p className="text-slate-600 font-semibold">{error || "Vehicule introuvable."}</p>
@@ -125,7 +125,7 @@ export default function VehicleDetails() {
   const usageHistory = Array.isArray(vehicle.usageHistory) ? vehicle.usageHistory : []
 
   return (
-    <div className="min-h-screen bg-[#F6F9FC] overflow-x-hidden">
+    <div className="min-h-screen bg-canvas overflow-x-hidden">
       <div className="max-w-[1500px] mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
 
         {/* ── Hero section (style MachineDetails) ── */}
@@ -139,7 +139,7 @@ export default function VehicleDetails() {
                 <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
                   <div className="relative aspect-[16/11] min-h-[200px] sm:min-h-[220px] bg-gradient-to-b from-slate-100 to-slate-200/70 flex items-center justify-center">
                     <div className="text-center">
-                      <div className="w-20 h-20 bg-[#0052CC] rounded-3xl flex items-center justify-center mx-auto shadow-lg shadow-blue-200 mb-4">
+                      <div className="w-20 h-20 bg-brand-600 rounded-3xl flex items-center justify-center mx-auto shadow-lg shadow-blue-200 mb-4">
                         <Truck size={40} className="text-white" />
                       </div>
                       <p className="font-mono text-xl font-black text-slate-900 tracking-widest px-4">{vehicle.matricule}</p>
@@ -173,7 +173,7 @@ export default function VehicleDetails() {
                       <Trash2 size={14} /> {deleting ? "Suppression..." : "Supprimer"}
                     </button>
                     <button onClick={() => navigate("/vehicles/" + id + "/edit")}
-                      className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2.5 bg-[#0052CC] text-white rounded-xl text-xs font-black shadow-lg shadow-blue-200 hover:bg-[#0042a3] transition-all">
+                      className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2.5 bg-brand-600 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-200 hover:bg-brand-700 transition-all">
                       <Edit2 size={14} /> Modifier
                     </button>
                   </div>

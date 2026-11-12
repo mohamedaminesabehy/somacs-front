@@ -4,7 +4,7 @@
  */
 
 export function getStepTextColor(isActive, isDone) {
-  if (isActive) return 'text-[#0052CC]'
+  if (isActive) return 'text-brand-600'
   if (isDone) return 'text-green-500'
   return 'text-slate-300'
 }
@@ -22,7 +22,7 @@ export function getStepDescColor(isActive, isDone) {
 }
 
 export function getStepLabelColor(isActive, isCompleted) {
-  if (isActive) return 'text-[#0052CC]'
+  if (isActive) return 'text-brand-600'
   if (isCompleted) return 'text-green-500'
   return 'text-slate-400'
 }

@@ -97,7 +97,7 @@ export default function NotificationBell() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative text-gray-500 hover:text-[#0052CC] p-2 hover:bg-[#0052CC]/5 rounded-xl transition-all"
+        className="relative text-gray-500 hover:text-brand-600 p-2 hover:bg-brand-600/5 rounded-xl transition-all"
         aria-label="Notifications"
       >
         <Bell size={20} />
@@ -128,7 +128,7 @@ export default function NotificationBell() {
               className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-all ${
                 unreadCount === 0
                   ? 'text-gray-300 border-gray-100 bg-gray-50 cursor-not-allowed'
-                  : 'text-[#0052CC] border-[#0052CC]/20 bg-[#0052CC]/5 hover:bg-[#0052CC]/10'
+                  : 'text-brand-600 border-brand-600/20 bg-brand-600/5 hover:bg-brand-600/10'
               }`}
             >
               Tout lire
@@ -219,11 +219,11 @@ export default function NotificationBell() {
                                 }
                               }}
                               className={`w-full text-left px-4 py-3 transition-all ${
-                                isRead ? 'bg-white hover:bg-gray-50' : 'bg-[#0052CC]/5 hover:bg-[#0052CC]/10'
+                                isRead ? 'bg-white hover:bg-gray-50' : 'bg-brand-600/5 hover:bg-brand-600/10'
                               }`}
                             >
                               <div className="flex items-start gap-3">
-                                <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${isRead ? 'bg-gray-200' : 'bg-[#0052CC]'}`} />
+                                <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${isRead ? 'bg-gray-200' : 'bg-brand-600'}`} />
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-start justify-between gap-2">
                                     <div className="font-black text-sm text-slate-900 leading-snug line-clamp-2">{n.title}</div>

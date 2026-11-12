@@ -1,39 +1,40 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Edit2, Trash2, Shield, Clock, AlertCircle } from 'lucide-react'
+import { Clock, History, Pencil, Trash2, UserCog, Users, AlertTriangle, Mail, Building2 } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
-
-const roleColors = {
-  purple: 'bg-purple-100 text-purple-700',
-  blue: 'bg-blue-100 text-blue-700',
-  gray: 'bg-gray-100 text-gray-700',
-}
-
-const statusColors = {
-  green: 'bg-green-100 text-green-700',
-  gray: 'bg-gray-100 text-gray-700',
-}
+import Modal from '../ui/Modal'
+import StatusBadge from '../ui/StatusBadge'
+import { EmptyState, InlineAlert, SkeletonTableRows } from '../ui/Feedback'
+import { Field } from '../ui/DataKit'
+import { RoleBadge, UserAvatar } from './roleStyles'
 
 function getRoleColorKey(role) {
   if (role === 'Administrateur') return 'purple'
-  if (role === 'Commerciale' || role === 'Coordinateur' || role === 'Responsable technicien') return 'blue'
+  if (role === 'Coordinateur' || role === 'Responsable technicien') return 'blue'
   return 'gray'
 }
 
+function RowActions({ user, onHistory, onEdit, onDelete, compact = false }) {
+  const base = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-colors'
+  return (
+    <div className={compact ? 'grid grid-cols-3 gap-2' : 'flex items-center justify-end gap-1'}>
+      <button type="button" onClick={onHistory} className={`${base} ${compact ? 'bg-slate-100 text-ink hover:bg-slate-200' : 'w-9 text-ink-muted hover:bg-slate-100 hover:text-ink'}`} aria-label={`Historique de ${user.name}`} title="Historique">
+        <History size={15} aria-hidden="true" />
+        {compact && 'Historique'}
+      </button>
+      <button type="button" onClick={onEdit} className={`${base} ${compact ? 'bg-brand-50 text-brand-700 hover:bg-brand-100' : 'w-9 text-ink-muted hover:bg-brand-50 hover:text-brand-700'}`} aria-label={`Modifier ${user.name}`} title="Modifier">
+        <Pencil size={15} aria-hidden="true" />
+        {compact && 'Modifier'}
+      </button>
+      <button type="button" onClick={onDelete} className={`${base} ${compact ? 'bg-red-50 text-red-700 hover:bg-red-100' : 'w-9 text-ink-muted hover:bg-red-50 hover:text-red-600'}`} aria-label={`Supprimer ${user.name}`} title="Supprimer">
+        <Trash2 size={15} aria-hidden="true" />
+        {compact && 'Supprimer'}
+      </button>
+    </div>
+  )
+}
 
-export default function UserTable({
-  users,
-  isLoading,
-  currentUser,
-  onUsersChanged,
-  onAction,
-  searchTerm,
-  onSearchChange,
-  roleFilter,
-  onRoleChange,
-  statusFilter,
-  onStatusChange,
-}) {
+export default function UserTable({ users, isLoading, currentUser, onUsersChanged, onAction, onRolesLoaded }) {
   const navigate = useNavigate()
 
   const [userList, setUserList] = useState(users)
@@ -61,19 +62,20 @@ export default function UserTable({
       setIsLoadingRoles(true)
       try {
         const response = await apiFetch('/roles', { auth: true })
-        if (!response.ok) {
-          return
-        }
+        if (!response.ok) return
         const data = await response.json()
         if (Array.isArray(data)) {
           setAvailableRoles(data)
+          onRolesLoaded?.(data.map((role) => role.name))
         }
+      } catch {
+        setAvailableRoles([])
       } finally {
         setIsLoadingRoles(false)
       }
     }
-
     fetchRoles()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleOpenEdit = (user) => {
@@ -98,13 +100,13 @@ export default function UserTable({
     setActionError('')
 
     if (!isAdmin) {
-      setActionError("Seul un administrateur peut modifier un utilisateur.")
+      setActionError('Seul un administrateur peut modifier un utilisateur.')
       return
     }
 
     const token = typeof window !== 'undefined' ? window.localStorage.getItem('auth_token') : null
     if (!token) {
-      setActionError('Session expiree. Veuillez vous reconnecter.')
+      setActionError('Session expirée. Veuillez vous reconnecter.')
       return
     }
 
@@ -122,49 +124,41 @@ export default function UserTable({
       })
 
       if (!response.ok) {
-        const message =
+        setActionError(
           response.status === 403
-            ? "Vous n'avez pas l'autorisation pour modifier cet utilisateur."
-            : "Impossible de modifier l'utilisateur. Reessayez plus tard."
-        setActionError(message)
+            ? "Vous n'avez pas l'autorisation de modifier cet utilisateur."
+            : "Impossible de modifier l'utilisateur. Réessayez plus tard.",
+        )
         return
       }
 
       const updated = await response.json()
-
-      const nextRoleColor = getRoleColorKey(updated.role)
-      const nextStatusText = updated.isActive ? 'Actif' : 'Inactif'
-      const nextStatusColor = updated.isActive ? 'green' : 'gray'
-
       setUserList((prev) =>
-        prev.map((user) => {
-          if (user.id !== selectedUser.id) return user
-          return {
-            ...user,
-            name: updated.name,
-            email: updated.email,
-            department: updated.department || '',
-            role: updated.role,
-            status: nextStatusText,
-            roleColor: nextRoleColor,
-            statusColor: nextStatusColor,
-          }
-        }),
+        prev.map((user) =>
+          user.id !== selectedUser.id
+            ? user
+            : {
+                ...user,
+                name: updated.name,
+                email: updated.email,
+                department: updated.department || '',
+                role: updated.role,
+                status: updated.isActive ? 'Actif' : 'Inactif',
+                roleColor: getRoleColorKey(updated.role),
+                statusColor: updated.isActive ? 'green' : 'gray',
+              },
+        ),
       )
 
-      if (onUsersChanged) {
-        onUsersChanged()
-      }
-
+      onUsersChanged?.()
+      const prevStatus = selectedUser.status
       setIsEditOpen(false)
       setSelectedUser(null)
       if (onAction) {
-        const prevStatus = selectedUser.status
-        const nextStatus = editStatus
-        if (prevStatus !== nextStatus) {
-          onAction(nextStatus === 'Inactif' ? 'Utilisateur desactive' : 'Utilisateur reactive')
+        if (prevStatus !== editStatus) {
+          onAction(editStatus === 'Inactif' ? 'Utilisateur désactivé' : 'Utilisateur réactivé')
         } else {
-          onAction('Utilisateur modifie')
+          onAction('Utilisateur modifié')
         }
       }
     } catch {
@@ -191,42 +185,33 @@ export default function UserTable({
     setActionError('')
 
     if (!isAdmin) {
-      setActionError("Seul un administrateur peut supprimer un utilisateur.")
+      setActionError('Seul un administrateur peut supprimer un utilisateur.')
       return
     }
 
     const token = typeof window !== 'undefined' ? window.localStorage.getItem('auth_token') : null
     if (!token) {
-      setActionError('Session expiree. Veuillez vous reconnecter.')
+      setActionError('Session expirée. Veuillez vous reconnecter.')
       return
     }
 
     setIsSubmittingDelete(true)
     try {
-      const response = await apiFetch(`/users/${selectedUser.id}`, {
-        method: 'DELETE',
-        auth: true,
-      })
-
+      const response = await apiFetch(`/users/${selectedUser.id}`, { method: 'DELETE', auth: true })
       if (!response.ok) {
-        const message =
+        setActionError(
           response.status === 403
-            ? "Vous n'avez pas l'autorisation pour supprimer cet utilisateur."
-            : "Impossible de supprimer l'utilisateur. Reessayez plus tard."
-        setActionError(message)
+            ? "Vous n'avez pas l'autorisation de supprimer cet utilisateur."
+            : "Impossible de supprimer l'utilisateur. Réessayez plus tard.",
+        )
         return
       }
 
       setUserList((prev) => prev.filter((user) => user.id !== selectedUser.id))
       setIsDeleteOpen(false)
       setSelectedUser(null)
-
-      if (onUsersChanged) {
-        onUsersChanged()
-      }
-      if (onAction) {
-        onAction('Utilisateur supprime')
-      }
+      onUsersChanged?.()
+      onAction?.('Utilisateur supprimé')
     } catch {
       setActionError("Erreur lors de la suppression de l'utilisateur.")
     } finally {
@@ -234,215 +219,103 @@ export default function UserTable({
     }
   }
 
+  const emptyState = (
+    <EmptyState
+      icon={Users}
+      title="Aucun utilisateur trouvé"
+      description="Modifiez la recherche ou les filtres, ou créez un nouveau compte."
+    />
+  )
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap gap-3 items-center bg-slate-50/50">
-        <div className="relative flex-1 min-w-[200px]">
-          <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-          <input
-            type="text"
-            placeholder="Rechercher par nom ou email..."
-            value={searchTerm}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] transition-all font-medium placeholder:text-slate-400"
-          />
-        </div>
-        <select
-          value={roleFilter}
-          onChange={(e) => onRoleChange(e.target.value)}
-          className="w-full sm:w-auto px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] transition-all cursor-pointer"
-        >
-          <option>Tous les roles</option>
-          {availableRoles.map((role) => (
-            <option key={role.name} value={role.name}>{role.name}</option>
-          ))}
-        </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => onStatusChange(e.target.value)}
-          className="w-full sm:w-auto px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] transition-all cursor-pointer"
-        >
-          <option>Statut: Tous</option>
-          <option>Actif</option>
-          <option>Inactif</option>
-        </select>
-      </div>
-
-      {/* Mobile / tablet cards */}
-      <div className="lg:hidden bg-slate-50 px-4 py-4 sm:px-6 sm:py-5">
+    <div className="ui-card overflow-hidden">
+      <div className="divide-y divide-line lg:hidden">
         {isLoading ? (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-6 py-16 text-center">
-            <div className="flex flex-col items-center gap-3">
-              <svg className="animate-spin h-8 w-8 text-[#0052CC]" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-              <p className="text-sm font-semibold text-slate-400">Chargement des utilisateurs...</p>
-            </div>
-          </div>
+          <div className="p-6 text-center text-sm text-ink-muted">Chargement des utilisateurs…</div>
         ) : userList.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-6 py-16 text-center">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center">
-                <Shield size={24} className="text-slate-300" />
-              </div>
-              <p className="font-bold text-slate-500">Aucun utilisateur trouve</p>
-              <p className="text-sm text-slate-400">Modifiez vos criteres ou creez un nouveau compte.</p>
-            </div>
-          </div>
+          <div className="p-4">{emptyState}</div>
         ) : (
-          <div className="space-y-4 sm:space-y-5">
-            {userList.map((user) => (
-              <div key={user.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-4 sm:p-5 transition active:scale-[0.99] sm:hover:shadow-md">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0052CC] to-blue-700 flex items-center justify-center text-white font-black text-sm shrink-0 shadow-sm">
-                      {user.avatar}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-bold text-slate-900 text-sm truncate">{user.name}</p>
-                      <p className="text-xs text-slate-500 font-medium truncate">{user.email}</p>
-                    </div>
+          userList.map((user) => (
+            <article key={user.id} className="flex flex-col gap-3 p-4">
+              <div className="flex items-start gap-3">
+                <UserAvatar name={user.name} role={user.role} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="truncate font-display text-sm font-bold text-ink">{user.name}</h3>
+                    <StatusBadge status={user.status} />
                   </div>
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 ${statusColors[user.statusColor]}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${user.statusColor === 'green' ? 'bg-green-500' : 'bg-gray-400'}`}></span>
-                    {user.status}
-                  </span>
-                </div>
-
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold ${roleColors[user.roleColor]}`}>
-                    {user.role === 'Administrateur' && <Shield size={12} />}
-                    {user.role}
-                  </span>
-                  {user.department && (
-                    <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">{user.department}</span>
-                  )}
-                </div>
-
-                <div className="mt-2 flex items-center gap-2 text-xs text-slate-500 font-medium">
-                  <Clock size={13} className="text-slate-400 shrink-0" />
-                  {user.lastLogin}
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/users/${user.id}/details`)}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
-                  >
-                    Historique
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenEdit(user)}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
-                  >
-                    Modifier
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenDelete(user)}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
-                  >
-                    Supprimer
-                  </button>
+                  <p className="truncate text-xs text-ink-muted">{user.email}</p>
                 </div>
               </div>
-            ))}
-          </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <RoleBadge role={user.role} />
+                {user.department && <span className="text-xs font-medium text-ink-muted">{user.department}</span>}
+              </div>
+              <p className="flex items-center gap-1.5 text-xs text-ink-faint">
+                <Clock size={12} aria-hidden="true" /> {user.lastLogin}
+              </p>
+              <RowActions
+                compact
+                user={user}
+                onHistory={() => navigate(`/users/${user.id}/details`)}
+                onEdit={() => handleOpenEdit(user)}
+                onDelete={() => handleOpenDelete(user)}
+              />
+            </article>
+          ))
         )}
       </div>
 
-      <div className="overflow-x-auto hidden lg:block">
-        <table className="w-full min-w-[840px]">
+      <div className="hidden overflow-x-auto lg:block">
+        <table className="w-full min-w-[860px] text-sm">
           <thead>
-            <tr className="bg-slate-50 border-b border-slate-100">
-              <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Utilisateur</th>
-              <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Email</th>
-              <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Departement</th>
-              <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Role</th>
-              <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Statut</th>
-              <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Derniere connexion</th>
-              <th className="px-6 py-3.5 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
+            <tr className="border-b border-line bg-slate-50/80 text-left text-xs font-semibold text-ink-muted">
+              <th scope="col" className="px-5 py-3">Utilisateur</th>
+              <th scope="col" className="px-5 py-3">Département</th>
+              <th scope="col" className="px-5 py-3">Rôle</th>
+              <th scope="col" className="px-5 py-3">Statut</th>
+              <th scope="col" className="px-5 py-3">Dernière connexion</th>
+              <th scope="col" className="px-5 py-3 text-right"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50">
+          <tbody className="divide-y divide-line">
             {isLoading ? (
-              <tr><td colSpan={7} className="px-6 py-16 text-center">
-                <div className="flex flex-col items-center gap-3">
-                  <svg className="animate-spin h-8 w-8 text-[#0052CC]" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                  <p className="text-sm font-semibold text-slate-400">Chargement des utilisateurs...</p>
-                </div>
-              </td></tr>
+              <SkeletonTableRows rows={4} columns={6} />
             ) : userList.length === 0 ? (
-              <tr><td colSpan={7} className="px-6 py-16 text-center">
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center">
-                    <Shield size={24} className="text-slate-300" />
-                  </div>
-                  <p className="font-bold text-slate-500">Aucun utilisateur trouve</p>
-                  <p className="text-sm text-slate-400">Modifiez vos criteres ou creez un nouveau compte.</p>
-                </div>
-              </td></tr>
+              <tr><td colSpan={6} className="p-4">{emptyState}</td></tr>
             ) : (
               userList.map((user) => (
-                <tr key={user.id} className="hover:bg-slate-50/70 transition-colors group">
-                  <td className="px-6 py-4">
+                <tr key={user.id} className="transition-colors hover:bg-slate-50/70">
+                  <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#0052CC] to-blue-700 flex items-center justify-center text-white font-black text-sm shrink-0 shadow-sm">
-                        {user.avatar}
+                      <UserAvatar name={user.name} role={user.role} />
+                      <div className="min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/users/${user.id}/details`)}
+                          className="block truncate font-semibold text-ink hover:text-brand-700"
+                        >
+                          {user.name}
+                        </button>
+                        <span className="block truncate text-xs text-ink-muted">{user.email}</span>
                       </div>
-                      <span className="font-semibold text-slate-900 text-sm">{user.name}</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-500 font-medium">{user.email}</td>
-                  <td className="px-6 py-4 text-sm text-slate-500 font-medium">{user.department || '-'}</td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold ${roleColors[user.roleColor]}`}>
-                      {user.role === 'Administrateur' && <Shield size={12} />}
-                      {user.role}
+                  <td className="px-5 py-3.5 text-ink-muted">{user.department || '—'}</td>
+                  <td className="px-5 py-3.5"><RoleBadge role={user.role} /></td>
+                  <td className="px-5 py-3.5"><StatusBadge status={user.status} /></td>
+                  <td className="px-5 py-3.5">
+                    <span className="flex items-center gap-1.5 text-xs text-ink-muted">
+                      <Clock size={12} aria-hidden="true" className="text-ink-faint" /> {user.lastLogin}
                     </span>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold ${statusColors[user.statusColor]}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${user.statusColor === 'green' ? 'bg-green-500' : 'bg-gray-400'}`}></span>
-                      {user.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
-                      <Clock size={13} className="text-slate-400 shrink-0" />
-                      {user.lastLogin}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/users/${user.id}/details`)}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:border-blue-200 hover:bg-blue-100 hover:text-blue-800"
-                        title="Historique"
-                        aria-label={`Historique ${user.name}`}
-                      >
-                        Historique
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEdit(user)}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:border-amber-200 hover:bg-amber-100 hover:text-amber-800"
-                        title="Modifier"
-                        aria-label={`Modifier ${user.name}`}
-                      >
-                        Modifier
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenDelete(user)}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:border-rose-200 hover:bg-rose-100 hover:text-rose-800"
-                        title="Supprimer"
-                        aria-label={`Supprimer ${user.name}`}
-                      >
-                        Supprimer
-                      </button>
-                    </div>
+                  <td className="px-5 py-3.5">
+                    <RowActions
+                      user={user}
+                      onHistory={() => navigate(`/users/${user.id}/details`)}
+                      onEdit={() => handleOpenEdit(user)}
+                      onDelete={() => handleOpenDelete(user)}
+                    />
                   </td>
                 </tr>
               ))
@@ -451,168 +324,107 @@ export default function UserTable({
         </table>
       </div>
 
-      {isEditOpen && selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 animate-in fade-in duration-300">
-          <div className="w-full max-w-lg bg-white rounded-2xl border border-gray-100 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#E6F0FF] rounded-xl flex items-center justify-center">
-                  <Edit2 size={20} className="text-[#0052CC]" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900">Modifier le profil</h2>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">ID: {selectedUser.id}</p>
-                </div>
+      <Modal
+        open={isEditOpen && Boolean(selectedUser)}
+        onClose={handleCloseEdit}
+        title="Modifier le compte"
+        description={selectedUser ? `${selectedUser.name} · identifiant ${selectedUser.id}` : ''}
+        icon={UserCog}
+        footer={
+          <>
+            <button type="button" onClick={handleCloseEdit} className="ui-btn-secondary">Annuler</button>
+            <button type="submit" form="edit-user-form" disabled={isSubmittingEdit} className="ui-btn-primary">
+              {isSubmittingEdit ? 'Enregistrement…' : 'Enregistrer'}
+            </button>
+          </>
+        }
+      >
+        {selectedUser && (
+          <form id="edit-user-form" onSubmit={handleSubmitEdit} className="flex flex-col gap-5">
+            <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
+              <UserAvatar name={selectedUser.name} role={editRole || selectedUser.role} />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-ink">{selectedUser.name}</p>
+                <RoleBadge role={editRole || selectedUser.role} className="mt-1" />
               </div>
-              <button onClick={handleCloseEdit} className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-              </button>
             </div>
-
-            <div className="p-6">
-              {actionError && (
-                <div className="mb-6 px-4 py-3 rounded-xl bg-red-50 border border-red-100 text-sm text-red-600 flex items-center gap-3">
-                  <AlertCircle size={18} />
-                  <p className="font-medium">{actionError}</p>
+            {actionError && <InlineAlert tone="error" icon={AlertTriangle}>{actionError}</InlineAlert>}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="Email professionnel" htmlFor="edit-email" full>
+                <div className="relative">
+                  <Mail size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint" aria-hidden="true" />
+                  <input id="edit-email" type="email" value={editEmail} onChange={(event) => setEditEmail(event.target.value)} className="ui-input pl-10" required />
                 </div>
-              )}
-
-              <form onSubmit={handleSubmitEdit} className="space-y-5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">
-                      Email professionnel
-                    </label>
-                    <input
-                      type="email"
-                      value={editEmail}
-                      onChange={(event) => setEditEmail(event.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] focus:bg-white transition-all font-medium"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">
-                      Departement
-                    </label>
-                    <select
-                      value={editDepartment}
-                      onChange={(event) => setEditDepartment(event.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] focus:bg-white transition-all font-bold text-gray-700"
-                    >
-                      <option value="">Selectionner un departement</option>
-                      <option value="SOMACS Commercial">SOMACS Commercial</option>
-                      <option value="SOMACS Service">SOMACS Service</option>
-                    </select>
-                  </div>
+              </Field>
+              <Field label="Département" htmlFor="edit-department">
+                <div className="relative">
+                  <Building2 size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint" aria-hidden="true" />
+                  <select id="edit-department" value={editDepartment} onChange={(event) => setEditDepartment(event.target.value)} className="ui-select pl-10">
+                    <option value="">Non renseigné</option>
+                    <option value="SOMACS Service">SOMACS Service</option>
+                    <option value="SOMACS Commercial">SOMACS Commercial</option>
+                  </select>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">
-                      Role systeme
-                    </label>
-                    <select
-                      value={editRole}
-                      onChange={(event) => setEditRole(event.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] focus:bg-white transition-all font-bold text-gray-700"
-                    >
-                      {availableRoles.length === 0 ? (
-                        <option value="">{isLoadingRoles ? 'Chargement...' : 'Aucun role'}</option>
-                      ) : (
-                        availableRoles.map((role) => (
-                          <option key={role.name} value={role.name}>
-                            {role.name}
-                          </option>
-                        ))
-                      )}
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest ml-1">
-                      Statut du compte
-                    </label>
-                    <select
-                      value={editStatus}
-                      onChange={(event) => setEditStatus(event.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] focus:bg-white transition-all font-bold text-gray-700"
-                    >
-                      <option value="Actif">Actif</option>
-                      <option value="Inactif">Inactif</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={handleCloseEdit}
-                    className="flex-1 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition-all active:scale-95"
+              </Field>
+              <Field label="Rôle" htmlFor="edit-role">
+                <select id="edit-role" value={editRole} onChange={(event) => setEditRole(event.target.value)} className="ui-select">
+                  {availableRoles.length === 0 ? (
+                    <option value={editRole}>{isLoadingRoles ? 'Chargement…' : editRole || 'Aucun rôle'}</option>
+                  ) : (
+                    availableRoles.map((role) => <option key={role.name} value={role.name}>{role.name}</option>)
+                  )}
+                </select>
+              </Field>
+            </div>
+            <fieldset>
+              <legend className="ui-label">Statut du compte</legend>
+              <div className="grid grid-cols-2 gap-2">
+                {['Actif', 'Inactif'].map((status) => (
+                  <label
+                    key={status}
+                    className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-3.5 py-3 text-sm font-semibold transition-colors ${
+                      editStatus === status ? 'border-brand-600 bg-brand-50 text-brand-800' : 'border-line text-ink-muted hover:border-slate-300'
+                    }`}
                   >
-                    Annuler
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmittingEdit}
-                    className="flex-[2] px-6 py-3 bg-[#0052CC] hover:bg-[#0042a3] text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-[#0052CC]/20 disabled:opacity-60 disabled:cursor-not-allowed active:scale-95"
-                  >
-                    {isSubmittingEdit ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        Enregistrement...
-                      </span>
-                    ) : 'Mettre a jour'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isDeleteOpen && selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4 animate-in fade-in duration-300">
-          <div className="w-full max-w-sm bg-white rounded-2xl border border-gray-100 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Trash2 size={32} className="text-red-600" />
+                    <input type="radio" name="edit-status" value={status} checked={editStatus === status} onChange={() => setEditStatus(status)} className="accent-brand-600" />
+                    {status === 'Actif' ? 'Actif' : 'Désactivé'}
+                  </label>
+                ))}
               </div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Supprimer l'utilisateur</h2>
-              <p className="text-sm text-gray-500 mb-6">
-                Etes-vous sur de vouloir supprimer <span className="font-bold text-gray-900">{selectedUser.name}</span> ? Cette action est irreversible.
-              </p>
+            </fieldset>
+          </form>
+        )}
+      </Modal>
 
-              {actionError && (
-                <div className="mb-6 px-4 py-2 rounded-xl bg-red-50 border border-red-100 text-xs text-red-600 font-medium">
-                  {actionError}
-                </div>
-              )}
-
-              <div className="flex flex-col gap-3">
-                <button
-                  type="button"
-                  onClick={handleConfirmDelete}
-                  disabled={isSubmittingDelete}
-                  className="w-full px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-red-600/20 disabled:opacity-60 disabled:cursor-not-allowed active:scale-95"
-                >
-                  {isSubmittingDelete ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                      Suppression...
-                    </span>
-                  ) : 'Confirmer la suppression'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCloseDelete}
-                  className="w-full px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition-all active:scale-95"
-                >
-                  Annuler
-                </button>
+      <Modal
+        open={isDeleteOpen && Boolean(selectedUser)}
+        onClose={handleCloseDelete}
+        title="Supprimer ce compte ?"
+        description="Cette action est définitive. L'historique des missions reste conservé."
+        icon={Trash2}
+        size="sm"
+        footer={
+          <>
+            <button type="button" onClick={handleCloseDelete} className="ui-btn-secondary">Annuler</button>
+            <button type="button" onClick={handleConfirmDelete} disabled={isSubmittingDelete} className="ui-btn-danger">
+              {isSubmittingDelete ? 'Suppression…' : 'Supprimer le compte'}
+            </button>
+          </>
+        }
+      >
+        {selectedUser && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-3 rounded-xl border border-red-100 bg-red-50/60 p-3">
+              <UserAvatar name={selectedUser.name} role={selectedUser.role} />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-ink">{selectedUser.name}</p>
+                <p className="truncate text-xs text-ink-muted">{selectedUser.email}</p>
               </div>
             </div>
+            {actionError && <InlineAlert tone="error" icon={AlertTriangle}>{actionError}</InlineAlert>}
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   )
 }

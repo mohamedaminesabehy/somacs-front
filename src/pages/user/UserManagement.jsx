@@ -1,20 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Users, Shield, UserPlus, CheckCircle2 } from 'lucide-react'
+import { Users, UserPlus, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react'
 import UserTable from '../../components/user/UserTable'
+import PageHeader from '../../components/ui/PageHeader'
 import CreateUserForm from '../../components/user/CreateUserForm'
-import RoleManagement from '../../components/user/RoleManagement'
+import { StatStrip, SearchField, SegmentedFilter, Toolbar, Toast } from '../../components/ui/DataKit'
+import { InlineAlert } from '../../components/ui/Feedback'
+import { ROLE_STYLES } from '../../components/user/roleStyles'
+
+const ALL_ROLES = 'Tous les rôles'
+const ALL_STATUSES = 'Statut: Tous'
+const ROLE_ORDER = ['Administrateur', 'Responsable technicien', 'Coordinateur', 'Technicien']
+const ROLE_TONES = { Administrateur: 'slate', 'Responsable technicien': 'brand', Coordinateur: 'amber', Technicien: 'teal' }
 
 export default function UserManagement({ currentUser }) {
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 4
+  const itemsPerPage = 8
   const [rawUsers, setRawUsers] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
-  const [roleFilter, setRoleFilter] = useState('Tous les rôles')
-  const [statusFilter, setStatusFilter] = useState('Statut: Tous')
-  const [actionToast, setActionToast] = useState({ open: false, message: '' })
+  const [roleFilter, setRoleFilter] = useState(ALL_ROLES)
+  const [statusFilter, setStatusFilter] = useState(ALL_STATUSES)
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [toast, setToast] = useState(null)
   const toastTimerRef = useRef(null)
+
+  const isAdmin = currentUser?.role === 'Administrateur'
 
   const fetchUsers = async () => {
     setIsLoading(true)
@@ -26,17 +37,17 @@ export default function UserManagement({ currentUser }) {
         headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       })
       if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          setError("Vous n'êtes pas autorisé à consulter la liste des utilisateurs. Veuillez vous reconnecter.")
-        } else {
-          setError("Impossible de charger les utilisateurs.")
-        }
+        setError(
+          response.status === 401 || response.status === 403
+            ? "Vous n'êtes pas autorisé à consulter la liste des utilisateurs. Veuillez vous reconnecter."
+            : 'Impossible de charger les utilisateurs.',
+        )
         return
       }
       const data = await response.json()
       setRawUsers(Array.isArray(data) ? data : [])
     } catch {
-      setError("Erreur lors du chargement des utilisateurs.")
+      setError('Erreur lors du chargement des utilisateurs.')
     } finally {
       setIsLoading(false)
     }
@@ -44,210 +55,165 @@ export default function UserManagement({ currentUser }) {
 
   useEffect(() => { fetchUsers() }, [])
   useEffect(() => { setCurrentPage(1) }, [searchTerm, roleFilter, statusFilter])
+  useEffect(() => () => { if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current) }, [])
 
-  const fallbackRoles = useMemo(
-    () => ['Administrateur', 'Technicien', 'Commerciale', 'Coordinateur', 'Responsable technicien'],
-    [],
-  )
+  const fallbackRoles = useMemo(() => ROLE_ORDER, [])
 
   const users = useMemo(() =>
     rawUsers.map((user) => {
-      const initials = user.name && typeof user.name === 'string'
-        ? user.name.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]?.toUpperCase()).join('')
-        : 'US'
-      const roleColor = user.role === 'Administrateur' ? 'purple'
-        : user.role === 'Commerciale' || user.role === 'Coordinateur' || user.role === 'Responsable technicien' ? 'blue' : 'gray'
       const isActive = Boolean(user.isActive)
       return {
-        id: user.id, name: user.name, email: user.email, department: user.department || '',
-        role: user.role, roleColor,
+        id: user.id,
+        name: user.name || '',
+        email: user.email || '',
+        department: user.department || '',
+        role: user.role,
+        roleColor: user.role === 'Administrateur' ? 'purple' : user.role === 'Coordinateur' || user.role === 'Responsable technicien' ? 'blue' : 'gray',
         status: isActive ? 'Actif' : 'Inactif',
         statusColor: isActive ? 'green' : 'gray',
         lastLogin: user.lastLogin
           ? new Date(user.lastLogin).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
           : 'Jamais connecté',
-        avatar: initials,
       }
     }), [rawUsers])
 
-  const filteredUsers = useMemo(() => users.filter((user) => {
-    const q = searchTerm.toLowerCase()
-    const matchesSearch =
-      user.name.toLowerCase().includes(q) ||
-      user.email.toLowerCase().includes(q) ||
-      (user.department || '').toLowerCase().includes(q)
-    const matchesRole   = roleFilter === 'Tous les rôles' || user.role === roleFilter
-    const matchesStatus = statusFilter === 'Statut: Tous' || user.status === statusFilter
-    return matchesSearch && matchesRole && matchesStatus
-  }), [users, searchTerm, roleFilter, statusFilter])
+  const usersMatchingSearchAndStatus = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase()
+    return users.filter((user) => {
+      const matchesSearch = !q || user.name.toLowerCase().includes(q) || user.email.toLowerCase().includes(q) || user.department.toLowerCase().includes(q)
+      const matchesStatus = statusFilter === ALL_STATUSES || user.status === statusFilter
+      return matchesSearch && matchesStatus
+    })
+  }, [users, searchTerm, statusFilter])
 
-  const totalUsers    = filteredUsers.length
-  const totalRoles    = new Set(users.map(u => u.role)).size
-  const activeUsers   = users.filter(u => u.status === 'Actif').length
-  const totalPages    = totalUsers === 0 ? 1 : Math.ceil(totalUsers / itemsPerPage)
+  const filteredUsers = useMemo(
+    () => usersMatchingSearchAndStatus.filter((user) => roleFilter === ALL_ROLES || user.role === roleFilter),
+    [usersMatchingSearchAndStatus, roleFilter],
+  )
+
+  const roleCounts = useMemo(() => {
+    const counts = Object.fromEntries(ROLE_ORDER.map((role) => [role, 0]))
+    users.forEach((user) => { counts[user.role] = (counts[user.role] || 0) + 1 })
+    return counts
+  }, [users])
+
+  const activeUsers = users.filter((user) => user.status === 'Actif').length
+
+  const stripItems = ROLE_ORDER.map((role) => ({
+    key: role,
+    label: role,
+    hint: ROLE_STYLES[role]?.short,
+    value: roleCounts[role] || 0,
+    icon: ROLE_STYLES[role]?.icon,
+    tone: ROLE_TONES[role],
+  }))
+
+  const totalUsers = filteredUsers.length
+  const totalPages = Math.max(1, Math.ceil(totalUsers / itemsPerPage))
   const safeCurrentPage = Math.min(currentPage, totalPages)
-  const startIndex    = totalUsers === 0 ? 0 : (safeCurrentPage - 1) * itemsPerPage
-  const endIndex      = totalUsers === 0 ? 0 : Math.min(startIndex + itemsPerPage, totalUsers)
+  const startIndex = (safeCurrentPage - 1) * itemsPerPage
+  const endIndex = Math.min(startIndex + itemsPerPage, totalUsers)
   const paginatedUsers = filteredUsers.slice(startIndex, endIndex)
 
-  const handlePreviousPage = () => { if (safeCurrentPage > 1) setCurrentPage(p => Math.max(1, p - 1)) }
-  const handleNextPage     = () => { if (safeCurrentPage < totalPages) setCurrentPage(p => Math.min(totalPages, p + 1)) }
-
-  const showActionToast = (message) => {
-    if (toastTimerRef.current) {
-      window.clearTimeout(toastTimerRef.current)
-      toastTimerRef.current = null
-    }
-    setActionToast({ open: true, message })
-    toastTimerRef.current = window.setTimeout(() => {
-      setActionToast({ open: false, message: '' })
-      toastTimerRef.current = null
-    }, 3000)
+  const showToast = (message, type = 'success') => {
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
+    setToast({ message, type })
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 3200)
   }
 
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
-      toastTimerRef.current = null
-    }
-  }, [])
+  const hasFilters = searchTerm !== '' || roleFilter !== ALL_ROLES || statusFilter !== ALL_STATUSES
+  const resetFilters = () => {
+    setSearchTerm('')
+    setRoleFilter(ALL_ROLES)
+    setStatusFilter(ALL_STATUSES)
+  }
+
+  const statusOptions = [
+    { value: ALL_STATUSES, label: 'Tous', count: usersMatchingSearchAndStatus.length === users.length ? users.length : undefined },
+    { value: 'Actif', label: 'Actifs', count: activeUsers },
+    { value: 'Inactif', label: 'Désactivés', count: users.length - activeUsers },
+  ]
 
   return (
-    <div className="p-6 lg:p-8 space-y-8 bg-slate-50 min-h-full">
+    <div className="flex min-h-full flex-col gap-6 bg-surface p-4 sm:p-6 lg:p-8">
+      <Toast toast={toast} onClose={() => setToast(null)} />
 
-      {actionToast.open && (
-        <div className="fixed top-5 right-5 sm:top-6 sm:right-6 z-[120] animate-in fade-in duration-200">
-          <div
-            role="status"
-            className="w-[320px] sm:w-[360px] bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden"
+      <PageHeader
+        eyebrow="Administration"
+        title="Gestion des utilisateurs"
+        description={`${users.length} comptes · ${activeUsers} actifs. Gérez les rôles et accès de l'équipe SOMACS.`}
+        icon={Users}
+        actions={
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(true)}
+            className="ui-btn-primary"
+            disabled={!isAdmin}
+            title={isAdmin ? undefined : 'Réservé aux administrateurs'}
           >
-            <div className="flex items-start gap-3.5 px-4 py-3.5">
-              <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
-                <CheckCircle2 size={18} className="text-emerald-600" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Succès</p>
-                <p className="text-sm font-semibold text-slate-800 leading-snug mt-0.5 break-words">{actionToast.message}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  if (toastTimerRef.current) {
-                    window.clearTimeout(toastTimerRef.current)
-                    toastTimerRef.current = null
-                  }
-                  setActionToast({ open: false, message: '' })
-                }}
-                className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-colors"
-                aria-label="Fermer"
-              >
-                <span className="text-lg leading-none">×</span>
-              </button>
-            </div>
-            <div className="h-1 bg-gradient-to-r from-emerald-500 via-green-500 to-lime-400" />
-          </div>
-        </div>
-      )}
+            <UserPlus size={16} aria-hidden="true" /> Nouvel utilisateur
+          </button>
+        }
+      />
 
-      {/* ── PAGE HEADER ── */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-        <div className="flex items-center gap-5">
-          <div className="w-14 h-14 bg-gradient-to-br from-purple-600 to-purple-800 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-200">
-            <Users size={26} className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Gestion des utilisateurs</h1>
-            <p className="text-sm text-slate-500 font-medium mt-0.5">Administrez les comptes, les rôles et les droits d'accès de l'équipe SOMACS.</p>
-          </div>
-        </div>
-      </div>
+      <StatStrip
+        items={stripItems}
+        total={users.length}
+        activeKey={roleFilter === ALL_ROLES ? null : roleFilter}
+        onSelect={(key) => setRoleFilter(key || ALL_ROLES)}
+      />
 
-      {/* ── STAT CARDS ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-4 sm:px-6 sm:py-5 flex items-center gap-3 sm:gap-4">
-          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-[#E6F0FF] flex items-center justify-center shrink-0">
-            <Users size={22} className="text-[#0052CC]" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Total comptes</p>
-            <p className="text-2xl font-black text-slate-900 mt-0.5">{users.length}</p>
-          </div>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-4 sm:px-6 sm:py-5 flex items-center gap-3 sm:gap-4">
-          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-green-50 flex items-center justify-center shrink-0">
-            <UserPlus size={22} className="text-green-600" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Comptes actifs</p>
-            <p className="text-2xl font-black text-slate-900 mt-0.5">{activeUsers}</p>
-          </div>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-4 sm:px-6 sm:py-5 flex items-center gap-3 sm:gap-4">
-          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-purple-50 flex items-center justify-center shrink-0">
-            <Shield size={22} className="text-purple-600" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Rôles définis</p>
-            <p className="text-2xl font-black text-slate-900 mt-0.5">{totalRoles}</p>
-          </div>
-        </div>
-      </div>
+      {error && <InlineAlert tone="error" icon={AlertTriangle}>{error}</InlineAlert>}
 
-      {/* ── ERROR ── */}
-      {error && (
-        <div className="flex items-center gap-3 px-5 py-4 rounded-2xl bg-red-50 border border-red-200 text-sm text-red-700 font-medium">
-          <span className="text-lg">⚠️</span>
-          {error}
-        </div>
-      )}
+      <Toolbar
+        summary={
+          totalUsers === 0
+            ? 'Aucun utilisateur ne correspond aux critères'
+            : `${totalUsers} utilisateur${totalUsers > 1 ? 's' : ''}${roleFilter !== ALL_ROLES ? ` · ${roleFilter}` : ''}`
+        }
+        onReset={hasFilters ? resetFilters : undefined}
+      >
+        <SearchField
+          value={searchTerm}
+          onChange={setSearchTerm}
+          placeholder="Nom, email ou département…"
+          label="Rechercher un utilisateur"
+          className="lg:max-w-sm lg:flex-1"
+        />
+        <SegmentedFilter options={statusOptions} value={statusFilter} onChange={setStatusFilter} label="Filtrer par statut" className="lg:ml-auto" />
+      </Toolbar>
 
-      {/* ── USER TABLE ── */}
       <UserTable
         users={paginatedUsers}
-        currentPage={currentPage}
-        totalUsers={totalUsers}
-        itemsPerPage={itemsPerPage}
         isLoading={isLoading}
         currentUser={currentUser}
         onUsersChanged={fetchUsers}
-        onAction={showActionToast}
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        roleFilter={roleFilter}
-        onRoleChange={setRoleFilter}
-        statusFilter={statusFilter}
-        onStatusChange={setStatusFilter}
+        onAction={(message) => showToast(message)}
       />
 
-      {/* ── PAGINATION ── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center text-sm text-slate-500 font-medium">
-        <span>
-          {totalUsers === 0
-            ? 'Aucun utilisateur ne correspond aux critères sélectionnés'
-            : `Affichage de ${startIndex + 1} à ${endIndex} sur ${totalUsers} utilisateur${totalUsers > 1 ? 's' : ''}`}
-        </span>
-        <div className="flex gap-2">
-          <button type="button" onClick={handlePreviousPage} disabled={safeCurrentPage <= 1 || totalUsers === 0}
-            className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all text-sm">
-            Précédent
-          </button>
-          <button type="button" onClick={handleNextPage} disabled={safeCurrentPage >= totalPages || totalUsers === 0}
-            className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all text-sm">
-            Suivant
-          </button>
-        </div>
-      </div>
+      {totalUsers > itemsPerPage && (
+        <nav className="flex flex-col gap-3 text-sm text-ink-muted sm:flex-row sm:items-center sm:justify-between" aria-label="Pagination des utilisateurs">
+          <span className="tabular-nums">{startIndex + 1}–{endIndex} sur {totalUsers}</span>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={safeCurrentPage <= 1} className="ui-btn-secondary ui-btn-sm">
+              <ChevronLeft size={15} aria-hidden="true" /> Précédent
+            </button>
+            <span className="px-2 text-xs font-semibold tabular-nums text-ink">{safeCurrentPage} / {totalPages}</span>
+            <button type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={safeCurrentPage >= totalPages} className="ui-btn-secondary ui-btn-sm">
+              Suivant <ChevronRight size={15} aria-hidden="true" />
+            </button>
+          </div>
+        </nav>
+      )}
 
-      {/* ── BOTTOM PANELS ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
-        <CreateUserForm
-          currentUser={currentUser}
-          onUserCreated={fetchUsers}
-          onAction={showActionToast}
-          fallbackRoles={fallbackRoles}
-        />
-        <RoleManagement />
-      </div>
+      <CreateUserForm
+        open={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        currentUser={currentUser}
+        onUserCreated={fetchUsers}
+        onAction={(message) => showToast(message)}
+        fallbackRoles={fallbackRoles}
+      />
     </div>
   )
 }

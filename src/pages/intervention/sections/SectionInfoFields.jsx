@@ -1,13 +1,13 @@
 import { Building2, User, Phone, MapPin, FileText, Settings, Zap, Hash, Cpu } from 'lucide-react'
 
 const INPUT_BASE = "w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:ring-4 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm hover:border-slate-300"
-const INPUT_BLUE = `${INPUT_BASE} focus:border-[#0052CC] focus:ring-[#0052CC]/10`
+const INPUT_BLUE = `${INPUT_BASE} focus:border-brand-600 focus:ring-brand-600/10`
 const INPUT_ORANGE = `${INPUT_BASE} focus:border-orange-500 focus:ring-orange-500/10`
 const INPUT_READONLY = "w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold shadow-sm"
 
 function FieldLabel({ children, color = 'blue' }) {
-  const dotColorMap = { blue: 'bg-[#0052CC]', orange: 'bg-orange-500' }
-  const focusColorMap = { blue: 'group-focus-within:text-[#0052CC]', orange: 'group-focus-within:text-orange-500' }
+  const dotColorMap = { blue: 'bg-brand-600', orange: 'bg-orange-500' }
+  const focusColorMap = { blue: 'group-focus-within:text-brand-600', orange: 'group-focus-within:text-orange-500' }
   const dotColor = dotColorMap[color] || 'bg-slate-300'
   const focusColor = focusColorMap[color] || ''
   return (
@@ -43,14 +43,14 @@ export function ClientInfoFields({
   return (
     <div className="space-y-4 sm:space-y-6">
       <h3 className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
-        <User size={12} className="text-[#0052CC]" />
+        <User size={12} className="text-brand-600" />
         Identification Client
       </h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         <div className="space-y-2 sm:space-y-3 group">
           <FieldLabel color="blue">Client</FieldLabel>
           <div className="relative">
-            <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={18} />
+            <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={18} />
             {isReadOnly ? (
               <input type="text" value={interventionData.clientName || ''} readOnly className={INPUT_READONLY} />
             ) : (
@@ -64,47 +64,47 @@ export function ClientInfoFields({
         <div className="space-y-2 sm:space-y-3 group">
           <FieldLabel color="muted">Code Client</FieldLabel>
           <div className="relative">
-            <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={18} />
+            <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={18} />
             <input type="text" name="clientCode" value={selectedClient?.code || interventionData.clientCode || ''} readOnly className={INPUT_BLUE} />
           </div>
         </div>
         <div className="space-y-2 sm:space-y-3 group">
           <FieldLabel color="muted">Demandeur</FieldLabel>
           <div className="relative">
-            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={18} />
+            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={18} />
             <input type="text" name="requestorName" value={interventionData.requestorName} onChange={handleChange} className={INPUT_BLUE} />
           </div>
         </div>
         <div className="space-y-2 sm:space-y-3 group">
           <FieldLabel color="muted">Téléphone</FieldLabel>
           <div className="relative">
-            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={18} />
+            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={18} />
             <input type="tel" name="clientPhone" value={selectedClient?.phone || interventionData.clientPhone || ''} readOnly className={INPUT_BLUE} />
           </div>
         </div>
         <div className="md:col-span-2 space-y-2 sm:space-y-3 group">
           <FieldLabel color="muted">E-mail</FieldLabel>
           <div className="relative">
-            <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={18} />
+            <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={18} />
             <input type="email" name="clientEmail" value={selectedClient?.email || interventionData.clientEmail || ''} readOnly className={INPUT_BLUE} />
           </div>
         </div>
         <div className="md:col-span-2 space-y-2 sm:space-y-3 group">
           <FieldLabel color="muted">Adresse</FieldLabel>
           <div className="relative">
-            <MapPin className="absolute left-4 top-4 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={18} />
+            <MapPin className="absolute left-4 top-4 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={18} />
             <textarea
               name="clientAddress"
               value={getClientAddress(selectedClient, interventionData)}
               readOnly
-              className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold h-20 sm:h-24 resize-none shadow-sm hover:border-slate-300 leading-relaxed"
+              className="w-full pl-11 pr-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-brand-600 focus:ring-4 focus:ring-brand-600/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-semibold h-20 sm:h-24 resize-none shadow-sm hover:border-slate-300 leading-relaxed"
             />
           </div>
         </div>
         <div className="md:col-span-2 space-y-2 sm:space-y-3 group">
           <FieldLabel color="muted">Site / Localisation</FieldLabel>
           <div className="relative">
-            <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={18} />
+            <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={18} />
             <input
               type="text"
               name="siteName"

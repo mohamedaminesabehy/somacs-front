@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Eye, EyeOff, AlertCircle, ArrowRight } from 'lucide-react'
 import logo from '../../assets/logo.jpg'
@@ -22,6 +22,10 @@ async function loginRequest(username, password) {
     body: JSON.stringify({ username, password }),
   })
 
+  if (response.status === 403) {
+    const payload = await response.json().catch(() => null)
+    return { error: payload?.message || LOGIN_ERROR_MESSAGES.invalidCredentials }
+  }
   if (!response.ok) {
     return { error: LOGIN_ERROR_MESSAGES.invalidCredentials }
   }
@@ -42,7 +46,6 @@ function getPostLoginRedirect(searchParams) {
   // Priority 1: explicit redirect URL param
   const redirectParam = searchParams.get('redirect')
   if (redirectParam && redirectParam.startsWith('/')) {
-    console.log('[LoginForm] Redirect from URL param:', redirectParam)
     return redirectParam
   }
 
@@ -51,7 +54,6 @@ function getPostLoginRedirect(searchParams) {
     const pendingMission = window.sessionStorage.getItem('pending_notification_mission')
     if (pendingMission) {
       window.sessionStorage.removeItem('pending_notification_mission')
-      console.log('[LoginForm] Redirect from pending notification — missionId:', pendingMission)
       return `/missions/${pendingMission}`
     }
   } catch { /* storage may be unavailable */ }
@@ -84,7 +86,6 @@ export default function LoginForm({ onLoginSuccess }) {
 
       // Post-login redirect: priority 1 = URL param, priority 2 = sessionStorage, priority 3 = default
       const redirectTarget = getPostLoginRedirect(searchParams)
-      console.log('[LoginForm] Post-login redirect target:', redirectTarget)
 
       // Store redirect target in sessionStorage so App.jsx can use it after re-render
       // (the navigate() below may be overridden by React re-render unmounting this component)
@@ -99,222 +100,119 @@ export default function LoginForm({ onLoginSuccess }) {
       setIsLoading(false)
     }
   }
-
   return (
-    <div style={{ position: 'relative', minHeight: '100vh', width: '100%', overflow: 'hidden' }}>
+    <div className="relative flex min-h-screen w-full bg-canvas">
+      <aside className="relative hidden w-[46%] max-w-[720px] overflow-hidden bg-navy text-white lg:flex lg:flex-col">
+        <img src={machines} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover opacity-35 mix-blend-luminosity" />
+        <div className="absolute inset-0 bg-navy/70" aria-hidden="true" />
 
-      {/* ── BACKGROUND IMAGE ── */}
-      <img
-        src={machines}
-        alt=""
-        aria-hidden="true"
-        style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          objectPosition: 'center',
-        }}
-      />
-
-      {/* ── OVERLAY ── */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'linear-gradient(160deg, rgba(2,6,23,0.88) 0%, rgba(4,20,40,0.82) 50%, rgba(7,26,47,0.88) 100%)',
-          backdropFilter: 'blur(2px)',
-          WebkitBackdropFilter: 'blur(2px)',
-        }}
-      />
-
-      {/* ── AMBIENT GLOWS ── */}
-      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-        <div style={{ position: 'absolute', top: '-10%', right: '-5%', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle,rgba(220,38,38,0.20) 0%,transparent 65%)' }} />
-        <div style={{ position: 'absolute', bottom: '-10%', left: '-5%', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle,rgba(0,82,204,0.18) 0%,transparent 65%)' }} />
-      </div>
-
-      {/* ── CONTENT ── */}
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 10,
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '2rem 1.25rem',
-        }}
-      >
-        {/* Card */}
-        <div
-          style={{
-            width: '100%',
-            maxWidth: 420,
-            background: 'rgba(10, 15, 30, 0.72)',
-            border: '1px solid rgba(255,255,255,0.10)',
-            borderRadius: 20,
-            padding: '2.25rem 2rem',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            boxShadow: '0 8px 48px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.06) inset',
-          }}
-        >
-          {/* Logo + product name */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginBottom: '1.75rem' }}>
-            <div style={{ width: 56, height: 56, borderRadius: 14, overflow: 'hidden', flexShrink: 0, boxShadow: '0 0 0 1px rgba(255,255,255,0.15), 0 4px 16px rgba(0,0,0,0.4)' }}>
-              <img src={logo} alt="Logo SOMACS" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        <div className="relative flex h-full flex-col justify-between p-10 xl:p-14">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 overflow-hidden rounded-xl bg-white ring-1 ring-white/20">
+              <img src={logo} alt="Logo SOMACS" className="h-full w-full object-cover" />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ color: '#fff', fontWeight: 700, fontSize: 19, letterSpacing: '0.02em' }}>SOMACS</span>
+            <div>
+              <p className="font-display text-xl font-extrabold tracking-tight">SOMACS</p>
+              <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-brand-300">ERP · Service après-vente</p>
             </div>
           </div>
 
-          {/* Heading */}
-          <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
-            <h1 style={{ color: '#fff', fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>
-              Connexion
-            </h1>
-            <p style={{ color: '#94a3b8', fontSize: 13, marginTop: 6 }}>
-              Bienvenue — accédez à votre espace de travail.
+          <div className="max-w-md">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-300">Espace de travail interne</p>
+            <h2 className="mt-3 font-display text-4xl font-extrabold leading-tight tracking-tight text-balance">
+              Pilotez chaque intervention, du terrain au bureau.
+            </h2>
+            <p className="mt-4 text-base leading-relaxed text-slate-300 text-pretty">
+              Missions, fiches d&apos;intervention, parc machines et clients réunis dans un seul outil.
             </p>
           </div>
 
-          {/* Error */}
+          <p className="text-xs text-slate-400">© {new Date().getFullYear()} SOMACS · Tous droits réservés</p>
+        </div>
+      </aside>
+
+      <main className="flex flex-1 items-center justify-center px-5 py-10 sm:px-8">
+        <div className="w-full max-w-[400px]">
+          <div className="mb-8 flex items-center gap-3 lg:hidden">
+            <div className="h-11 w-11 overflow-hidden rounded-xl bg-white ring-1 ring-slate-200">
+              <img src={logo} alt="Logo SOMACS" className="h-full w-full object-cover" />
+            </div>
+            <p className="font-display text-lg font-extrabold tracking-tight text-slate-900">SOMACS</p>
+          </div>
+
+          <h1 className="font-display text-3xl font-extrabold tracking-tight text-slate-900">Connexion</h1>
+          <p className="mt-2 text-sm leading-relaxed text-slate-500">Bienvenue — accédez à votre espace de travail.</p>
+
           {error && (
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#fca5a5', fontSize: 13, marginBottom: '1.25rem' }}>
-              <AlertCircle size={15} style={{ marginTop: 1, flexShrink: 0 }} />
+            <div role="alert" className="mt-6 flex items-start gap-2.5 rounded-xl bg-red-50 px-3.5 py-3 text-sm text-red-700 ring-1 ring-inset ring-red-200">
+              <AlertCircle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
               <span>{error}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {/* Username */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ color: '#cbd5e1', fontSize: 13, fontWeight: 500 }}>
-                Nom d'utilisateur
-              </label>
+          <form onSubmit={handleSubmit} className="mt-7 flex flex-col gap-5">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="login-username" className="text-sm font-medium text-slate-700">Nom d&apos;utilisateur</label>
               <input
+                id="login-username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="ex : jean.dupont"
                 required
                 autoComplete="username"
-                style={{
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: 10,
-                  padding: '10px 14px',
-                  color: '#f1f5f9',
-                  fontSize: 14,
-                  outline: 'none',
-                  transition: 'border-color 0.2s',
-                  width: '100%',
-                  boxSizing: 'border-box',
-                }}
-                onFocus={(e) => { e.target.style.borderColor = 'rgba(59,130,246,0.6)' }}
-                onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.12)' }}
+                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-4 focus:ring-brand-600/15"
               />
             </div>
 
-            {/* Password */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ color: '#cbd5e1', fontSize: 13, fontWeight: 500 }}>
-                Mot de passe
-              </label>
-              <div style={{ position: 'relative' }}>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="login-password" className="text-sm font-medium text-slate-700">Mot de passe</label>
+              <div className="relative">
                 <input
+                  id="login-password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
                   autoComplete="current-password"
-                  style={{
-                    background: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.12)',
-                    borderRadius: 10,
-                    padding: '10px 44px 10px 14px',
-                    color: '#f1f5f9',
-                    fontSize: 14,
-                    outline: 'none',
-                    transition: 'border-color 0.2s',
-                    width: '100%',
-                    boxSizing: 'border-box',
-                  }}
-                  onFocus={(e) => { e.target.style.borderColor = 'rgba(59,130,246,0.6)' }}
-                  onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.12)' }}
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-3.5 pr-11 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-4 focus:ring-brand-600/15"
                 />
                 <button
                   type="button"
-                  tabIndex={-1}
                   onClick={() => setShowPassword(!showPassword)}
-                  style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 0, display: 'flex', alignItems: 'center' }}
+                  className="absolute right-1 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:text-slate-700"
+                  aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
                 >
                   {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                 </button>
               </div>
             </div>
 
-            {/* Submit */}
             <button
               type="submit"
               disabled={isLoading}
-              style={{
-                marginTop: 4,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                padding: '11px 20px',
-                borderRadius: 10,
-                background: 'linear-gradient(135deg,#0052CC 0%,#1a6eff 100%)',
-                boxShadow: '0 2px 16px rgba(0,82,204,0.40)',
-                color: '#fff',
-                fontSize: 14,
-                fontWeight: 600,
-                border: 'none',
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                opacity: isLoading ? 0.65 : 1,
-                transition: 'opacity 0.2s',
-                width: '100%',
-              }}
+              className="mt-1 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-600 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-65"
             >
               {isLoading ? (
                 <>
-                  <div style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" aria-hidden="true" />
                   Connexion en cours...
                 </>
               ) : (
                 <>
                   Se connecter
-                  <ArrowRight size={16} />
+                  <ArrowRight size={16} aria-hidden="true" />
                 </>
               )}
             </button>
           </form>
 
-          {/* Footer */}
-          <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.07)', textAlign: 'center' }}>
-            <p style={{ color: '#475569', fontSize: 12, lineHeight: 1.6 }}>
-              Accès réservé aux membres de l'organisation SOMACS.<br />
-              Contactez votre administrateur en cas de problème.
-            </p>
-          </div>
+          <p className="mt-8 border-t border-slate-200 pt-6 text-xs leading-relaxed text-slate-500">
+            Accès réservé aux membres de l&apos;organisation SOMACS. Contactez votre administrateur en cas de problème.
+          </p>
         </div>
-
-        {/* Bottom tagline */}
-        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 11, marginTop: 20, textAlign: 'center' }}>
-          © {new Date().getFullYear()} SOMACS · Tous droits réservés
-        </p>
-      </div>
-
-      {/* Spin keyframe */}
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-
+      </main>
     </div>
   )
 }

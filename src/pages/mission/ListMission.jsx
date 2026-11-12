@@ -1,48 +1,16 @@
 ﻿import { useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  Plus, Search,
-  Calendar, Clock, CheckCircle2, AlertCircle, Layers,
-  ArrowUpRight, Wrench, ClipboardList, RefreshCw,
-  X, TrendingUp,
+  Plus, Calendar, Clock, CheckCircle2, AlertCircle, Layers,
+  Wrench, RefreshCw, X, Trash2, SlidersHorizontal,
 } from 'lucide-react'
 import MissionTable from '../../components/mission/MissionTable'
+import PageHeader from '../../components/ui/PageHeader'
+import Modal from '../../components/ui/Modal'
+import { InlineAlert } from '../../components/ui/Feedback'
+import { StatStrip, SearchField, SegmentedFilter, Toast } from '../../components/ui/DataKit'
 import { useListMissionData } from './hooks/useListMissionData'
 import { useMissionGrouping } from './hooks/useMissionGrouping'
-
-const accentMap = {
-  blue:    { bg: 'bg-blue-50',    border: 'border-blue-100',    icon: 'bg-blue-100 text-blue-600',     value: 'text-blue-700',    delta: 'text-blue-500',    bar: 'bg-blue-500'    },
-  amber:   { bg: 'bg-amber-50',   border: 'border-amber-100',   icon: 'bg-amber-100 text-amber-600',   value: 'text-amber-700',   delta: 'text-amber-500',   bar: 'bg-amber-500'   },
-  emerald: { bg: 'bg-emerald-50', border: 'border-emerald-100', icon: 'bg-emerald-100 text-emerald-600',value: 'text-emerald-700', delta: 'text-emerald-500', bar: 'bg-emerald-500' },
-  red:     { bg: 'bg-red-50',     border: 'border-red-100',     icon: 'bg-red-100 text-red-600',       value: 'text-red-700',     delta: 'text-red-500',     bar: 'bg-red-500'     },
-}
-
-// ── KPI Card component ────────────────────────────────────────────────────────
-function KpiCard({ kpi }) {
-  const a = accentMap[kpi.accent]
-  const Icon = kpi.icon
-  return (
-    <div className={`relative flex flex-col gap-2 sm:gap-3 rounded-2xl border ${a.border} ${a.bg} p-3 sm:p-5 overflow-hidden group hover:shadow-md transition-shadow duration-200`}>
-      <div className="flex items-start justify-between">
-        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 ${a.icon}`}>
-          <Icon size={18} />
-        </div>
-        <ArrowUpRight size={16} className="text-slate-300 group-hover:text-slate-400 transition-colors" />
-      </div>
-      <div>
-        <p className={`text-2xl sm:text-3xl font-black tracking-tight ${a.value}`}>{kpi.value}</p>
-        <p className="text-[10px] sm:text-xs font-semibold text-slate-500 mt-0.5">{kpi.label}</p>
-      </div>
-      <div className={`flex items-center gap-1 text-[10px] sm:text-xs font-bold ${a.delta}`}>
-        {kpi.deltaUp === true  && <TrendingUp size={12} />}
-        {kpi.deltaUp === false && <AlertCircle size={12} />}
-        <span>{kpi.delta}</span>
-        <span className="font-normal text-slate-400">{kpi.deltaLabel}</span>
-      </div>
-      <div className={`absolute bottom-0 left-0 right-0 h-1 ${a.bar} opacity-40 rounded-b-2xl`} />
-    </div>
-  )
-}
 
 function buildDeleteMissionSummary(mission) {
   const interventionId = String(mission?.interventionId || '').trim()
@@ -304,351 +272,223 @@ export default function ListMission() {
     setActiveTab('all')
   }
 
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const advancedCount = [
+    filterEmployee !== 'all',
+    filterPriority !== 'all',
+    filterType !== 'all',
+    dateMode === 'today' || startDate !== '' || endDate !== '',
+  ].filter(Boolean).length
+
+  const statusKeyByKpi = { inprogress: 'En cours', done: 'Terminée', blocked: 'Bloquée' }
+  const kpiToneByKey = { today: 'brand', inprogress: 'amber', done: 'teal', blocked: 'red' }
+  const stripItems = kpis.map((kpi) => ({
+    key: kpi.key,
+    label: kpi.label,
+  hint: `${kpi.delta === '—' || kpi.delta === '!' ? '' : `${kpi.delta} `}${kpi.deltaLabel}`,
+  hintTone: kpi.key === 'blocked' && kpi.value > 0 ? 'alert' : undefined,
+    value: kpi.value,
+    icon: kpi.icon,
+    tone: kpiToneByKey[kpi.key],
+    showShare: false,
+  }))
+  const activeStripKey = dateMode === 'today' && filterStatus === 'all'
+    ? 'today'
+    : Object.keys(statusKeyByKpi).find((key) => statusKeyByKpi[key] === filterStatus) || null
+
+  const selectStrip = (key) => {
+    if (!key) {
+      setFilterStatus('all')
+      setActiveTab('all')
+      if (dateMode === 'today') setDateMode('range')
+      return
+    }
+    if (key === 'today') {
+      setDateMode('today')
+      setFilterStatus('all')
+      setActiveTab('all')
+      return
+    }
+    setFilterStatus(statusKeyByKpi[key])
+    setActiveTab(statusKeyByKpi[key])
+  }
+
+  const deleteSummary = deleteDialog.open ? buildDeleteMissionSummary(deleteDialog.mission) : null
+  const closeDeleteDialog = () => {
+    if (deleteDialog.isDeleting) return
+    setDeleteDialog({ open: false, mission: null, isDeleting: false })
+  }
+
   return (
-    <div className="min-h-full bg-slate-50">
-      {deleteDialog.open && (
-        (() => {
-          const summary = buildDeleteMissionSummary(deleteDialog.mission)
-          return (
-        <div
-          className="fixed inset-0 z-[130] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Confirmer la suppression"
-        >
-          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200">
-            <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className={`text-[10px] font-black uppercase tracking-widest ${summary.isLinked ? 'text-amber-500' : 'text-slate-400'}`}>
-                  {summary.isLinked ? 'Attention' : 'Suppression'}
-                </p>
-                <h2 className="text-base sm:text-lg font-black text-slate-900 mt-1 flex items-center gap-2">
-                  {summary.isLinked && <AlertCircle size={16} className="text-amber-500 shrink-0" />}
-                  {summary.title}
-                </h2>
-                {deleteDialog.mission?.title && (
-                  <p className="text-xs sm:text-sm text-slate-600 mt-1.5 break-words">
-                    {deleteDialog.mission.title}
-                  </p>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  if (deleteDialog.isDeleting) return
-                  setDeleteDialog({ open: false, mission: null, isDeleting: false })
-                }}
-                className="w-9 h-9 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-colors shrink-0"
-                aria-label="Fermer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="px-5 py-4">
-                <div className={`rounded-2xl border px-4 py-4 ${summary.isLinked ? 'border-amber-200 bg-amber-50/80' : 'border-slate-200 bg-slate-50'}`}>
-                  <p className="text-sm text-slate-700 font-semibold leading-relaxed whitespace-pre-line">
-                    {summary.message}
-                  </p>
-                  {summary.details.length > 0 && (
-                    <ul className="mt-3 space-y-1 text-sm text-slate-600">
-                      {summary.details.map((detail) => (
-                        <li key={detail} className="flex items-start gap-2">
-                          <span className={`mt-1 h-1.5 w-1.5 rounded-full ${summary.isLinked ? 'bg-amber-500' : 'bg-slate-400'}`} />
-                          <span>{detail}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-            </div>
-
-            <div className="px-5 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setDeleteDialog({ open: false, mission: null, isDeleting: false })}
-                disabled={deleteDialog.isDeleting}
-                className={`px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
-                  deleteDialog.isDeleting
-                    ? 'text-slate-400 border-slate-200 bg-white cursor-not-allowed'
-                    : 'text-slate-600 border-slate-200 bg-white hover:bg-slate-100'
-                }`}
-              >
-                Annuler
-              </button>
-              <button
-                type="button"
-                disabled={deleteDialog.isDeleting || !deleteDialog.mission?.id}
-                onClick={handleDeleteMission}
-                className={`px-4 py-2.5 rounded-xl text-sm font-black transition-all active:scale-95 ${
-                  deleteDialog.isDeleting
-                    ? 'bg-red-400 text-white cursor-not-allowed'
-                    : summary.isLinked
-                      ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                      : 'bg-red-600 hover:bg-red-700 text-white'
-                }`}
-              >
-                {deleteDialog.isDeleting ? 'Suppression...' : 'Confirmer suppression'}
-              </button>
-            </div>
-          </div>
-        </div>
-          )
-        })()
-      )}
-      {toast.open && (
-        <div className="fixed top-5 right-5 sm:top-6 sm:right-6 z-[120] animate-in fade-in duration-200">
-          <div
-            role="status"
-            className="w-[320px] sm:w-[360px] bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden"
-          >
-            <div className="flex items-start gap-3.5 px-4 py-3.5">
-              <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
-                <CheckCircle2 size={18} className="text-emerald-600" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Missions</p>
-                <p className="text-sm font-semibold text-slate-800 leading-snug mt-0.5 break-words">{toast.message}</p>
-              </div>
-              <button
-                type="button"
-                onClick={dismissToast}
-                className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-colors"
-                aria-label="Fermer"
-              >
-                <span className="text-lg leading-none">×</span>
-              </button>
-            </div>
-            <div className="h-1 bg-gradient-to-r from-emerald-500 via-green-500 to-lime-400" />
-          </div>
-        </div>
-      )}
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 space-y-6">
-
-        {/* ── Page header ── */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <div className="w-9 h-9 rounded-xl bg-[#0052CC] flex items-center justify-center shadow-lg shadow-blue-200">
-                <Layers size={18} className="text-white" />
-              </div>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Gestion des missions</h1>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-500 font-medium ml-12 hidden sm:block">
-              Suivez, assignez et pilotez toutes les missions de votre équipe SAV.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+    <div className="min-h-full bg-canvas">
+      <Modal
+        open={deleteDialog.open}
+        onClose={closeDeleteDialog}
+        title={deleteSummary?.title || 'Supprimer cette mission ?'}
+        description={deleteDialog.mission?.title}
+        icon={deleteSummary?.isLinked ? AlertCircle : Trash2}
+        size="md"
+        footer={
+          <>
+            <button type="button" className="ui-btn-secondary" onClick={closeDeleteDialog} disabled={deleteDialog.isDeleting}>
+              Annuler
+            </button>
             <button
               type="button"
-              onClick={() => navigate('/missions/assign')}
-              className="flex items-center gap-2 px-5 py-2.5 bg-[#0052CC] hover:bg-[#003fa3] text-white rounded-xl text-sm font-black shadow-lg shadow-blue-200 transition-all active:scale-95"
+              disabled={deleteDialog.isDeleting || !deleteDialog.mission?.id}
+              onClick={handleDeleteMission}
+              className={deleteSummary?.isLinked ? 'ui-btn bg-amber-600 text-white hover:bg-amber-700' : 'ui-btn-danger'}
             >
-              <Plus size={18} strokeWidth={2.5} />
-              Affecter une mission
+              {deleteDialog.isDeleting ? <RefreshCw size={15} className="animate-spin" aria-hidden="true" /> : <Trash2 size={15} aria-hidden="true" />}
+              {deleteDialog.isDeleting ? 'Suppression…' : 'Confirmer la suppression'}
             </button>
-          </div>
-        </div>
+          </>
+        }
+      >
+        {deleteSummary && (
+          <InlineAlert tone={deleteSummary.isLinked ? 'warning' : 'info'} icon={deleteSummary.isLinked ? AlertCircle : undefined}>
+            <p className="whitespace-pre-line">{deleteSummary.message}</p>
+            {deleteSummary.details.length > 0 && (
+              <ul className="mt-2 flex list-disc flex-col gap-1 pl-4">
+                {deleteSummary.details.map((detail) => <li key={detail}>{detail}</li>)}
+              </ul>
+            )}
+          </InlineAlert>
+        )}
+      </Modal>
 
-        {/* ── KPI Cards ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {kpis.map((kpi) => <KpiCard key={kpi.key} kpi={kpi} />)}
-        </div>
+      <Toast toast={toast.open ? { type: 'success', message: toast.message } : null} onClose={dismissToast} />
 
-        {/* ── Main table card ── */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="ui-page flex flex-col gap-5">
+        <PageHeader
+          eyebrow="Planification"
+          title="Gestion des missions"
+          description="Suivez, assignez et pilotez toutes les missions de votre équipe SAV."
+          icon={Layers}
+          actions={
+            <>
+              <button type="button" onClick={refreshMissions} className="ui-btn-secondary" aria-label="Actualiser les missions">
+                <RefreshCw size={16} aria-hidden="true" />
+                <span className="hidden sm:inline">Actualiser</span>
+              </button>
+              <button type="button" onClick={() => navigate('/missions/assign')} className="ui-btn-primary">
+                <Plus size={18} strokeWidth={2.25} aria-hidden="true" />
+                Affecter une mission
+              </button>
+            </>
+          }
+        />
 
-          {/* Card header */}
-          <div className="px-5 sm:px-6 pt-5 pb-4 border-b border-slate-100">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              {/* Title */}
-              <div className="flex items-center gap-3">
-                <ClipboardList size={18} className="text-[#0052CC]" />
-                <h2 className="text-base font-black text-slate-900 tracking-tight">Toutes les missions</h2>
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-50 text-[#0052CC] text-xs font-black">
-                  {visibleMissions.length}
+        <StatStrip items={stripItems} activeKey={activeStripKey} onSelect={selectStrip} />
+
+        <section className="ui-card overflow-hidden" aria-labelledby="missions-heading">
+          <div className="flex flex-col gap-4 border-b border-line px-4 py-4 sm:px-5">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+              <div className="flex items-center gap-2.5">
+                <h2 id="missions-heading" className="font-display text-base font-bold text-ink">Toutes les missions</h2>
+                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold tabular-nums text-ink-muted">{visibleMissions.length}</span>
+                <span className="hidden items-center gap-1.5 rounded-md bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700 sm:inline-flex">
+                  <Wrench size={12} aria-hidden="true" /> {interventionsLinkedCount} SAV liées
                 </span>
               </div>
-
-              {/* Search + filter toggle */}
-              <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                <div className="relative flex-1 sm:flex-none sm:w-64">
-                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Rechercher une mission…"
-                    className="w-full pl-9 pr-8 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/30 focus:border-[#0052CC] bg-slate-50 hover:bg-white transition-all"
-                  />
-                  {search && (
-                    <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                      <X size={14} />
-                    </button>
+              <div className="flex flex-1 items-center gap-2 lg:justify-end">
+                <SearchField
+                  value={search}
+                  onChange={setSearch}
+                  label="Rechercher une mission"
+                  placeholder="Titre, technicien, site, n° intervention…"
+                  className="flex-1 lg:max-w-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced((v) => !v)}
+                  aria-expanded={showAdvanced}
+                  aria-controls="mission-advanced-filters"
+                  className={`ui-btn border ${showAdvanced || advancedCount > 0 ? 'border-brand-200 bg-brand-50 text-brand-700' : 'border-line bg-white text-ink-soft hover:bg-slate-50'}`}
+                >
+                  <SlidersHorizontal size={16} aria-hidden="true" />
+                  <span className="hidden sm:inline">Filtres</span>
+                  {advancedCount > 0 && (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-600 px-1 text-[11px] font-bold text-white">{advancedCount}</span>
                   )}
-                </div>
-
-                {hasActiveFilters && (
-                  <button
-                    onClick={resetFilters}
-                    className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-bold text-slate-500 hover:text-red-600 rounded-xl hover:bg-red-50 border border-transparent hover:border-red-100 transition-all"
-                  >
-                    <RefreshCw size={13} />
-                    Réinitialiser
-                  </button>
-                )}
+                </button>
               </div>
             </div>
 
-            {/* Expandable advanced filters */}
-            <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Employé</label>
-                <select
-                  value={filterEmployee}
-                  onChange={(e) => setFilterEmployee(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/30 bg-white"
-                >
-                  <option value="all">Tous les employés</option>
-                  {employeeOptions.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Statut</label>
-                <select
-                  value={filterStatus}
-                  onChange={(e) => {
-                    setFilterStatus(e.target.value)
-                    setActiveTab(e.target.value === 'all' ? 'all' : e.target.value)
-                  }}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/30 bg-white"
-                >
-                  <option value="all">Tous les statuts</option>
-                  <option value="À faire">À faire</option>
-                  <option value="En cours">En cours</option>
-                  <option value="Terminée">Terminée</option>
-                  <option value="Bloquée">Bloquée</option>
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Priorité</label>
-                <select
-                  value={filterPriority}
-                  onChange={(e) => setFilterPriority(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/30 bg-white"
-                >
-                  <option value="all">Toutes priorités</option>
-                  <option value="Critique">Critique</option>
-                  <option value="Haute">Haute</option>
-                  <option value="Moyenne">Moyenne</option>
-                  <option value="Basse">Basse</option>
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Type de mission</label>
-                <select
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC]/30 bg-white"
-                >
-                  <option value="all">Tous les types</option>
-                  <option value="Normal">Normal</option>
-                  <option value="Intervention">Intervention S.A.V</option>
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date mission</label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setDateMode('today')}
-                    className={`px-3 py-2 rounded-lg text-sm font-semibold border transition-all ${
-                      dateMode === 'today'
-                        ? 'bg-[#0052CC] text-white border-[#0052CC]'
-                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    Aujourd&apos;hui
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDateMode('range')}
-                    className={`px-3 py-2 rounded-lg text-sm font-semibold border transition-all ${
-                      dateMode === 'range'
-                        ? 'bg-[#0052CC] text-white border-[#0052CC]'
-                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    Intervalle
-                  </button>
+            {showAdvanced && (
+              <div id="mission-advanced-filters" className="grid grid-cols-1 gap-3 rounded-xl bg-slate-50 p-3 animate-fade-up sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <label htmlFor="filter-employee" className="ui-label">Technicien</label>
+                  <select id="filter-employee" value={filterEmployee} onChange={(e) => setFilterEmployee(e.target.value)} className="ui-select">
+                    <option value="all">Tous les techniciens</option>
+                    {employeeOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+                  </select>
                 </div>
+                <div>
+                  <label htmlFor="filter-priority" className="ui-label">Priorité</label>
+                  <select id="filter-priority" value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)} className="ui-select">
+                    <option value="all">Toutes priorités</option>
+                    <option value="Critique">Critique</option>
+                    <option value="Haute">Haute</option>
+                    <option value="Moyenne">Moyenne</option>
+                    <option value="Basse">Basse</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="filter-type" className="ui-label">Type de mission</label>
+                  <select id="filter-type" value={filterType} onChange={(e) => setFilterType(e.target.value)} className="ui-select">
+                    <option value="all">Tous les types</option>
+                    <option value="Normal">Normal</option>
+                    <option value="Intervention">Intervention S.A.V</option>
+                  </select>
+                </div>
+                <fieldset className="min-w-0">
+                  <legend className="ui-label">Date de mission</legend>
+                  <div className="flex gap-1 rounded-xl border border-line bg-white p-1">
+                    {[{ value: 'today', label: "Aujourd'hui" }, { value: 'range', label: 'Période' }].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setDateMode(option.value)}
+                        aria-pressed={dateMode === option.value}
+                        className={`h-8 flex-1 rounded-lg text-xs font-semibold transition-colors ${dateMode === option.value ? 'bg-navy text-white' : 'text-ink-muted hover:bg-slate-100'}`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
                 {dateMode === 'range' && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
-                    <div className="flex flex-col gap-1 min-w-0">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date début</label>
-                      <div className="relative min-w-0">
-                        <input
-                          type="date"
-                          value={startDate}
-                          onChange={(e) => setStartDate(e.target.value)}
-                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0052CC]/30 bg-white min-w-0"
-                        />
-                        {!startDate && (
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium pointer-events-none sm:hidden">JJ/MM/AAAA</span>
-                        )}
-                      </div>
+                  <div className="grid grid-cols-2 gap-3 sm:col-span-2 lg:col-span-4 lg:max-w-md">
+                    <div className="min-w-0">
+                      <label htmlFor="filter-start" className="ui-label">Du</label>
+                      <input id="filter-start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="ui-input" />
                     </div>
-                    <div className="flex flex-col gap-1 min-w-0">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date fin</label>
-                      <div className="relative min-w-0">
-                        <input
-                          type="date"
-                          value={endDate}
-                          onChange={(e) => setEndDate(e.target.value)}
-                          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0052CC]/30 bg-white min-w-0"
-                        />
-                        {!endDate && (
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium pointer-events-none sm:hidden">JJ/MM/AAAA</span>
-                        )}
-                      </div>
+                    <div className="min-w-0">
+                      <label htmlFor="filter-end" className="ui-label">Au</label>
+                      <input id="filter-end" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="ui-input" />
                     </div>
                   </div>
                 )}
               </div>
-            </div>
+            )}
 
-            {/* Quick status tabs + SAV badge */}
-            <div className="flex items-center gap-1 mt-4 overflow-x-auto no-scrollbar">
-              {statusTabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => {
-                    setActiveTab(tab.key)
-                    setFilterStatus(tab.key === 'all' ? 'all' : tab.key)
-                  }}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
-                    activeTab === tab.key
-                      ? 'bg-[#0052CC] text-white shadow-sm'
-                      : 'text-slate-500 hover:bg-slate-100'
-                  }`}
-                >
-                  {tab.label}
-                  <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-black ${
-                    activeTab === tab.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-                  }`}>
-                    {tab.count}
-                  </span>
+            <div className="flex items-center gap-3">
+              <SegmentedFilter
+                label="Statut des missions"
+                value={activeTab}
+                onChange={(key) => {
+                  setActiveTab(key)
+                  setFilterStatus(key === 'all' ? 'all' : key)
+                }}
+                options={statusTabs.map((tab) => ({ value: tab.key, label: tab.label, count: tab.count }))}
+                className="flex-1"
+              />
+              {hasActiveFilters && (
+                <button type="button" onClick={resetFilters} className="hidden shrink-0 items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-800 sm:inline-flex">
+                  <X size={13} aria-hidden="true" /> Réinitialiser
                 </button>
-              ))}
-              <div className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-[#0052CC] text-xs font-bold shrink-0 border border-blue-100">
-                <Wrench size={12} />
-                {interventionsLinkedCount} interventions SAV liées
-              </div>
+              )}
             </div>
           </div>
 
@@ -660,8 +500,7 @@ export default function ListMission() {
             onMissionsChanged={refreshMissions}
             onRequestDelete={(mission) => setDeleteDialog({ open: true, mission, isDeleting: false })}
           />
-        </div>
-
+        </section>
       </div>
     </div>
   )

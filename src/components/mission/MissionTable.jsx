@@ -299,7 +299,7 @@ function MissionTableInner(props, ref) {
                 >
                   <div className="flex items-start gap-3">
                     <div className={`mt-0.5 w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${mission.type === 'Intervention' ? 'bg-blue-50' : 'bg-gray-100'}`}>
-                      <IconComponent size={18} className={`${mission.type === 'Intervention' ? 'text-[#0052CC]' : 'text-gray-500'}`} />
+                      <IconComponent size={18} className={`${mission.type === 'Intervention' ? 'text-brand-600' : 'text-gray-500'}`} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="font-bold text-gray-900 text-sm">{mission.title}</p>
@@ -311,7 +311,7 @@ function MissionTableInner(props, ref) {
                   </div>
 
                   <div className="mt-3 flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-[#0052CC] text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+                    <div className="w-7 h-7 rounded-full bg-brand-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
                       {avatar}
                     </div>
                     <span className="text-xs font-medium text-gray-800 truncate">{employeeDisplay}</span>
@@ -319,7 +319,7 @@ function MissionTableInner(props, ref) {
 
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {mission.type === 'Intervention' ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold text-[#0052CC] bg-blue-50 border border-blue-100">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold text-brand-600 bg-blue-50 border border-blue-100">
                         <Wrench size={11} /> Intervention S.A.V
                       </span>
                     ) : (
@@ -430,13 +430,13 @@ function MissionTableInner(props, ref) {
                 <td className="px-4 sm:px-6 py-4">
                   <div className="flex items-start gap-3">
                     <div className={`mt-1 w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${mission.type === 'Intervention' ? 'bg-blue-50' : 'bg-gray-100'}`}>
-                      <IconComponent size={18} className={`${mission.type === 'Intervention' ? 'text-[#0052CC]' : 'text-gray-500'}`} />
+                      <IconComponent size={18} className={`${mission.type === 'Intervention' ? 'text-brand-600' : 'text-gray-500'}`} />
                     </div>
                     <div>
                       <p className="font-medium text-gray-900">{mission.title}</p>
                       <p className="text-sm text-gray-500" title={mission.description || ''}>{truncateText(mission.description)}</p>
                       {mission.type === 'Intervention' && (
-                        <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-[#0052CC] bg-blue-50 px-2 py-0.5 rounded-md">
+                        <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-brand-600 bg-blue-50 px-2 py-0.5 rounded-md">
                           <Link2 size={10} /> Intervention
                         </span>
                       )}
@@ -445,7 +445,7 @@ function MissionTableInner(props, ref) {
                 </td>
                 <td className="px-4 sm:px-6 py-4">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-[#0052CC] text-white flex items-center justify-center text-xs font-bold">
+                    <div className="w-8 h-8 rounded-full bg-brand-600 text-white flex items-center justify-center text-xs font-bold">
                       {avatar}
                     </div>
                     <span className="text-sm text-gray-900">{employeeDisplay}</span>
@@ -478,7 +478,7 @@ function MissionTableInner(props, ref) {
                 </td>
                 <td className="px-4 sm:px-6 py-4">
                   {mission.type === 'Intervention' ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold text-[#0052CC] bg-blue-50 border border-blue-100">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold text-brand-600 bg-blue-50 border border-blue-100">
                       <Wrench size={12} />
                       Intervention S.A.V
                     </span>
@@ -574,7 +574,7 @@ function MissionTableInner(props, ref) {
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                  <ClipboardList size={22} className="text-[#0052CC]" />
+                  <ClipboardList size={22} className="text-brand-600" />
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">
@@ -610,7 +610,7 @@ function MissionTableInner(props, ref) {
                       <select
                         value={missionType}
                         onChange={(e) => { setMissionType(e.target.value); setSelectedInterventionId('') }}
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC] bg-white transition-all hover:border-gray-300"
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 bg-white transition-all hover:border-gray-300"
                       >
                         <option value="Normal">Normal</option>
                         <option value="Intervention">Intervention SAV</option>
@@ -619,13 +619,13 @@ function MissionTableInner(props, ref) {
                     {missionType === 'Intervention' && (
                       <div className="space-y-1.5">
                         <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
-                          <Link2 size={14} className="text-[#0052CC]" />
+                          <Link2 size={14} className="text-brand-600" />
                           Lier à une intervention
                         </label>
                         <select
                           value={selectedInterventionId}
                           onChange={(e) => setSelectedInterventionId(e.target.value)}
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC] bg-white transition-all hover:border-gray-300"
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 bg-white transition-all hover:border-gray-300"
                           required
                         >
                           <option value="">Sélectionner une intervention</option>
@@ -651,7 +651,7 @@ function MissionTableInner(props, ref) {
                   {missionType === 'Intervention' && selectedIntervention && (
                     <div className="mt-4 p-5 bg-gradient-to-br from-blue-50/80 to-indigo-50/50 rounded-xl border border-blue-100 space-y-4">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-[#0052CC] font-bold text-xs uppercase tracking-wider">
+                        <div className="flex items-center gap-2 text-brand-600 font-bold text-xs uppercase tracking-wider">
                           <AlertCircle size={14} />
                           Détails de l’intervention
                         </div>
@@ -694,7 +694,7 @@ function MissionTableInner(props, ref) {
                           <div className="col-span-2">
                             <label className="block text-[10px] font-bold text-blue-400 uppercase mb-1">Déjà assignée à</label>
                             <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-[#0052CC] text-white flex items-center justify-center text-[10px] font-bold">
+                              <div className="w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-[10px] font-bold">
                                 {getAvatarFromName(selectedIntervention.assignedTo)}
                               </div>
                               <span className="text-sm font-semibold text-gray-800">{selectedIntervention.assignedTo}</span>
@@ -720,7 +720,7 @@ function MissionTableInner(props, ref) {
                       type="text"
                       value={formTitle}
                       onChange={(event) => setFormTitle(event.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC] transition-all hover:border-gray-300"
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 transition-all hover:border-gray-300"
                       placeholder={missionType === 'Normal' ? "Ex: Maintenance préventive..." : "Ex: Vérification câblage..."}
                       required
                     />
@@ -734,7 +734,7 @@ function MissionTableInner(props, ref) {
                       rows={3}
                       value={formDescription}
                       onChange={(event) => setFormDescription(event.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC] resize-none transition-all hover:border-gray-300"
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 resize-none transition-all hover:border-gray-300"
                       placeholder="Décrivez précisément les actions à réaliser..."
                       required
                     />
@@ -751,7 +751,7 @@ function MissionTableInner(props, ref) {
                           type="text"
                           value={formSite}
                           onChange={(e) => setFormSite(e.target.value)}
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC] transition-all hover:border-gray-300"
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 transition-all hover:border-gray-300"
                           placeholder="Nom du site"
                         />
                       </div>
@@ -764,7 +764,7 @@ function MissionTableInner(props, ref) {
                           type="text"
                           value={formAddress}
                           onChange={(e) => setFormAddress(e.target.value)}
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC] transition-all hover:border-gray-300"
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 transition-all hover:border-gray-300"
                           placeholder="Adresse complète"
                         />
                       </div>
@@ -777,7 +777,7 @@ function MissionTableInner(props, ref) {
                       rows={2}
                       value={formNotes}
                       onChange={(e) => setFormNotes(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC] resize-none transition-all hover:border-gray-300"
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 resize-none transition-all hover:border-gray-300"
                       placeholder="Consignes particulières, précautions, contacts sur place..."
                     />
                   </div>
@@ -812,7 +812,7 @@ function MissionTableInner(props, ref) {
                           <select
                             value={formEmployee}
                             onChange={(event) => setFormEmployee(event.target.value)}
-                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC] bg-white transition-all hover:border-gray-300"
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 bg-white transition-all hover:border-gray-300"
                           >
                             <option value="">Sélectionner un employé OU utiliser la sélection multiple ci-dessous</option>
                             {employeeOptions.map((employee) => (
@@ -843,11 +843,11 @@ function MissionTableInner(props, ref) {
                                       setFormEmployeeIds((prev) => prev.filter((id) => id !== employee.id))
                                     }
                                   }}
-                                  className="w-4 h-4 rounded border-gray-300 text-[#0052CC] focus:ring-2 focus:ring-[#0052CC] cursor-pointer"
+                                  className="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-2 focus:ring-brand-600 cursor-pointer"
                                 />
                                 <span className="text-sm text-gray-700 font-medium">{employee.name}</span>
                                 {formEmployeeIds.includes(employee.id) && (
-                                  <span className="ml-auto text-xs font-bold text-[#0052CC] bg-blue-50 px-2 py-1 rounded">✓ Sélectionné</span>
+                                  <span className="ml-auto text-xs font-bold text-brand-600 bg-blue-50 px-2 py-1 rounded">✓ Sélectionné</span>
                                 )}
                               </label>
                             ))
@@ -860,7 +860,7 @@ function MissionTableInner(props, ref) {
                           <select
                             value={formStatus}
                             onChange={(e) => setFormStatus(e.target.value)}
-                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC] bg-white transition-all hover:border-gray-300"
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 bg-white transition-all hover:border-gray-300"
                           >
                             <option value="À faire">À faire</option>
                             <option value="En cours">En cours</option>
@@ -879,7 +879,7 @@ function MissionTableInner(props, ref) {
                               onClick={() => setFormPriority(p)}
                               className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
                                 formPriority === p
-                                  ? 'bg-[#0052CC] text-white border-[#0052CC] shadow-sm'
+                                  ? 'bg-brand-600 text-white border-brand-600 shadow-sm'
                                   : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
                               }`}
                             >
@@ -898,7 +898,7 @@ function MissionTableInner(props, ref) {
                             type="date"
                             value={formDueDate}
                             onChange={(event) => setFormDueDate(event.target.value)}
-                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC] transition-all hover:border-gray-300"
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 transition-all hover:border-gray-300"
                           />
                         </div>
                       </div>
@@ -912,7 +912,7 @@ function MissionTableInner(props, ref) {
                             type="time"
                             value={formDueTime}
                             onChange={(event) => setFormDueTime(event.target.value)}
-                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0052CC] transition-all hover:border-gray-300"
+                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 transition-all hover:border-gray-300"
                           />
                         </div>
                       </div>
@@ -936,14 +936,14 @@ function MissionTableInner(props, ref) {
                   />
                   <label
                     htmlFor="mission-table-attachments"
-                    className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center hover:border-[#0052CC] hover:bg-blue-50/50 transition-all cursor-pointer group bg-gray-50/50 block"
+                    className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center hover:border-brand-600 hover:bg-blue-50/50 transition-all cursor-pointer group bg-gray-50/50 block"
                   >
                     <div className="flex flex-col items-center gap-2">
-                      <div className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center text-gray-400 group-hover:text-[#0052CC] transition-colors">
+                      <div className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center text-gray-400 group-hover:text-brand-600 transition-colors">
                         <FileText size={24} />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-gray-700 group-hover:text-[#0052CC] transition-colors">
+                        <p className="text-sm font-semibold text-gray-700 group-hover:text-brand-600 transition-colors">
                           Cliquez pour ajouter des fichiers
                         </p>
                         <p className="text-xs text-gray-500">PDF, JPG, PNG (Max 10MB)</p>
@@ -971,7 +971,7 @@ function MissionTableInner(props, ref) {
                               href={a.url}
                               target="_blank"
                               rel="noreferrer"
-                              className="text-[10px] font-bold text-[#0052CC] hover:underline"
+                              className="text-[10px] font-bold text-brand-600 hover:underline"
                             >
                               Ouvrir
                             </a>
@@ -1028,7 +1028,7 @@ function MissionTableInner(props, ref) {
               <button
                 form="mission-form"
                 type="submit"
-                className="px-8 py-2.5 bg-[#0052CC] text-white rounded-lg text-sm font-semibold hover:bg-[#0042a3] hover:shadow-lg hover:shadow-blue-200 transition-all active:scale-95"
+                className="px-8 py-2.5 bg-brand-600 text-white rounded-lg text-sm font-semibold hover:bg-brand-700 hover:shadow-lg hover:shadow-blue-200 transition-all active:scale-95"
               >
                 {modalMode === 'create' ? 'Créer la mission' : 'Sauvegarder'}
               </button>
@@ -1081,7 +1081,7 @@ function MissionTableInner(props, ref) {
                 {viewMission.interventionId && (
                   <div className="bg-blue-50 p-3 rounded-xl border border-blue-100">
                     <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-1.5">Intervention liée</p>
-                    <span className="font-mono text-sm font-bold text-[#0052CC]">{viewMission.interventionId}</span>
+                    <span className="font-mono text-sm font-bold text-brand-600">{viewMission.interventionId}</span>
                   </div>
                 )}
 
@@ -1137,7 +1137,7 @@ function MissionTableInner(props, ref) {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="flex items-start gap-3">
                     <div className="mt-1 p-2 bg-blue-50 rounded-lg">
-                      <Calendar size={16} className="text-[#0052CC]" />
+                      <Calendar size={16} className="text-brand-600" />
                     </div>
                     <div>
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Échéance</p>

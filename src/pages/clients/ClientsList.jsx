@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Search,
   Building2,
   Phone,
   Mail,
@@ -9,17 +8,20 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
-  Eye,
-  AlertCircle,
-  Users,
-  AlertTriangle,
   ArrowUpRight,
-  X,
+  AlertTriangle,
+  CheckCircle2,
   Trash2,
+  Map,
 } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
+import PageHeader from '../../components/ui/PageHeader'
+import Modal from '../../components/ui/Modal'
+import StatusBadge from '../../components/ui/StatusBadge'
+import { EmptyState, InlineAlert, SkeletonTableRows } from '../../components/ui/Feedback'
+import { StatStrip, SearchField, SegmentedFilter, Toolbar, Toast } from '../../components/ui/DataKit'
 
-const PAGE_SIZE = 9
+const PAGE_SIZE = 10
 
 function normalize(value) {
   return String(value || '')
@@ -29,49 +31,50 @@ function normalize(value) {
 }
 
 function getInitials(name) {
-  return String(name || '?')
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() || '')
-    .join('') || '?'
-}
-
-// Couleur d'avatar dérivée du nom (sobre, ERP-friendly)
-const AVATAR_GRADIENTS = [
-  'from-blue-500 to-blue-700',
-  'from-indigo-500 to-indigo-700',
-  'from-violet-500 to-violet-700',
-  'from-cyan-500 to-cyan-700',
-  'from-teal-500 to-teal-700',
-  'from-emerald-500 to-emerald-700',
-  'from-amber-500 to-amber-700',
-  'from-rose-500 to-rose-700',
-]
-function avatarColor(seed) {
-  const s = String(seed || '')
-  let h = 0
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
-  return AVATAR_GRADIENTS[h % AVATAR_GRADIENTS.length]
-}
-
-function ClientCardSkeleton() {
   return (
-    <div className="bg-white border border-slate-100 rounded-2xl p-5 animate-pulse">
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-2xl bg-slate-100" />
-        <div className="flex-1 space-y-2">
-          <div className="h-3 w-2/3 bg-slate-100 rounded" />
-          <div className="h-2.5 w-1/3 bg-slate-100 rounded" />
-        </div>
-      </div>
-      <div className="mt-5 space-y-2">
-        <div className="h-2.5 w-full bg-slate-100 rounded" />
-        <div className="h-2.5 w-5/6 bg-slate-100 rounded" />
-        <div className="h-2.5 w-4/6 bg-slate-100 rounded" />
-      </div>
-      <div className="mt-5 h-8 w-full bg-slate-100 rounded-lg" />
-    </div>
+    String(name || '?')
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() || '')
+      .join('') || '?'
+  )
+}
+
+const isIncomplete = (client) => !client.phone && !client.email
+
+function readRole() {
+  try {
+    const user = JSON.parse(window.localStorage.getItem('auth_user') || 'null')
+    return String(user?.role || '').trim().toLowerCase()
+  } catch {
+    return ''
+  }
+}
+
+function ClientAvatar({ client }) {
+  return (
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-navy font-display text-sm font-bold text-white">
+      {getInitials(client.name)}
+    </span>
+  )
+}
+
+function ContactLine({ icon, value, fallback }) {
+  const Icon = icon
+  return (
+    <span className={`flex min-w-0 items-center gap-2 ${value ? 'text-ink-soft' : 'text-ink-faint'}`}>
+      <Icon size={14} className="shrink-0" aria-hidden="true" />
+      <span className="truncate">{value || fallback}</span>
+    </span>
+  )
+}
+
+function CompletenessBadge({ client }) {
+  return isIncomplete(client) ? (
+    <StatusBadge tone="amber">À compléter</StatusBadge>
+  ) : (
+    <StatusBadge tone="teal">Complet</StatusBadge>
   )
 }
 
@@ -81,25 +84,18 @@ export default function ClientsList() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
+  const [completeness, setCompleteness] = useState(null)
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [zoneFilter, setZoneFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
-  const [deleteSuccess, setDeleteSuccess] = useState(null)
+  const [toast, setToast] = useState(null)
 
-  // Role-based access
-  const authUser = (() => {
-    try { return JSON.parse(window.localStorage.getItem('auth_user') || 'null') } catch { return null }
-  })()
-  const role = String(authUser?.role || '').trim().toLowerCase()
-  const isCommercial = role === 'commerciale' || role === 'commercial'
-  const canDelete = role === 'administrateur' || role === 'coordinateur' || role === 'responsable technicien'
+  const role = readRole()
+  const canDelete = ['administrateur', 'coordinateur', 'responsable technicien'].includes(role)
 
-  // Block Commercial from accessing this page
-  useEffect(() => {
-    if (isCommercial) navigate('/', { replace: true })
-  }, [isCommercial, navigate])
-
-  const loadClients = () => {
+  const loadClients = useCallback(() => {
     let alive = true
     setLoading(true)
     setError(null)
@@ -108,37 +104,59 @@ export default function ClientsList() {
       .then((data) => alive && setClients(Array.isArray(data) ? data : []))
       .catch((err) => alive && setError(err))
       .finally(() => alive && setLoading(false))
-    return () => { alive = false }
-  }
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  useEffect(() => loadClients(), [loadClients])
 
   useEffect(() => {
-    if (isCommercial) return undefined
-    return loadClients()
-  }, [isCommercial])
+    if (!toast) return undefined
+    const timer = setTimeout(() => setToast(null), 4000)
+    return () => clearTimeout(timer)
+  }, [toast])
 
-  const isIncomplete = (c) => !c.phone && !c.email
-  const totalIncomplete = useMemo(() => clients.filter(isIncomplete).length, [clients])
+  const types = useMemo(() => [...new Set(clients.map((c) => c.type).filter(Boolean))].sort(), [clients])
+  const zones = useMemo(() => [...new Set(clients.map((c) => c.zone || c.city).filter(Boolean))].sort(), [clients])
+
+  const counts = useMemo(() => {
+    const incomplete = clients.filter(isIncomplete).length
+    return {
+      total: clients.length,
+      complete: clients.length - incomplete,
+      incomplete,
+      withEmail: clients.filter((c) => c.email).length,
+    }
+  }, [clients])
 
   const filtered = useMemo(() => {
-    let list = clients
     const q = normalize(search.trim())
-    if (q) {
-      list = list.filter((c) => {
-        const haystack = [c.code, c.name, c.phone, c.phone2, c.email, c.city, c.zone, c.address]
-          .map((v) => normalize(v))
-          .join(' ')
-        return haystack.includes(q)
-      })
-    }
-    return list
-  }, [clients, search])
+    return clients.filter((c) => {
+      if (completeness === 'complete' && isIncomplete(c)) return false
+      if (completeness === 'incomplete' && !isIncomplete(c)) return false
+      if (typeFilter !== 'all' && c.type !== typeFilter) return false
+      if (zoneFilter !== 'all' && (c.zone || c.city) !== zoneFilter) return false
+      if (!q) return true
+      return [c.code, c.name, c.phone, c.phone2, c.email, c.city, c.zone, c.address].map(normalize).join(' ').includes(q)
+    })
+  }, [clients, search, completeness, typeFilter, zoneFilter])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, completeness, typeFilter, zoneFilter])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
-  const startIdx = (safePage - 1) * PAGE_SIZE
-  const visible = filtered.slice(startIdx, startIdx + PAGE_SIZE)
+  const visible = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const hasFilters = Boolean(search || completeness || typeFilter !== 'all' || zoneFilter !== 'all')
 
-  useEffect(() => { setPage(1) }, [search])
+  const resetFilters = () => {
+    setSearch('')
+    setCompleteness(null)
+    setTypeFilter('all')
+    setZoneFilter('all')
+  }
 
   const goTo360 = (client) => navigate(`/clients/${client.id}/360`)
 
@@ -148,315 +166,263 @@ export default function ClientsList() {
     try {
       const response = await apiFetch(`/clients/${deleteTarget.id}`, { method: 'DELETE', auth: true })
       if (response.ok) {
-        setClients(prev => prev.filter(c => c.id !== deleteTarget.id))
-        setDeleteSuccess(`Le client « ${deleteTarget.name} » a été supprimé avec succès.`)
-        setTimeout(() => setDeleteSuccess(null), 4000)
+        setClients((prev) => prev.filter((c) => c.id !== deleteTarget.id))
+        setToast({ type: 'success', message: `Le client « ${deleteTarget.name} » a été supprimé.` })
       } else {
         const data = await response.json().catch(() => ({}))
-        setError(new Error(data.message || 'Erreur lors de la suppression.'))
+        setToast({ type: 'error', message: data.message || 'Erreur lors de la suppression.' })
       }
     } catch {
-      setError(new Error('Impossible de supprimer le client. Vérifiez votre connexion.'))
+      setToast({ type: 'error', message: 'Impossible de supprimer le client. Vérifiez votre connexion.' })
     } finally {
       setDeleting(false)
       setDeleteTarget(null)
     }
   }
 
-  if (isCommercial) return null
+  const statItems = [
+    { key: 'complete', label: 'Fiches complètes', value: counts.complete, icon: CheckCircle2, tone: 'teal' },
+    { key: 'incomplete', label: 'À compléter', value: counts.incomplete, icon: AlertTriangle, tone: 'amber', hint: 'Sans téléphone ni email' },
+  ]
+
+  const typeOptions = [
+    { value: 'all', label: 'Tous', count: clients.length },
+    ...types.map((type) => ({ value: type, label: type, count: clients.filter((c) => c.type === type).length })),
+  ]
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-[11px] font-bold text-[#0052CC] uppercase tracking-[0.18em] mb-1">
-            <Building2 size={12} /> Référentiel
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900">Clients</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Annuaire SOMACS — accédez à la fiche 360° de chaque client.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={loadClients}
-            disabled={loading}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors"
-          >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+    <div className="ui-page">
+      <PageHeader
+        eyebrow="Référentiel"
+        title="Clients"
+        description="Annuaire des établissements suivis par SOMACS. Ouvrez la fiche 360° pour voir parc, missions et interventions."
+        icon={Building2}
+        meta={!loading && `${counts.total} client(s) · ${zones.length} zone(s)`}
+        actions={
+          <button type="button" onClick={loadClients} disabled={loading} className="ui-btn-secondary">
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} aria-hidden="true" />
             Actualiser
           </button>
+        }
+      />
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
+        <div className="ui-card flex items-center gap-4 p-5">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-navy text-white">
+            <Building2 size={22} aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-ink-muted">Clients enregistrés</p>
+            <p className="font-display text-3xl font-bold tabular-nums text-ink">{loading ? '…' : counts.total}</p>
+            <p className="text-xs text-ink-faint">{counts.withEmail} joignable(s) par email</p>
+          </div>
         </div>
+        <StatStrip
+          items={statItems}
+          total={counts.total}
+          activeKey={completeness}
+          onSelect={setCompleteness}
+        />
       </div>
 
-      {/* KPI compacts */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#0052CC] flex items-center justify-center">
-              <Users size={18} />
-            </div>
-            <div>
-              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total</p>
-              <p className="text-xl font-black text-slate-900">{loading ? '…' : clients.length}</p>
-            </div>
+      <Toolbar
+        summary={loading ? 'Chargement…' : `${filtered.length} client(s) affiché(s) sur ${clients.length}`}
+        onReset={hasFilters ? resetFilters : undefined}
+      >
+        <SearchField
+          value={search}
+          onChange={setSearch}
+          label="Rechercher un client"
+          placeholder="Nom, code, téléphone, email, ville…"
+          className="lg:w-80"
+        />
+        {types.length > 0 && (
+          <SegmentedFilter options={typeOptions} value={typeFilter} onChange={setTypeFilter} label="Type de client" className="lg:flex-1" />
+        )}
+        {zones.length > 1 && (
+          <div className="lg:w-48">
+            <label htmlFor="client-zone" className="sr-only">Zone</label>
+            <select id="client-zone" value={zoneFilter} onChange={(e) => setZoneFilter(e.target.value)} className="ui-select">
+              <option value="all">Toutes les zones</option>
+              {zones.map((zone) => (
+                <option key={zone} value={zone}>{zone}</option>
+              ))}
+            </select>
           </div>
-        </div>
-        <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <Mail size={18} />
-            </div>
-            <div>
-              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Avec email</p>
-              <p className="text-xl font-black text-slate-900">
-                {loading ? '…' : clients.filter((c) => c.email).length}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center">
-              <Phone size={18} />
-            </div>
-            <div>
-              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Avec téléphone</p>
-              <p className="text-xl font-black text-slate-900">
-                {loading ? '…' : clients.filter((c) => c.phone).length}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <AlertTriangle size={18} />
-            </div>
-            <div>
-              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Incomplets</p>
-              <p className="text-xl font-black text-slate-900">{loading ? '…' : totalIncomplete}</p>
-            </div>
-          </div>
-        </div>
-      </div>
+        )}
+      </Toolbar>
 
-      {/* Recherche */}
-      <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-4 flex flex-col lg:flex-row lg:items-center gap-3">
-        <div className="relative w-full lg:max-w-md">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher nom, code, téléphone, email, ville…"
-            className="w-full pl-9 pr-9 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white focus:border-[#0052CC] focus:ring-2 focus:ring-blue-100 outline-none transition"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
-            >
-              <X size={14} />
-            </button>
-          )}
-        </div>
-
-        <p className="lg:ml-auto text-xs text-slate-400">
-          {loading
-            ? 'Chargement…'
-            : <><strong className="text-slate-700">{filtered.length}</strong> résultat(s)</>}
-        </p>
-      </div>
-
-      {/* Erreur */}
       {error && (
-        <div className="bg-red-50 border border-red-100 rounded-2xl p-5 flex items-start gap-3">
-          <AlertCircle className="text-red-500 shrink-0" size={18} />
-          <div>
-            <p className="text-sm font-bold text-red-700">Impossible de charger les clients.</p>
-            <p className="text-xs text-red-600 mt-0.5">{String(error.message || error)}</p>
-          </div>
-        </div>
+        <InlineAlert tone="error" title="Impossible de charger les clients.">
+          {String(error.message || error)}
+        </InlineAlert>
       )}
 
-      {/* Loading skeleton */}
-      {loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => <ClientCardSkeleton key={i} />)}
-        </div>
-      )}
-
-      {/* Empty state */}
-      {!loading && !error && filtered.length === 0 && (
-        <div className="bg-white border border-slate-100 rounded-2xl p-12 text-center">
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-slate-50 flex items-center justify-center mb-3">
-            <Building2 className="text-slate-300" size={24} />
-          </div>
-          <p className="text-sm font-bold text-slate-700">Aucun client trouvé</p>
-          <p className="text-xs text-slate-400 mt-1">
-            {search ? 'Ajustez votre recherche.' : 'Aucun client enregistr\u00e9 pour le moment.'}
-          </p>
-          {search && (
-            <button
-              onClick={() => { setSearch('') }}
-              className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0052CC] bg-blue-50 hover:bg-blue-100 rounded-lg"
-            >
-              Réinitialiser
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Cards */}
-      {!loading && !error && filtered.length > 0 && (
-        <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {visible.map((client) => {
-              const incomplete = isIncomplete(client)
-              return (
-                <div
-                  key={client.id}
-                  onClick={() => goTo360(client)}
-                  className="group bg-white border border-slate-100 rounded-2xl p-5 hover:border-blue-200 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex flex-col"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${avatarColor(client.code || client.name)} flex items-center justify-center text-white text-sm font-black shadow-sm shrink-0`}>
-                      {getInitials(client.name)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-[10px] font-bold text-[#0052CC] uppercase tracking-wider font-mono">
-                            {client.code || `#${client.id}`}
-                          </p>
-                          <p className="text-sm font-black text-slate-800 truncate group-hover:text-[#0052CC] transition-colors">
-                            {client.name || '—'}
-                          </p>
+      <section className="ui-card overflow-hidden" aria-label="Liste des clients">
+        {loading ? (
+          <table className="ui-table">
+            <tbody>
+              <SkeletonTableRows rows={6} columns={5} />
+            </tbody>
+          </table>
+        ) : !error && filtered.length === 0 ? (
+          <EmptyState
+            icon={Building2}
+            title="Aucun client trouvé"
+            description={hasFilters ? 'Aucun client ne correspond à ces critères.' : 'Aucun client enregistré pour le moment.'}
+            action={hasFilters && (
+              <button type="button" onClick={resetFilters} className="ui-btn-secondary">Réinitialiser les filtres</button>
+            )}
+          />
+        ) : (
+          <>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="ui-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Client</th>
+                    <th scope="col">Contact</th>
+                    <th scope="col">Localisation</th>
+                    <th scope="col">Fiche</th>
+                    <th scope="col" className="text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visible.map((client) => (
+                    <tr key={client.id} className="cursor-pointer" onClick={() => goTo360(client)}>
+                      <td>
+                        <div className="flex min-w-0 items-center gap-3">
+                          <ClientAvatar client={client} />
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-ink">{client.name || '—'}</p>
+                            <p className="flex items-center gap-2 text-xs text-ink-muted">
+                              <span className="ui-ref">{client.code || `#${client.id}`}</span>
+                              {client.type && <span>{client.type}</span>}
+                            </p>
+                          </div>
                         </div>
-                        <ArrowUpRight size={14} className="text-slate-300 group-hover:text-[#0052CC] transition-colors shrink-0 mt-0.5" />
-                      </div>
-                      {client.type && (
-                        <span className="inline-flex mt-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded">
-                          {client.type}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                      </td>
+                      <td>
+                        <div className="flex max-w-[15rem] flex-col gap-1 text-sm">
+                          <ContactLine icon={Phone} value={client.phone} fallback="Non renseigné" />
+                          <ContactLine icon={Mail} value={client.email} fallback="Non renseigné" />
+                        </div>
+                      </td>
+                      <td>
+                        <div className="flex max-w-[14rem] flex-col gap-0.5 text-sm">
+                          <span className="truncate font-medium text-ink">{client.city || '—'}</span>
+                          <span className="truncate text-xs text-ink-muted">{[client.zone, client.address].filter(Boolean).join(' · ')}</span>
+                        </div>
+                      </td>
+                      <td><CompletenessBadge client={client} /></td>
+                      <td>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); goTo360(client) }}
+                            className="ui-btn-secondary ui-btn-sm"
+                          >
+                            Fiche 360°
+                            <ArrowUpRight size={14} aria-hidden="true" />
+                          </button>
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setDeleteTarget(client) }}
+                              className="ui-icon-btn h-9 w-9 hover:text-red-600"
+                              aria-label={`Supprimer ${client.name}`}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-                  <div className="mt-4 space-y-1.5 text-xs text-slate-500 flex-1">
-                    <div className="flex items-center gap-2 truncate">
-                      <Phone size={12} className={client.phone ? 'text-slate-400' : 'text-slate-200'} />
-                      <span className={`truncate ${client.phone ? '' : 'text-slate-300 italic'}`}>
-                        {client.phone || 'Téléphone non renseigné'}
+            <ul className="divide-y divide-line md:hidden">
+              {visible.map((client) => (
+                <li key={client.id} className="flex flex-col gap-3 p-4">
+                  <button type="button" onClick={() => goTo360(client)} className="flex min-w-0 items-center gap-3 text-left">
+                    <ClientAvatar client={client} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold text-ink">{client.name || '—'}</span>
+                      <span className="flex items-center gap-2 text-xs text-ink-muted">
+                        <span className="ui-ref">{client.code || `#${client.id}`}</span>
+                        {client.type}
                       </span>
-                    </div>
-                    <div className="flex items-center gap-2 truncate">
-                      <Mail size={12} className={client.email ? 'text-slate-400' : 'text-slate-200'} />
-                      <span className={`truncate ${client.email ? '' : 'text-slate-300 italic'}`}>
-                        {client.email || 'Email non renseigné'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 truncate">
-                      <MapPin size={12} className={(client.city || client.address) ? 'text-slate-400' : 'text-slate-200'} />
-                      <span className={`truncate ${(client.city || client.address) ? '' : 'text-slate-300 italic'}`}>
-                        {[client.city, client.zone].filter(Boolean).join(' · ') || client.address || 'Adresse non renseignée'}
-                      </span>
-                    </div>
+                    </span>
+                    <ArrowUpRight size={16} className="shrink-0 text-ink-faint" aria-hidden="true" />
+                  </button>
+                  <div className="grid grid-cols-1 gap-1.5 text-sm">
+                    <ContactLine icon={Phone} value={client.phone} fallback="Téléphone non renseigné" />
+                    <ContactLine icon={Mail} value={client.email} fallback="Email non renseigné" />
+                    <ContactLine icon={MapPin} value={[client.city, client.zone].filter(Boolean).join(' · ')} fallback="Adresse non renseignée" />
                   </div>
-
-                  <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between gap-2">
-                    {incomplete ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-100 px-2 py-1 rounded">
-                        <AlertTriangle size={10} /> À compléter
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-1 rounded">
-                        Complet
-                      </span>
-                    )}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); goTo360(client) }}
-                      className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0052CC] text-white text-xs font-bold rounded-lg hover:bg-[#0047b3] transition-colors shadow-sm"
-                    >
-                      <Eye size={12} />
-                      Voir fiche
-                    </button>
+                  <div className="flex items-center justify-between gap-2">
+                    <CompletenessBadge client={client} />
                     {canDelete && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); setDeleteTarget(client) }}
-                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-400 hover:border-red-200 hover:text-red-600 transition-all"
+                        type="button"
+                        onClick={() => setDeleteTarget(client)}
+                        className="ui-btn-ghost ui-btn-sm text-red-600"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={14} aria-hidden="true" /> Supprimer
                       </button>
                     )}
                   </div>
+                </li>
+              ))}
+            </ul>
+
+            {totalPages > 1 && (
+              <nav className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 text-sm text-ink-muted" aria-label="Pagination">
+                <span>Page {safePage} sur {totalPages}</span>
+                <div className="flex gap-1">
+                  <button type="button" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={safePage === 1} className="ui-icon-btn h-9 w-9" aria-label="Page précédente">
+                    <ChevronLeft size={16} />
+                  </button>
+                  <button type="button" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages} className="ui-icon-btn h-9 w-9" aria-label="Page suivante">
+                    <ChevronRight size={16} />
+                  </button>
                 </div>
-              )
-            })}
-          </div>
+              </nav>
+            )}
+          </>
+        )}
+      </section>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 pt-2">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={safePage === 1}
-                className="p-2 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft size={14} />
-              </button>
-              <span className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg">
-                {safePage} / {totalPages}
-              </span>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={safePage >= totalPages}
-                className="p-2 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <ChevronRight size={14} />
-              </button>
-            </div>
-          )}
-        </>
+      {!loading && zones.length > 0 && (
+        <p className="flex items-center gap-2 text-xs text-ink-faint">
+          <Map size={13} aria-hidden="true" /> Zones couvertes : {zones.join(', ')}
+        </p>
       )}
 
-      {/* Popup confirmation suppression */}
-      {deleteTarget && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => !deleting && setDeleteTarget(null)} />
-          <div className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-500">
-                <AlertTriangle size={28} />
-              </div>
-              <h3 className="mt-4 text-lg font-black text-slate-900">Supprimer ce client ?</h3>
-              <p className="mt-2 text-sm text-slate-500">
-                Êtes-vous sûr de vouloir supprimer <span className="font-bold text-slate-800">{deleteTarget.name}</span> ?<br />
-                Cette action est irréversible.
-              </p>
-              <div className="mt-6 flex w-full gap-3">
-                <button onClick={() => setDeleteTarget(null)} disabled={deleting}
-                  className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 disabled:opacity-50">
-                  Annuler
-                </button>
-                <button onClick={handleDeleteConfirm} disabled={deleting}
-                  className="flex-1 rounded-2xl bg-red-600 px-4 py-3 text-sm font-bold text-white transition-all hover:bg-red-700 disabled:opacity-50">
-                  {deleting ? 'Suppression...' : 'Supprimer'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={Boolean(deleteTarget)}
+        onClose={() => !deleting && setDeleteTarget(null)}
+        title="Supprimer ce client ?"
+        description="Cette action est irréversible."
+        icon={AlertTriangle}
+        size="sm"
+        footer={
+          <>
+            <button type="button" onClick={() => setDeleteTarget(null)} disabled={deleting} className="ui-btn-secondary">Annuler</button>
+            <button type="button" onClick={handleDeleteConfirm} disabled={deleting} className="ui-btn-danger">
+              {deleting ? 'Suppression…' : 'Supprimer'}
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm leading-relaxed text-ink-soft">
+          Le client <strong className="text-ink">{deleteTarget?.name}</strong> sera retiré de l&apos;annuaire. Les machines et interventions associées peuvent être impactées.
+        </p>
+      </Modal>
 
-      {/* Toast succès suppression */}
-      {deleteSuccess && (
-        <div className="fixed bottom-6 left-1/2 z-[210] -translate-x-1/2 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 shadow-lg">
-          <p className="text-sm font-bold text-emerald-700">{deleteSuccess}</p>
-        </div>
-      )}
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   )
 }

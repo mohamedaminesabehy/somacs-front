@@ -63,8 +63,18 @@ export function Root() {
   )
 }
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <Root />
-  </StrictMode>,
-)
+function renderApp() {
+  createRoot(document.getElementById('root')).render(
+    <StrictMode>
+      <Root />
+    </StrictMode>,
+  )
+}
+
+if (import.meta.env.DEV && import.meta.env.VITE_UI_DEMO === 'true') {
+  import('./dev/demoApi.js')
+    .then(({ installDemoApi }) => installDemoApi(import.meta.env.VITE_API_URL || 'http://localhost:3000'))
+    .finally(renderApp)
+} else {
+  renderApp()
+}

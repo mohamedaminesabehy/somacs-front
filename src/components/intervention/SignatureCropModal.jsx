@@ -270,7 +270,7 @@ export default function SignatureCropModal({ file, title, onCancel, onValidate }
               <>
                 <img src={image._dataUrl} alt={title} draggable={false} style={imgStyle} />
                 {/* Crop frame border */}
-                <div className="absolute inset-0 pointer-events-none border-2 border-[#0052CC] rounded-xl" />
+                <div className="absolute inset-0 pointer-events-none border-2 border-brand-600 rounded-xl" />
               </>
             )}
           </div>
@@ -294,7 +294,7 @@ export default function SignatureCropModal({ file, title, onCancel, onValidate }
                 step="0.01"
                 value={zoom}
                 onChange={(e) => applyZoom(Number(e.target.value))}
-                className="flex-1 accent-[#0052CC]"
+                className="flex-1 accent-brand-600"
                 aria-label="Niveau de zoom"
               />
               <button
@@ -332,7 +332,7 @@ export default function SignatureCropModal({ file, title, onCancel, onValidate }
             type="button"
             onClick={handleValidate}
             disabled={processing || !image || !!error}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 py-3 rounded-xl bg-[#0052CC] text-white text-[10px] font-black uppercase tracking-wider hover:bg-blue-700 transition-colors disabled:opacity-60"
+            className="flex-1 inline-flex items-center justify-center gap-1.5 py-3 rounded-xl bg-brand-600 text-white text-[10px] font-black uppercase tracking-wider hover:bg-blue-700 transition-colors disabled:opacity-60"
           >
             <Check size={14} />
             {processing ? 'Traitement…' : 'Valider'}

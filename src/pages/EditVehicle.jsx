@@ -87,7 +87,7 @@ export default function EditVehicle() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
+      <div className="min-h-screen bg-canvas flex items-center justify-center">
         <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
       </div>
     )
@@ -95,7 +95,7 @@ export default function EditVehicle() {
 
   if (!initialForm) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
+      <div className="min-h-screen bg-canvas flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <AlertCircle size={40} className="text-red-400" />
           <p className="text-slate-600 font-semibold">{error || "Vehicule introuvable."}</p>
@@ -150,7 +150,7 @@ export default function EditVehicle() {
   )
 
   return (
-    <div className="min-h-screen bg-[#F6F9FC]">
+    <div className="min-h-screen bg-canvas">
       {headerContent}
       <VehicleForm
         mode="edit"

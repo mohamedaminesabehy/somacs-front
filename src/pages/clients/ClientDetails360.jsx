@@ -36,6 +36,10 @@ import {
   Save,
 } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
+import PageHeader from '../../components/ui/PageHeader'
+import StatusBadge from '../../components/ui/StatusBadge'
+import { EmptyState, InlineAlert, SkeletonLines } from '../../components/ui/Feedback'
+import { StatStrip, Toast } from '../../components/ui/DataKit'
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -203,85 +207,76 @@ function enrichMachinesForClient(directMachines, interventions) {
   return Array.from(byKey.values())
 }
 
-const STATUS_PRESETS = {
-  COMPLETED:   { label: 'Terminée',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', icon: CheckCircle2 },
-  TERMINEE:    { label: 'Terminée',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', icon: CheckCircle2 },
-  DONE:        { label: 'Terminée',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', icon: CheckCircle2 },
-  CLOSED:      { label: 'Clôturée',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', icon: CheckCircle2 },
-  CLOTURE:     { label: 'Clôturée',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', icon: CheckCircle2 },
-  CLOTUREE:    { label: 'Clôturée',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', icon: CheckCircle2 },
-  CLÔTURÉE:    { label: 'Clôturée',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', icon: CheckCircle2 },
-  OPEN:        { label: 'Ouverte',     cls: 'bg-sky-50 text-sky-700 border-sky-200',             dot: 'bg-sky-500',     icon: ClipboardList },
-  OUVERTE:     { label: 'Ouverte',     cls: 'bg-sky-50 text-sky-700 border-sky-200',             dot: 'bg-sky-500',     icon: ClipboardList },
-  IN_PROGRESS: { label: 'En cours',    cls: 'bg-blue-50 text-blue-700 border-blue-200',          dot: 'bg-blue-500',    icon: PlayCircle },
-  EN_COURS:    { label: 'En cours',    cls: 'bg-blue-50 text-blue-700 border-blue-200',          dot: 'bg-blue-500',    icon: PlayCircle },
-  ASSIGNED:    { label: 'Affectée',    cls: 'bg-violet-50 text-violet-700 border-violet-200',    dot: 'bg-violet-500',  icon: ClipboardList },
-  AFFECTEE:    { label: 'Affectée',    cls: 'bg-violet-50 text-violet-700 border-violet-200',    dot: 'bg-violet-500',  icon: ClipboardList },
-  ASSIGNEE:    { label: 'Affectée',    cls: 'bg-violet-50 text-violet-700 border-violet-200',    dot: 'bg-violet-500',  icon: ClipboardList },
-  PENDING:     { label: 'En attente',  cls: 'bg-amber-50 text-amber-700 border-amber-200',       dot: 'bg-amber-500',   icon: Clock },
-  EN_ATTENTE:  { label: 'En attente',  cls: 'bg-amber-50 text-amber-700 border-amber-200',       dot: 'bg-amber-500',   icon: Clock },
-  CANCELLED:   { label: 'Annulée',     cls: 'bg-red-50 text-red-700 border-red-200',             dot: 'bg-red-500',     icon: XCircle },
-  ANNULEE:     { label: 'Annulée',     cls: 'bg-red-50 text-red-700 border-red-200',             dot: 'bg-red-500',     icon: XCircle },
+const TONE_CLASSES = {
+  teal: { cls: 'bg-teal-50 text-teal-800 border-teal-200', dot: 'bg-teal-500' },
+  brand: { cls: 'bg-brand-50 text-brand-700 border-brand-200', dot: 'bg-brand-600' },
+  amber: { cls: 'bg-amber-50 text-amber-800 border-amber-200', dot: 'bg-amber-500' },
+  red: { cls: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-500' },
+  slate: { cls: 'bg-slate-100 text-slate-700 border-slate-200', dot: 'bg-slate-400' },
 }
+
+const preset = (label, tone, icon) => ({ label, tone, icon, ...TONE_CLASSES[tone] })
+
+const STATUS_PRESETS = {
+  COMPLETED: preset('Terminée', 'teal', CheckCircle2),
+  TERMINEE: preset('Terminée', 'teal', CheckCircle2),
+  DONE: preset('Terminée', 'teal', CheckCircle2),
+  CLOSED: preset('Clôturée', 'teal', CheckCircle2),
+  CLOTURE: preset('Clôturée', 'teal', CheckCircle2),
+  CLOTUREE: preset('Clôturée', 'teal', CheckCircle2),
+  CLÔTURÉE: preset('Clôturée', 'teal', CheckCircle2),
+  OPEN: preset('Ouverte', 'brand', ClipboardList),
+  OUVERTE: preset('Ouverte', 'brand', ClipboardList),
+  IN_PROGRESS: preset('En cours', 'amber', PlayCircle),
+  EN_COURS: preset('En cours', 'amber', PlayCircle),
+  ASSIGNED: preset('Affectée', 'brand', ClipboardList),
+  AFFECTEE: preset('Affectée', 'brand', ClipboardList),
+  ASSIGNEE: preset('Affectée', 'brand', ClipboardList),
+  PENDING: preset('En attente', 'slate', Clock),
+  EN_ATTENTE: preset('En attente', 'slate', Clock),
+  CANCELLED: preset('Annulée', 'red', XCircle),
+  ANNULEE: preset('Annulée', 'red', XCircle),
+}
+
 function getStatusPreset(status) {
   const k = String(status || '').toUpperCase().replace(/[\s-]/g, '_')
-  return STATUS_PRESETS[k] || {
-    label: status || '—',
-    cls: 'bg-slate-50 text-slate-600 border-slate-200',
-    dot: 'bg-slate-400',
-    icon: ClipboardList,
-  }
+  return STATUS_PRESETS[k] || preset(status || '—', 'slate', ClipboardList)
+}
+
+function machineTone(status) {
+  const s = String(status || '').toLowerCase()
+  if (s.includes('panne') || s.includes('hors')) return 'red'
+  if (s.includes('maintenance')) return 'amber'
+  if (s.includes('service') || s.includes('disponible') || s.includes('stock')) return 'teal'
+  if (s.includes('utilisation')) return 'brand'
+  return 'slate'
 }
 
 function MachineStatusPill({ status }) {
-  const s = String(status || '').toLowerCase()
-  let cls = 'bg-slate-50 text-slate-600 border-slate-200'
-  let dot = 'bg-slate-400'
-  if (s.includes('disponible') || s.includes('stock')) { cls = 'bg-emerald-50 text-emerald-700 border-emerald-200'; dot = 'bg-emerald-500' }
-  else if (s.includes('utilisation'))                  { cls = 'bg-blue-50 text-blue-700 border-blue-200'; dot = 'bg-blue-500' }
-  else if (s.includes('maintenance'))                  { cls = 'bg-amber-50 text-amber-700 border-amber-200'; dot = 'bg-amber-500' }
-  else if (s.includes('hors'))                         { cls = 'bg-red-50 text-red-700 border-red-200'; dot = 'bg-red-500' }
-  else if (s.includes('archiv'))                       { cls = 'bg-slate-100 text-slate-500 border-slate-200' }
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-[11px] font-bold ${cls}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
-      {status || '—'}
-    </span>
-  )
+  return <StatusBadge tone={machineTone(status)}>{status || '—'}</StatusBadge>
 }
 
 function PriorityPill({ priority }) {
   const p = String(priority || '').toLowerCase()
   if (!p) return null
-  let cls = 'bg-slate-50 text-slate-600 border-slate-200'
-  if (p.includes('haut') || p.includes('urg') || p === 'high')        cls = 'bg-red-50 text-red-700 border-red-200'
-  else if (p.includes('moyen') || p === 'medium')                     cls = 'bg-amber-50 text-amber-700 border-amber-200'
-  else if (p.includes('bas') || p.includes('faib') || p === 'low')    cls = 'bg-emerald-50 text-emerald-700 border-emerald-200'
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wider ${cls}`}>
-      <AlertTriangle size={10} /> {priority}
-    </span>
-  )
+  let tone = 'slate'
+  if (p.includes('crit') || p.includes('urg')) tone = 'red'
+  else if (p.includes('haut') || p === 'high') tone = 'amber'
+  else if (p.includes('moyen') || p === 'medium') tone = 'brand'
+  return <StatusBadge tone={tone} dot={false}>{priority}</StatusBadge>
 }
 
-function InfoCard({ icon, label, value, mono = false, accent = 'slate' }) {
+function InfoCard({ icon, label, value, mono = false }) {
   const InfoIcon = icon
-  const accents = {
-    slate:   'bg-slate-50 text-slate-500',
-    blue:    'bg-blue-50 text-blue-600',
-    emerald: 'bg-emerald-50 text-emerald-600',
-    violet:  'bg-violet-50 text-violet-600',
-    amber:   'bg-amber-50 text-amber-600',
-  }
   return (
-    <div className="flex items-start gap-3 p-3.5 bg-white border border-slate-100 rounded-xl hover:border-slate-200 transition-colors">
-      <div className={`w-9 h-9 rounded-lg ${accents[accent]} flex items-center justify-center shrink-0`}>
-        <InfoIcon size={15} />
-      </div>
+    <div className="flex min-w-0 items-start gap-3">
+      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-ink-muted">
+        <InfoIcon size={15} aria-hidden="true" />
+      </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.12em]">{label}</p>
-        <p className={`text-sm text-slate-800 truncate mt-0.5 ${mono ? 'font-mono' : 'font-semibold'}`}>
-          {value || <span className="text-slate-300 italic font-normal">Non renseigné</span>}
+        <p className="text-xs font-medium text-ink-muted">{label}</p>
+        <p className={`mt-0.5 break-words text-sm text-ink ${mono ? 'font-mono' : 'font-semibold'}`}>
+          {value || <span className="font-sans font-normal text-ink-faint">Non renseigné</span>}
         </p>
       </div>
     </div>
@@ -289,33 +284,20 @@ function InfoCard({ icon, label, value, mono = false, accent = 'slate' }) {
 }
 
 function ClientEditField({ icon: Icon, label, name, value, onChange, required = false, type = 'text', multiline = false }) {
-  const inputClass = 'mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none transition-colors focus:border-[#0052CC] focus:ring-2 focus:ring-blue-100'
-
+  const fieldId = `client-${name}`
   return (
-    <label className={multiline ? 'sm:col-span-2 min-w-0' : 'min-w-0'}>
-      <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.12em] flex items-center gap-1.5">
-        {Icon && <Icon size={10} />}
+    <div className={multiline ? 'min-w-0 sm:col-span-2' : 'min-w-0'}>
+      <label htmlFor={fieldId} className="ui-label flex items-center gap-1.5">
+        {Icon && <Icon size={13} aria-hidden="true" />}
         {label}
-        {required && <span className="text-red-500">*</span>}
-      </span>
+        {required && <span className="text-red-500" aria-hidden="true">*</span>}
+      </label>
       {multiline ? (
-        <textarea
-          name={name}
-          value={value}
-          onChange={onChange}
-          rows={3}
-          className={`${inputClass} resize-none leading-snug`}
-        />
+        <textarea id={fieldId} name={name} value={value} onChange={onChange} rows={3} className="ui-textarea" />
       ) : (
-        <input
-          name={name}
-          type={type}
-          value={value}
-          onChange={onChange}
-          className={inputClass}
-        />
+        <input id={fieldId} name={name} type={type} value={value} onChange={onChange} required={required} className="ui-input" />
       )}
-    </label>
+    </div>
   )
 }
 
@@ -324,25 +306,21 @@ function ClientPhoneEditField({ value, onChange }) {
 
   const handleDigitsChange = (event) => {
     const nextDigits = event.target.value.replace(/\D/g, '').slice(0, 8)
-    onChange({
-      target: {
-        name: 'phone',
-        value: `${PHONE_PREFIX}${nextDigits}`,
-      },
-    })
+    onChange({ target: { name: 'phone', value: `${PHONE_PREFIX}${nextDigits}` } })
   }
 
   return (
-    <label className="min-w-0">
-      <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.12em] flex items-center gap-1.5">
-        <Phone size={10} />
+    <div className="min-w-0">
+      <label htmlFor="client-phone" className="ui-label flex items-center gap-1.5">
+        <Phone size={13} aria-hidden="true" />
         Téléphone
-      </span>
-      <div className="mt-1 flex rounded-lg border border-slate-200 bg-white shadow-sm transition-colors focus-within:border-[#0052CC] focus-within:ring-2 focus-within:ring-blue-100">
-        <span className="inline-flex items-center rounded-l-lg border-r border-slate-200 bg-slate-50 px-3 text-sm font-black text-slate-700 select-none">
+      </label>
+      <div className="flex overflow-hidden rounded-xl border border-line bg-white transition-colors focus-within:border-brand-600 focus-within:ring-2 focus-within:ring-brand-100">
+        <span className="inline-flex select-none items-center border-r border-line bg-slate-50 px-3 text-sm font-semibold text-ink-soft">
           {PHONE_PREFIX}
         </span>
         <input
+          id="client-phone"
           name="phoneDigits"
           type="text"
           value={digits}
@@ -351,186 +329,138 @@ function ClientPhoneEditField({ value, onChange }) {
           pattern="[0-9]{8}"
           maxLength={8}
           autoComplete="tel-national"
-          className="w-full rounded-r-lg border-0 bg-white px-3 py-2 text-sm font-semibold text-slate-800 outline-none"
+          className="h-11 w-full border-0 bg-white px-3 text-sm text-ink outline-none"
         />
       </div>
-    </label>
+      <p className="mt-1.5 text-xs text-ink-faint">8 chiffres après l&apos;indicatif.</p>
+    </div>
   )
 }
-
 
 // ─── Cards ─────────────────────────────────────────────────────────────────
 
 function MachineCard({ machine }) {
   const reference = getMachineReference(machine)
-
   return (
-    <div className="group bg-white border border-slate-100 rounded-2xl p-5 hover:border-blue-200 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
-      <div className="flex items-start gap-3">
-        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 text-white flex items-center justify-center shadow-sm shrink-0">
-          <Cpu size={18} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold text-[#0052CC] uppercase tracking-wider font-mono">
-            {reference || (present(machine.id) ? `#${machine.id}` : FALLBACK)}
+    <li className="flex flex-col gap-3 p-4 sm:px-5 xl:flex-row xl:items-center xl:gap-4">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-100">
+          <Cpu size={18} aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <p className="truncate font-semibold text-ink">{valueOrFallback(getMachineLabel(machine))}</p>
+          <p className="flex flex-wrap items-center gap-x-2 text-xs text-ink-muted">
+            <span className="ui-ref">{reference || (present(machine.id) ? `#${machine.id}` : FALLBACK)}</span>
+            {[machine.brand, machine.model].filter(present).join(' · ')}
           </p>
-          <p className="text-sm font-black text-slate-800 truncate group-hover:text-[#0052CC] transition-colors">
-            {valueOrFallback(getMachineLabel(machine))}
-          </p>
         </div>
+      </div>
+      <dl className="grid grid-cols-3 gap-3 text-xs xl:w-80 xl:shrink-0">
+        <div className="min-w-0">
+          <dt className="text-ink-muted">N° série</dt>
+          <dd className="truncate font-mono text-ink">{present(machine.serialNumber) ? machine.serialNumber : '—'}</dd>
+        </div>
+        <div>
+          <dt className="text-ink-muted">Interventions</dt>
+          <dd className="font-semibold tabular-nums text-ink">{Number(machine.interventionCount) || 0}</dd>
+        </div>
+        <div>
+          <dt className="text-ink-muted">Dernière</dt>
+          <dd className="font-semibold text-ink">{machine.lastInterventionDate ? fmtDate(machine.lastInterventionDate) : '—'}</dd>
+        </div>
+      </dl>
+      <div className="xl:w-28 xl:shrink-0 xl:text-right">
         <MachineStatusPill status={machine.status} />
       </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-        <div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Marque</p>
-          <p className="text-slate-700 font-semibold truncate mt-0.5">
-            {present(machine.brand) ? machine.brand : <span className="text-slate-300 italic font-normal">{FALLBACK}</span>}
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Modèle</p>
-          <p className="text-slate-700 font-semibold truncate mt-0.5">
-            {present(machine.model) ? machine.model : <span className="text-slate-300 italic font-normal">{FALLBACK}</span>}
-          </p>
-        </div>
-        <div className="col-span-2">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Numéro de série</p>
-          <p className="text-slate-700 font-mono text-[12px] truncate mt-0.5">
-            {present(machine.serialNumber) ? machine.serialNumber : <span className="text-slate-300 italic font-sans font-normal">{FALLBACK}</span>}
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Interventions</p>
-          <p className="text-slate-700 font-semibold truncate mt-0.5">
-            {Number(machine.interventionCount) || 0}
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Dernière</p>
-          <p className="text-slate-700 font-semibold truncate mt-0.5">
-            {machine.lastInterventionDate ? fmtDate(machine.lastInterventionDate) : <span className="text-slate-300 italic font-normal">{FALLBACK}</span>}
-          </p>
-        </div>
-      </div>
-
-    </div>
+    </li>
   )
 }
 
 function InterventionCard({ intervention, onView }) {
-  const preset = getStatusPreset(intervention.status)
-  const Icon = preset.icon
+  const status = getStatusPreset(intervention.status)
   const machine = getInterventionMachine(intervention)
-
-  const fields = [
-    { label: 'Panne / symptôme',        value: intervention.problemDescription },
-    { label: 'Diagnostic à distance',   value: intervention.telephoneDiagnostic },
-    { label: 'Solution appliquée',      value: intervention.interventionDetail },
-    { label: 'Technicien',              value: intervention.technicianName || intervention.assignedTo, isUser: true },
-  ]
+  const technician = intervention.technicianName || intervention.assignedTo
 
   return (
-    <div className="bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md hover:border-blue-100 transition-all overflow-hidden">
-      {/* Header */}
-      <div className="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center gap-3 justify-between bg-gradient-to-br from-slate-50/50 to-white">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className={`w-10 h-10 rounded-xl ${preset.cls} border flex items-center justify-center shrink-0`}>
-            <Icon size={16} />
+    <li className="relative flex gap-4 pb-6 pl-8 last:pb-0">
+      <span className="absolute left-[11px] top-7 bottom-0 w-px bg-line" aria-hidden="true" />
+      <span className={`absolute left-0 top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white ring-1 ${status.cls}`} aria-hidden="true">
+        <span className={`h-2 w-2 rounded-full ${status.dot}`} />
+      </span>
+      <article className="min-w-0 flex-1 rounded-2xl border border-line bg-white p-4 transition-shadow hover:shadow-raised sm:p-5">
+        <header className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="flex flex-wrap items-center gap-2 text-xs text-ink-muted">
+              <span className="ui-ref">{intervention.id}</span>
+              <span className="inline-flex items-center gap-1"><Calendar size={12} aria-hidden="true" />{fmtDate(intervention.interventionDate)}</span>
+            </p>
+            <h3 className="mt-1 font-display text-[15px] font-bold text-ink">
+              {intervention.interventionType || 'Intervention'}
+              <span className="font-normal text-ink-muted"> — {valueOrFallback(getMachineLabel(machine))}</span>
+            </h3>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+            <PriorityPill priority={intervention.priority} />
+          </div>
+        </header>
+
+        <dl className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+          <div className="min-w-0">
+            <dt className="flex items-center gap-1.5 text-xs text-ink-muted"><AlertTriangle size={12} aria-hidden="true" /> Panne / symptôme</dt>
+            <dd className="mt-0.5 line-clamp-2 text-ink-soft">{intervention.problemDescription || <span className="text-ink-faint">Non renseigné</span>}</dd>
           </div>
           <div className="min-w-0">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">N° intervention</p>
-            <p className="text-sm font-black text-slate-800 font-mono truncate">{intervention.id}</p>
+            <dt className="flex items-center gap-1.5 text-xs text-ink-muted"><Wrench size={12} aria-hidden="true" /> Solution appliquée</dt>
+            <dd className="mt-0.5 line-clamp-2 text-ink-soft">{intervention.interventionDetail || <span className="text-ink-faint">Non renseigné</span>}</dd>
           </div>
-        </div>
+          {intervention.telephoneDiagnostic && (
+            <div className="min-w-0 sm:col-span-2">
+              <dt className="flex items-center gap-1.5 text-xs text-ink-muted"><Stethoscope size={12} aria-hidden="true" /> Diagnostic à distance</dt>
+              <dd className="mt-0.5 line-clamp-2 text-ink-soft">{intervention.telephoneDiagnostic}</dd>
+            </div>
+          )}
+        </dl>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-bold ${preset.cls}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${preset.dot}`} />
-            {preset.label}
+        <footer className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-3">
+          <span className="flex min-w-0 items-center gap-2 text-sm text-ink-soft">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-navy text-[11px] font-bold text-white">
+              {technician ? getInitials(technician) : <UserIcon size={13} aria-hidden="true" />}
+            </span>
+            <span className="truncate">{technician || 'Technicien non affecté'}</span>
           </span>
-          <PriorityPill priority={intervention.priority} />
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-50 border border-slate-100 px-2 py-1 rounded-md">
-            <Calendar size={11} /> {fmtDate(intervention.interventionDate)}
+          <button type="button" onClick={onView} className="ui-btn-secondary ui-btn-sm shrink-0">
+            <Eye size={14} aria-hidden="true" /> Détail
+          </button>
+        </footer>
+      </article>
+    </li>
+  )
+}
+
+function SectionShell({ icon, title, description, count, actions, children }) {
+  const Icon = icon
+  return (
+    <section className="ui-card overflow-hidden">
+      <header className="flex items-start justify-between gap-3 border-b border-line px-5 py-4 sm:px-6">
+        <div className="flex items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-100">
+            <Icon size={17} aria-hidden="true" />
           </span>
-        </div>
-      </div>
-
-      {/* Body */}
-      <div className="px-5 py-4 space-y-3">
-        {intervention.interventionType && (
-          <div className="flex items-center gap-2">
-            <Hammer size={13} className="text-slate-400" />
-            <span className="text-sm font-bold text-slate-800">{intervention.interventionType}</span>
-          </div>
-        )}
-
-        <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3">
-          <p className="text-[10px] font-bold text-blue-600 uppercase tracking-[0.12em] flex items-center gap-1.5">
-            <Cpu size={10} /> Équipement lié
-          </p>
-          <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nom équipement</p>
-              <p className="text-sm font-semibold text-slate-800 truncate mt-0.5">
-                {valueOrFallback(getMachineLabel(machine))}
-              </p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Marque</p>
-              <p className="text-sm font-semibold text-slate-800 truncate mt-0.5">
-                {valueOrFallback(machine?.brand)}
-              </p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Modèle</p>
-              <p className="text-sm font-semibold text-slate-800 truncate mt-0.5">
-                {valueOrFallback(machine?.model)}
-              </p>
-            </div>
+          <div>
+            <h2 className="flex items-center gap-2 font-display text-[15px] font-bold text-ink">
+              {title}
+              {count != null && (
+                <span className="rounded-md bg-slate-100 px-1.5 text-xs font-semibold tabular-nums text-ink-muted">{count}</span>
+              )}
+            </h2>
+            {description && <p className="mt-0.5 text-sm text-ink-muted">{description}</p>}
           </div>
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {fields.map((f) => {
-            const empty = !f.value
-            return (
-              <div key={f.label} className="bg-slate-50/60 border border-slate-100 rounded-xl p-3">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.12em] flex items-center gap-1.5">
-                  {f.label === 'Panne / symptôme' && <AlertTriangle size={10} />}
-                  {f.label === 'Diagnostic à distance' && <Stethoscope size={10} />}
-                  {f.label === 'Solution appliquée' && <Wrench size={10} />}
-                  {f.label === 'Technicien' && <UserIcon size={10} />}
-                  {f.label}
-                </p>
-                {empty ? (
-                  <p className="text-xs text-slate-300 italic mt-1">Non renseigné</p>
-                ) : f.isUser ? (
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-violet-700 text-white flex items-center justify-center text-[10px] font-black">
-                      {getInitials(f.value)}
-                    </div>
-                    <span className="text-sm font-semibold text-slate-800 truncate">{f.value}</span>
-                  </div>
-                ) : (
-                  <p className="text-sm text-slate-700 mt-1 leading-snug line-clamp-3">{f.value}</p>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="px-5 py-3 border-t border-slate-100 flex justify-end bg-slate-50/40">
-        <button
-          onClick={onView}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0052CC] text-white text-xs font-bold rounded-lg hover:bg-[#0047b3] transition-colors shadow-sm"
-        >
-          <Eye size={12} /> Voir détail intervention
-        </button>
-      </div>
-    </div>
+        {actions}
+      </header>
+      {children}
+    </section>
   )
 }
 
@@ -670,320 +600,214 @@ export default function ClientDetails360() {
     }
   }
 
-  // ─── Loading ───
+  const canEditClient = (() => {
+    try {
+      const authUser = JSON.parse(window.localStorage.getItem('auth_user') || 'null')
+      return String(authUser?.role || '').trim().toLowerCase() !== 'technicien'
+    } catch {
+      return false
+    }
+  })()
+
   if (loading) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-16">
-        <div className="flex flex-col items-center justify-center gap-3 text-slate-400">
-          <Loader2 size={28} className="animate-spin text-[#0052CC]" />
-          <p className="text-sm font-medium">Chargement de la fiche client…</p>
+      <div className="ui-page" aria-busy="true">
+        <div className="ui-card flex flex-col gap-4 p-6">
+          <div className="flex items-center gap-4">
+            <div className="ui-skeleton h-16 w-16 rounded-2xl" />
+            <div className="flex-1">
+              <SkeletonLines count={2} />
+            </div>
+          </div>
         </div>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="ui-card p-6"><SkeletonLines count={6} /></div>
+          <div className="ui-card p-6 lg:col-span-2"><SkeletonLines count={6} /></div>
+        </div>
+        <p className="sr-only">Chargement de la fiche client…</p>
       </div>
     )
   }
 
-  // ─── Error ───
   if (error || !client) {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-12">
-        <div className="max-w-lg mx-auto bg-white border border-red-100 rounded-2xl p-6 text-center shadow-sm">
-          <div className="w-12 h-12 mx-auto rounded-2xl bg-red-50 flex items-center justify-center mb-3">
-            <AlertCircle className="text-red-500" size={22} />
-          </div>
-          <p className="text-sm text-slate-800 font-bold">Impossible de charger ce client.</p>
-          <p className="text-xs text-slate-500 mt-1">{error?.message || 'Erreur inconnue'}</p>
-          <div className="flex items-center justify-center gap-2 mt-4">
-            <button onClick={() => navigate(-1)} className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-lg">
-              Retour
-            </button>
-            <button onClick={load} className="px-4 py-2 text-xs font-semibold text-white bg-[#0052CC] hover:bg-[#0047b3] rounded-lg">
-              Réessayer
-            </button>
-          </div>
+      <div className="ui-page">
+        <div className="ui-card mx-auto w-full max-w-lg">
+          <EmptyState
+            icon={AlertCircle}
+            title="Impossible de charger ce client"
+            description={error?.message || 'Erreur inconnue'}
+            action={
+              <div className="flex flex-wrap justify-center gap-2">
+                <button type="button" onClick={() => navigate(-1)} className="ui-btn-secondary">Retour</button>
+                <button type="button" onClick={load} className="ui-btn-primary">Réessayer</button>
+              </div>
+            }
+          />
         </div>
       </div>
     )
   }
 
+  const openInterventions = interventions.filter((i) => getStatusPreset(i.status).tone !== 'teal').length
+  const machinesInAlert = machines.filter((m) => ['red', 'amber'].includes(machineTone(m.status))).length
+  const lastIntervention = interventions
+    .map((i) => i.interventionDate)
+    .filter(Boolean)
+    .sort()
+    .pop()
+
+  const SAV_PER_PAGE = 4
+  const totalSavPages = Math.max(1, Math.ceil(interventions.length / SAV_PER_PAGE))
+  const safeSavPage = Math.min(currentSavPage, totalSavPages)
+  const savVisible = interventions.slice((safeSavPage - 1) * SAV_PER_PAGE, safeSavPage * SAV_PER_PAGE)
+
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 space-y-4">
-      {toast && (
-        <div className="fixed top-4 right-4 z-[10000] rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 shadow-lg">
-          {toast}
-        </div>
-      )}
+    <div className="ui-page">
+      <Toast toast={toast ? { type: 'success', message: toast } : null} onClose={() => setToast('')} />
 
-      {/* Top bar */}
-      <div className="flex items-center justify-between gap-3">
-        <button
-          onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-[#0052CC] transition-colors"
-        >
-          <ArrowLeft size={14} /> Retour à la liste
-        </button>
-        <button
-          onClick={load}
-          className="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50"
-        >
-          <RefreshCw size={12} /> Actualiser
-        </button>
-      </div>
-
-      {/* Header premium */}
-      <div className="relative bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
-        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-br from-[#0052CC] via-blue-600 to-indigo-700" />
-        <div className="relative px-6 sm:px-8 pt-8 pb-6">
-          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
-            <div className="flex items-end gap-4 min-w-0">
-              <div className="w-20 h-20 rounded-2xl bg-white shadow-lg ring-4 ring-white flex items-center justify-center text-[#0052CC] shrink-0">
-                <Building2 size={32} strokeWidth={2.5} />
-              </div>
-              <div className="min-w-0 pb-1">
-                <p className="text-[10px] font-bold text-white/80 uppercase tracking-[0.18em] mb-1">
-                  Fiche client 360°
-                </p>
-                <h1 className="text-2xl sm:text-3xl font-black text-white truncate drop-shadow-sm">
-                  {client.name}
-                </h1>
-                <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/95 text-slate-700 text-[11px] font-bold font-mono rounded">
-                    <Hash size={10} /> {client.code}
-                  </span>
-                  {client.type && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 backdrop-blur-sm text-white text-[11px] font-bold rounded">
-                      <Tag size={10} /> {client.type}
-                    </span>
-                  )}
-                  {client.zone && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/20 backdrop-blur-sm text-white text-[11px] font-bold rounded">
-                      <MapPin size={10} /> Zone {client.zone}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-stretch gap-3 lg:pb-1">
-              <div className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-100 rounded-2xl shadow-sm min-w-[150px]">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 text-[#0052CC] flex items-center justify-center">
-                  <Cpu size={16} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Équipements</p>
-                  <p className="text-lg font-black text-slate-900 leading-tight">{machines.length}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-100 rounded-2xl shadow-sm min-w-[150px]">
-                <div className="w-9 h-9 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center">
-                  <Wrench size={16} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Interventions</p>
-                  <p className="text-lg font-black text-slate-900 leading-tight">{interventions.length}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick contact */}
-          <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm text-slate-600">
-            <div className="inline-flex items-center gap-2 px-3 py-2 bg-slate-50/80 rounded-lg truncate">
-              <Phone size={14} className="text-slate-400 shrink-0" />
-              <span className={`truncate ${!client.phone ? 'text-slate-300 italic' : 'font-medium'}`}>
-                {client.phone || 'Téléphone non renseigné'}
-              </span>
-            </div>
-            <div className="inline-flex items-center gap-2 px-3 py-2 bg-slate-50/80 rounded-lg truncate">
-              <Mail size={14} className="text-slate-400 shrink-0" />
-              <span className={`truncate ${!client.email ? 'text-slate-300 italic' : 'font-medium'}`}>
-                {client.email || 'Email non renseigné'}
-              </span>
-            </div>
-            <div className="inline-flex items-center gap-2 px-3 py-2 bg-slate-50/80 rounded-lg truncate">
-              <MapPin size={14} className="text-slate-400 shrink-0" />
-              <span className={`truncate ${!(client.city || client.address) ? 'text-slate-300 italic' : 'font-medium'}`}>
-                {[client.city, client.address].filter(Boolean).join(', ') || 'Adresse non renseignée'}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Informations client */}
-      <section className="bg-blue-50/40 border border-blue-100/60 rounded-2xl p-4 sm:p-5">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="text-base font-black text-slate-900">Informations client</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Coordonnées et identifiants administratifs</p>
-          </div>
-          {isEditingClient ? (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={cancelClientEdit}
-                disabled={savingClient}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
-              >
-                <X size={12} /> Annuler
-              </button>
-              <button
-                type="button"
-                onClick={saveClient}
-                disabled={savingClient}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0052CC] text-white rounded-lg text-xs font-bold hover:bg-[#0047b3] disabled:opacity-60 shadow-sm"
-              >
-                {savingClient ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                Enregistrer
-              </button>
-            </div>
-          ) : (() => {
-            const _authUser = (() => { try { return JSON.parse(window.localStorage.getItem('auth_user') || 'null') } catch { return null } })()
-            const _role = String(_authUser?.role || '').trim().toLowerCase()
-            const _canEdit = _role !== 'technicien' && _role !== 'commerciale' && _role !== 'commercial'
-            return _canEdit ? (
-            <button
-              type="button"
-              onClick={startClientEdit}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-400 text-black rounded-lg text-xs font-semibold shadow-sm transition-all hover:bg-yellow-500 hover:shadow-md active:scale-[0.98]"
-            >
-              <Pencil size={12} /> Modifier
+      <PageHeader
+        breadcrumbs={[{ label: 'Clients', to: '/clients' }, { label: client.name }]}
+        eyebrow="Fiche client 360°"
+        title={client.name}
+        icon={Building2}
+        meta={
+          <>
+            <span className="ui-ref">{client.code || `#${client.id}`}</span>
+            {client.type && <StatusBadge tone="slate" dot={false}>{client.type}</StatusBadge>}
+            {client.zone && (
+              <span className="inline-flex items-center gap-1 text-xs text-ink-muted"><MapPin size={12} aria-hidden="true" /> Zone {client.zone}</span>
+            )}
+          </>
+        }
+        actions={
+          <>
+            <button type="button" onClick={() => navigate('/clients')} className="ui-btn-ghost">
+              <ArrowLeft size={16} aria-hidden="true" /> Liste
             </button>
+            <button type="button" onClick={load} className="ui-btn-secondary">
+              <RefreshCw size={16} aria-hidden="true" /> Actualiser
+            </button>
+          </>
+        }
+      />
+
+      <StatStrip
+        items={[
+          { key: 'machines', label: 'Équipements', value: machines.length, icon: Cpu, tone: 'brand', showShare: false },
+          { key: 'alerts', label: 'Équipements en alerte', value: machinesInAlert, icon: AlertTriangle, tone: machinesInAlert ? 'red' : 'slate', showShare: false, hint: 'Panne ou maintenance' },
+          { key: 'interventions', label: 'Interventions', value: interventions.length, icon: Wrench, tone: 'teal', showShare: false },
+          { key: 'open', label: 'Dossiers ouverts', value: openInterventions, icon: Clock, tone: 'amber', showShare: false, hint: lastIntervention ? `Dernière le ${fmtDate(lastIntervention)}` : 'Aucune intervention' },
+        ]}
+      />
+
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
+        <SectionShell
+          icon={Building2}
+          title="Informations client"
+          description="Coordonnées et identifiants"
+          actions={
+            isEditingClient ? null : canEditClient ? (
+              <button type="button" onClick={startClientEdit} className="ui-btn-secondary ui-btn-sm shrink-0">
+                <Pencil size={14} aria-hidden="true" /> Modifier
+              </button>
             ) : null
-          })()}
-        </div>
+          }
+        >
+          {clientEditError && (
+            <InlineAlert tone="error" icon={AlertCircle} className="mx-5 mt-4 sm:mx-6">{clientEditError}</InlineAlert>
+          )}
 
-        {clientEditError && (
-          <div className="mb-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 flex items-center gap-2">
-            <AlertCircle size={14} />
-            {clientEditError}
-          </div>
-        )}
-
-        {isEditingClient ? (
-          <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <ClientEditField icon={Building2} label="Nom" name="name" value={clientDraft?.name || ''} onChange={handleClientDraftChange} required />
-              <InfoCard icon={Hash} label="Code client" value={client.code} mono accent="blue" />
-              <ClientEditField icon={FileDigit} label="Matricule fiscal" name="taxId" value={clientDraft?.taxId || ''} onChange={handleClientDraftChange} />
-              <ClientPhoneEditField value={clientDraft?.phone || PHONE_PREFIX} onChange={handleClientDraftChange} />
-              <ClientEditField icon={Mail} label="Email" name="email" value={clientDraft?.email || ''} onChange={handleClientDraftChange} type="email" />
-              <ClientEditField icon={Globe} label="Site web" name="web" value={clientDraft?.web || ''} onChange={handleClientDraftChange} />
-              <ClientEditField icon={MapPin} label="Ville" name="city" value={clientDraft?.city || ''} onChange={handleClientDraftChange} />
-              <ClientEditField icon={MapPin} label="Adresse" name="address" value={clientDraft?.address || ''} onChange={handleClientDraftChange} multiline />
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <InfoCard icon={Building2}  label="Nom"               value={client.name}  accent="blue" />
-            <InfoCard icon={Hash}       label="Code client"       value={client.code}  mono accent="blue" />
-            <InfoCard icon={FileDigit}  label="Matricule fiscal"  value={client.taxId} mono accent="violet" />
-            <InfoCard icon={Phone}      label="Téléphone"         value={client.phone || client.phone2 || client.phone3} accent="emerald" />
-            <InfoCard icon={Mail}       label="Email"             value={client.email} accent="emerald" />
-            <InfoCard icon={Globe}      label="Site web"          value={client.web} accent="slate" />
-            <InfoCard icon={MapPin}     label="Ville"             value={client.city} accent="amber" />
-            <div className="sm:col-span-2">
-              <InfoCard icon={MapPin}   label="Adresse"           value={client.address} accent="amber" />
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* Équipements du client */}
-      <section className="bg-emerald-50/30 border border-emerald-100/50 rounded-2xl p-4 sm:p-5">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
-              <Cpu size={16} className="text-[#0052CC]" /> Équipements du client
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">Parc machine rattaché à ce client</p>
-          </div>
-          <span className="text-xs font-bold text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-md">
-            {machines.length}
-          </span>
-        </div>
-
-        {machines.length === 0 ? (
-          <div className="bg-white border border-dashed border-slate-200 rounded-2xl p-10 text-center">
-            <div className="w-12 h-12 mx-auto rounded-2xl bg-slate-50 flex items-center justify-center mb-3">
-              <Cpu className="text-slate-300" size={20} />
-            </div>
-            <p className="text-sm font-bold text-slate-700">Aucun équipement</p>
-            <p className="text-xs text-slate-400 mt-1">Ce client ne possède pas encore de machine enregistrée.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {machines.map((m) => (
-              <MachineCard key={machineKey(m) || m.id} machine={m} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Suivi SAV du client */}
-      <section className="bg-violet-50/30 border border-violet-100/50 rounded-2xl p-4 sm:p-5">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
-              <Wrench size={16} className="text-violet-600" /> Suivi SAV du client
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">Historique des interventions, par ordre chronologique</p>
-          </div>
-          <span className="text-xs font-bold text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-md">
-            {interventions.length}
-          </span>
-        </div>
-
-        {interventions.length === 0 ? (
-          <div className="bg-white border border-dashed border-slate-200 rounded-2xl p-10 text-center">
-            <div className="w-12 h-12 mx-auto rounded-2xl bg-slate-50 flex items-center justify-center mb-3">
-              <Wrench className="text-slate-300" size={20} />
-            </div>
-            <p className="text-sm font-bold text-slate-700">Aucune intervention</p>
-            <p className="text-xs text-slate-400 mt-1">Ce client n'a pas encore d'intervention enregistr&eacute;e.</p>
-          </div>
-        ) : (() => {
-          const SAV_PER_PAGE = 4
-          const totalSavPages = Math.ceil(interventions.length / SAV_PER_PAGE)
-          const safeSavPage = Math.min(currentSavPage, totalSavPages)
-          const savVisible = interventions.slice((safeSavPage - 1) * SAV_PER_PAGE, safeSavPage * SAV_PER_PAGE)
-          return (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {savVisible.map((i) => (
-                  <InterventionCard
-                    key={i.id}
-                    intervention={i}
-                    onView={() => setSelectedIntervention(i)}
-                  />
-                ))}
+          {isEditingClient ? (
+            <form
+              onSubmit={(e) => { e.preventDefault(); saveClient() }}
+              className="flex flex-col gap-4 px-5 py-5 sm:px-6"
+            >
+              <div className="grid grid-cols-1 gap-4">
+                <ClientEditField icon={Building2} label="Nom" name="name" value={clientDraft?.name || ''} onChange={handleClientDraftChange} required />
+                <ClientEditField icon={FileDigit} label="Matricule fiscal" name="taxId" value={clientDraft?.taxId || ''} onChange={handleClientDraftChange} />
+                <ClientPhoneEditField value={clientDraft?.phone || PHONE_PREFIX} onChange={handleClientDraftChange} />
+                <ClientEditField icon={Mail} label="Email" name="email" value={clientDraft?.email || ''} onChange={handleClientDraftChange} type="email" />
+                <ClientEditField icon={Globe} label="Site web" name="web" value={clientDraft?.web || ''} onChange={handleClientDraftChange} />
+                <ClientEditField icon={MapPin} label="Ville" name="city" value={clientDraft?.city || ''} onChange={handleClientDraftChange} />
+                <ClientEditField icon={MapPin} label="Adresse" name="address" value={clientDraft?.address || ''} onChange={handleClientDraftChange} multiline />
               </div>
-              {totalSavPages > 1 && (
-                <div className="flex items-center justify-center gap-3 mt-4">
-                  <button
-                    onClick={() => setCurrentSavPage((p) => Math.max(1, p - 1))}
-                    disabled={safeSavPage <= 1}
-                    className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                  >
-                    Pr&eacute;c&eacute;dent
-                  </button>
-                  <span className="text-xs font-bold text-slate-500">
-                    {safeSavPage} / {totalSavPages}
-                  </span>
-                  <button
-                    onClick={() => setCurrentSavPage((p) => Math.min(totalSavPages, p + 1))}
-                    disabled={safeSavPage >= totalSavPages}
-                    className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                  >
-                    Suivant
-                  </button>
-                </div>
-              )}
-            </>
-          )
-        })()}
-      </section>
+              <div className="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
+                <button type="button" onClick={cancelClientEdit} disabled={savingClient} className="ui-btn-secondary">
+                  <X size={16} aria-hidden="true" /> Annuler
+                </button>
+                <button type="submit" disabled={savingClient} className="ui-btn-primary">
+                  {savingClient ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
+                  Enregistrer
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="flex flex-col gap-4 px-5 py-5 sm:px-6">
+              <InfoCard icon={Hash} label="Code client" value={client.code} mono />
+              <InfoCard icon={FileDigit} label="Matricule fiscal" value={client.taxId} mono />
+              <InfoCard icon={Phone} label="Téléphone" value={client.phone || client.phone2 || client.phone3} />
+              <InfoCard icon={Mail} label="Email" value={client.email} />
+              <InfoCard icon={Globe} label="Site web" value={client.web} />
+              <InfoCard icon={MapPin} label="Adresse" value={[client.address, client.city].filter(Boolean).join(', ')} />
+              <div className="grid grid-cols-2 gap-2 border-t border-line pt-4">
+                <a
+                  href={client.phone ? `tel:${client.phone}` : undefined}
+                  aria-disabled={!client.phone}
+                  className={`ui-btn-secondary ui-btn-sm ${client.phone ? '' : 'pointer-events-none opacity-50'}`}
+                >
+                  <Phone size={14} aria-hidden="true" /> Appeler
+                </a>
+                <a
+                  href={client.email ? `mailto:${client.email}` : undefined}
+                  aria-disabled={!client.email}
+                  className={`ui-btn-secondary ui-btn-sm ${client.email ? '' : 'pointer-events-none opacity-50'}`}
+                >
+                  <Mail size={14} aria-hidden="true" /> Écrire
+                </a>
+              </div>
+            </div>
+          )}
+        </SectionShell>
 
-      {/* Modal détail intervention */}
+        <div className="flex min-w-0 flex-col gap-4">
+          <SectionShell icon={Cpu} title="Parc équipements" description="Machines rattachées à ce client" count={machines.length}>
+            {machines.length === 0 ? (
+              <EmptyState icon={Cpu} title="Aucun équipement" description="Ce client ne possède pas encore de machine enregistrée." />
+            ) : (
+              <ul className="divide-y divide-line">
+                {machines.map((m) => (
+                  <MachineCard key={machineKey(m) || m.id} machine={m} />
+                ))}
+              </ul>
+            )}
+          </SectionShell>
+
+          <SectionShell icon={Wrench} title="Suivi SAV" description="Historique des interventions, du plus récent au plus ancien" count={interventions.length}>
+            {interventions.length === 0 ? (
+              <EmptyState icon={Wrench} title="Aucune intervention" description="Ce client n'a pas encore d'intervention enregistrée." />
+            ) : (
+              <div className="px-5 py-5 sm:px-6">
+                <ol>
+                  {savVisible.map((i) => (
+                    <InterventionCard key={i.id} intervention={i} onView={() => setSelectedIntervention(i)} />
+                  ))}
+                </ol>
+                {totalSavPages > 1 && (
+                  <nav className="mt-5 flex items-center justify-between gap-3 border-t border-line pt-4 text-sm text-ink-muted" aria-label="Pagination SAV">
+                    <span>Page {safeSavPage} sur {totalSavPages}</span>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setCurrentSavPage((p) => Math.max(1, p - 1))} disabled={safeSavPage <= 1} className="ui-btn-secondary ui-btn-sm">Précédent</button>
+                      <button type="button" onClick={() => setCurrentSavPage((p) => Math.min(totalSavPages, p + 1))} disabled={safeSavPage >= totalSavPages} className="ui-btn-secondary ui-btn-sm">Suivant</button>
+                    </div>
+                  </nav>
+                )}
+              </div>
+            )}
+          </SectionShell>
+        </div>
+      </div>
+
       <InterventionDetailsModal
         intervention={selectedIntervention}
         clientName={client.name}

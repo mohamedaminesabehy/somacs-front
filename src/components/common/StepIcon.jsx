@@ -7,12 +7,12 @@ const SIZE_CONFIG = {
 
 const STATE_CLASSES = {
   sm: {
-    active: 'bg-[#0052CC] text-white shadow-lg shadow-blue-200 scale-110',
+    active: 'bg-brand-600 text-white shadow-lg shadow-blue-200 scale-110',
     completed: 'bg-green-500 text-white',
     pending: 'bg-slate-100 text-slate-400',
   },
   lg: {
-    active: 'bg-[#0052CC] text-white shadow-xl shadow-blue-200 scale-110',
+    active: 'bg-brand-600 text-white shadow-xl shadow-blue-200 scale-110',
     completed: 'bg-green-500 text-white shadow-lg shadow-green-100',
     pending: 'bg-white text-slate-300 border-2 border-slate-50 group-hover:border-slate-200',
   },

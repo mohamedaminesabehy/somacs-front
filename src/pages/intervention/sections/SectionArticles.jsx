@@ -25,7 +25,7 @@ function PartsTable({ parts, addPart, removePart, updatePart }) {
           <span className="text-[10px] sm:text-xs font-black text-slate-700 uppercase tracking-wider">{parts.length} Référence{parts.length > 1 ? 's' : ''}</span>
         </div>
         <button onClick={addPart}
-          className="flex items-center gap-2 text-[9px] sm:text-[10px] font-black text-[#0052CC] hover:bg-[#0052CC]/10 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl transition-all border border-blue-200">
+          className="flex items-center gap-2 text-[9px] sm:text-[10px] font-black text-brand-600 hover:bg-brand-600/10 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl transition-all border border-blue-200">
           <Plus size={14} /> Ajouter
         </button>
       </div>
@@ -70,7 +70,7 @@ function PartCardMobile({ part, updatePart, removePart }) {
         <div className="flex-1 space-y-2">
           <input type="text" value={part.reference} onChange={(e) => updatePart(part.id, 'reference', e.target.value)}
             placeholder="Référence"
-            className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-mono font-bold text-[#0052CC] outline-none" />
+            className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-mono font-bold text-brand-600 outline-none" />
           <input type="text" value={part.designation} onChange={(e) => updatePart(part.id, 'designation', e.target.value)}
             placeholder="Désignation"
             className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold text-slate-600 outline-none" />
@@ -82,7 +82,7 @@ function PartCardMobile({ part, updatePart, removePart }) {
       <div className="flex items-center gap-3">
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Quantité:</span>
         <input type="number" value={part.quantity} onChange={(e) => updatePart(part.id, 'quantity', parseInt(e.target.value) || 0)}
-          className="w-20 bg-slate-50 rounded-lg px-3 py-1.5 text-center font-black text-xs text-slate-700 outline-none focus:ring-2 focus:ring-[#0052CC]/20" />
+          className="w-20 bg-slate-50 rounded-lg px-3 py-1.5 text-center font-black text-xs text-slate-700 outline-none focus:ring-2 focus:ring-brand-600/20" />
       </div>
     </div>
   )
@@ -94,7 +94,7 @@ function PartRowDesktop({ part, updatePart, removePart }) {
       <td className="px-6 py-4">
         <input type="text" value={part.reference} onChange={(e) => updatePart(part.id, 'reference', e.target.value)}
           placeholder="REF-..."
-          className="w-full bg-transparent border-none p-0 focus:ring-0 font-mono font-bold text-[#0052CC] outline-none" />
+          className="w-full bg-transparent border-none p-0 focus:ring-0 font-mono font-bold text-brand-600 outline-none" />
       </td>
       <td className="px-6 py-4">
         <input type="text" value={part.designation} onChange={(e) => updatePart(part.id, 'designation', e.target.value)}
@@ -103,7 +103,7 @@ function PartRowDesktop({ part, updatePart, removePart }) {
       </td>
       <td className="px-6 py-4">
         <input type="number" value={part.quantity} onChange={(e) => updatePart(part.id, 'quantity', parseInt(e.target.value) || 0)}
-          className="w-full bg-slate-50 rounded-lg px-3 py-1 text-center font-black text-slate-700 outline-none focus:ring-2 focus:ring-[#0052CC]/20" />
+          className="w-full bg-slate-50 rounded-lg px-3 py-1 text-center font-black text-slate-700 outline-none focus:ring-2 focus:ring-brand-600/20" />
       </td>
       <td className="px-6 py-4 text-right">
         <button onClick={() => removePart(part.id)} className="p-2 text-slate-200 hover:text-red-500 transition-colors">
@@ -134,7 +134,7 @@ function LaborPriceBox({ laborPrice, setLaborPrice }) {
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
           <input type="number" value={laborPrice} onChange={(e) => setLaborPrice(e.target.value)}
-            className="w-full sm:w-32 bg-slate-800 border-2 border-slate-700 rounded-xl px-4 py-2.5 sm:py-3 text-right font-black text-white focus:ring-2 focus:ring-[#0052CC] focus:border-[#0052CC] outline-none text-base sm:text-lg" />
+            className="w-full sm:w-32 bg-slate-800 border-2 border-slate-700 rounded-xl px-4 py-2.5 sm:py-3 text-right font-black text-white focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none text-base sm:text-lg" />
           <span className="text-base sm:text-lg font-black text-slate-400">DT</span>
         </div>
       </div>

@@ -167,11 +167,11 @@ export default function CreateIntervention() {
   }
 
   const renderStep1 = () => (
-          <div className="space-y-10 animate-in fade-in zoom-in-95 duration-500">
+          <div className="ui-card space-y-6 p-4 animate-in fade-in zoom-in-95 duration-300 sm:p-6">
             <div className="pb-6 border-b-2 border-slate-100 flex flex-col items-start gap-4">
               <div>
-                <h2 className="text-2xl font-black text-slate-900 mb-2 flex items-center gap-3">
-                  <Building2 className="text-[#0052CC]" size={28} />
+                <h2 className="flex items-center gap-3 font-display text-xl font-bold tracking-tight text-ink sm:text-2xl">
+                  <Building2 className="text-brand-600" size={28} />
                   Informations Client
                 </h2>
                 <p className="text-sm text-slate-500 font-medium">Renseignez les coordonnées complètes du client et le lieu d'intervention</p>
@@ -179,7 +179,7 @@ export default function CreateIntervention() {
               <button
                 type="button"
                 onClick={() => setIsClientModalOpen(true)}
-                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 min-h-12 w-fit whitespace-nowrap bg-[#0052CC] hover:bg-blue-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider leading-none transition-colors shadow-xl shadow-blue-100 shrink-0"
+                className="ui-btn-primary min-h-11 w-fit shrink-0 whitespace-nowrap"
               >
                 <Users size={18} />
                 Créer / Sélectionner Client
@@ -188,13 +188,13 @@ export default function CreateIntervention() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-3 group">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-[#0052CC] transition-colors">
-                  <span className="w-2 h-2 bg-[#0052CC] rounded-full"></span>
+                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
+                  <span className="w-2 h-2 bg-brand-600 rounded-full"></span>
                   Nom du Client
                   <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={20} />
+                  <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={20} />
                   <input
                     type="text"
                     name="clientName"
@@ -202,18 +202,18 @@ export default function CreateIntervention() {
                     onChange={handleChange}
                     readOnly
                     placeholder="Ex: Garage Automobile Central"
-                    className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
+                    className="ui-input w-full pl-11 font-medium read-only:bg-slate-50 read-only:text-ink-muted"
                     required
                   />
                 </div>
               </div>
               <div className="space-y-3 group">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-[#0052CC] transition-colors">
+                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
                   <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
                   Code Client
                 </label>
                 <div className="relative">
-                  <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={20} />
+                  <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={20} />
                   <input
                     type="text"
                     name="clientCode"
@@ -221,34 +221,34 @@ export default function CreateIntervention() {
                     onChange={handleChange}
                     readOnly
                     placeholder="CLT-2026-001"
-                    className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
+                    className="ui-input w-full pl-11 font-medium read-only:bg-slate-50 read-only:text-ink-muted"
                   />
                 </div>
               </div>
               <div className="space-y-3 group">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-[#0052CC] transition-colors">
+                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
                   <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
                   Demandeur
                 </label>
                 <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={20} />
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={20} />
                   <input
                     type="text"
                     name="requestorName"
                     value={formData.requestorName}
                     onChange={handleChange}
                     placeholder="Nom du responsable ou contact"
-                    className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
+                    className="ui-input w-full pl-11 font-medium read-only:bg-slate-50 read-only:text-ink-muted"
                   />
                 </div>
               </div>
               <div className="space-y-3 group">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-[#0052CC] transition-colors">
+                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
                   <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
                   Téléphone
                 </label>
                 <div className="relative">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={20} />
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={20} />
                   <input
                     type="tel"
                     name="clientPhone"
@@ -256,17 +256,17 @@ export default function CreateIntervention() {
                     onChange={handleChange}
                     readOnly
                     placeholder="+216 XX XXX XXX"
-                    className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
+                    className="ui-input w-full pl-11 font-medium read-only:bg-slate-50 read-only:text-ink-muted"
                   />
                 </div>
               </div>
               <div className="md:col-span-2 space-y-3 group">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-[#0052CC] transition-colors">
+                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
                   <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
                   Adresse E-mail
                 </label>
                 <div className="relative">
-                  <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={20} />
+                  <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={20} />
                   <input
                     type="email"
                     name="clientEmail"
@@ -274,29 +274,29 @@ export default function CreateIntervention() {
                     onChange={handleChange}
                     readOnly
                     placeholder="contact@exemple.com"
-                    className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
+                    className="ui-input w-full pl-11 font-medium read-only:bg-slate-50 read-only:text-ink-muted"
                   />
                 </div>
               </div>
               <div className="md:col-span-2 space-y-3 group">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-[#0052CC] transition-colors">
+                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
                   <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
                   Site / Localisation
                 </label>
                 <div className="relative">
-                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={20} />
+                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={20} />
                   <input
                     type="text"
                     name="siteName"
                     value={formData.siteName}
                     onChange={handleChange}
                     placeholder="Ex: Usine Principale - Zone Industrielle"
-                    className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
+                    className="ui-input w-full pl-11 font-medium read-only:bg-slate-50 read-only:text-ink-muted"
                   />
                 </div>
               </div>
               <div className="md:col-span-2 space-y-3 group">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-[#0052CC] transition-colors">
+                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
                   <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
                   Adresse Complète d'Intervention
                 </label>
@@ -307,7 +307,7 @@ export default function CreateIntervention() {
                     onChange={handleChange}
                     readOnly
                     placeholder="Saisissez l'adresse physique complète : rue, ville, code postal..."
-                    className="w-full px-5 py-4 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal h-32 resize-none shadow-sm hover:border-slate-300 leading-relaxed"
+                    className="ui-input min-h-32 w-full resize-y font-medium leading-relaxed read-only:bg-slate-50"
                   />
                 </div>
               </div>
@@ -316,10 +316,10 @@ export default function CreateIntervention() {
   )
 
   const renderStep2 = () => (
-          <div className="space-y-10 animate-in fade-in zoom-in-95 duration-500">
+          <div className="ui-card space-y-6 p-4 animate-in fade-in zoom-in-95 duration-300 sm:p-6">
             <div className="pb-6 border-b-2 border-slate-100 flex flex-col items-start gap-4">
               <div>
-                <h2 className="text-2xl font-black text-slate-900 mb-2 flex items-center gap-3">
+                <h2 className="flex items-center gap-3 font-display text-xl font-bold tracking-tight text-ink sm:text-2xl">
                   <Settings className="text-orange-500" size={28} />
                   Fiche Technique Machine
                 </h2>
@@ -328,7 +328,7 @@ export default function CreateIntervention() {
               <button
                 type="button"
                 onClick={() => setIsMachineModalOpen(true)}
-                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 min-h-12 w-fit whitespace-nowrap bg-orange-600 hover:bg-orange-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider leading-none transition-colors shadow-xl shadow-orange-100 shrink-0"
+                className="ui-btn-primary min-h-11 w-fit shrink-0 whitespace-nowrap"
               >
                 <Cpu size={18} />
                 Créer / Choisir Machine
@@ -337,7 +337,7 @@ export default function CreateIntervention() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-3 group">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-[#0052CC] transition-colors">
+                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
                   <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
                   Type de Machine
                   <span className="text-red-500">*</span>
@@ -357,7 +357,7 @@ export default function CreateIntervention() {
                 </div>
               </div>
               <div className="space-y-3 group">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-[#0052CC] transition-colors">
+                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
                   <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
                   Marque
                 </label>
@@ -369,12 +369,12 @@ export default function CreateIntervention() {
                     onChange={handleChange}
                     readOnly
                     placeholder="Ex: Ravaglioli, Hofmann, etc."
-                    className="w-full px-5 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
+                    className="ui-input w-full font-medium read-only:bg-slate-50 read-only:text-ink-muted"
                   />
                 </div>
               </div>
               <div className="space-y-3 group">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-[#0052CC] transition-colors">
+                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
                   <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
                   Modèle
                 </label>
@@ -386,12 +386,12 @@ export default function CreateIntervention() {
                     onChange={handleChange}
                     readOnly
                     placeholder="Ex: RAV-3000, KPH-370"
-                    className="w-full px-5 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
+                    className="ui-input w-full font-medium read-only:bg-slate-50 read-only:text-ink-muted"
                   />
                 </div>
               </div>
               <div className="space-y-3 group">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-[#0052CC] transition-colors">
+                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
                   <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
                   Numéro de Série
                 </label>
@@ -404,13 +404,13 @@ export default function CreateIntervention() {
                     onChange={handleChange}
                     readOnly
                     placeholder="SN-123456789"
-                    className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-slate-800 font-bold font-mono placeholder:text-slate-400 placeholder:font-normal tracking-wider shadow-sm hover:border-slate-300"
+                    className="ui-input w-full pl-11 font-mono font-medium read-only:bg-slate-50 read-only:text-ink-muted"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-orange-50 to-amber-50 border-2 border-orange-200 rounded-2xl p-6 flex items-start gap-4">
+            <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
               <div className="w-10 h-10 bg-orange-500 text-white rounded-xl flex items-center justify-center shrink-0">
                 <AlertCircle size={22} />
               </div>
@@ -423,9 +423,9 @@ export default function CreateIntervention() {
   )
 
   const renderStep3 = () => (
-          <div className="space-y-10 animate-in fade-in zoom-in-95 duration-500">
+          <div className="ui-card space-y-6 p-4 animate-in fade-in zoom-in-95 duration-300 sm:p-6">
             <div className="pb-6 border-b-2 border-slate-100">
-              <h2 className="text-2xl font-black text-slate-900 mb-2 flex items-center gap-3">
+              <h2 className="flex items-center gap-3 font-display text-xl font-bold tracking-tight text-ink sm:text-2xl">
                 <AlertCircle className="text-blue-600" size={28} />
                 Diagnostic & Analyse
               </h2>
@@ -434,7 +434,7 @@ export default function CreateIntervention() {
 
             <div className="space-y-6">
               <div className="space-y-3 group">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-blue-600 transition-colors">
+                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
                   <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
                   Type d'Intervention
                   <span className="text-red-500">*</span>
@@ -444,7 +444,7 @@ export default function CreateIntervention() {
                     name="interventionType"
                     value={formData.interventionType}
                     onChange={handleChange}
-                    className="w-full px-5 py-4 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all font-bold text-blue-700 appearance-none cursor-pointer shadow-sm hover:border-slate-300"
+                    className="ui-input w-full cursor-pointer font-semibold text-ink"
                     style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em' }}
                   >
                     <option value="Réparation">🔧 Réparation</option>
@@ -458,7 +458,7 @@ export default function CreateIntervention() {
               </div>
 
               <div className="space-y-3 group">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-blue-600 transition-colors">
+                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
                   <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
                   Type de panne
                   <span className="text-red-500">*</span>
@@ -469,7 +469,7 @@ export default function CreateIntervention() {
                     value={formData.problemDescription}
                     onChange={handleChange}
                     placeholder="Décrivez précisément le type de panne..."
-                    className="w-full px-5 py-4 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all text-slate-800 font-medium placeholder:text-slate-400 placeholder:font-normal h-32 resize-none leading-relaxed shadow-sm hover:border-slate-300"
+                    className="ui-input min-h-32 w-full resize-y font-medium leading-relaxed"
                     required
                   />
                 </div>
@@ -479,7 +479,7 @@ export default function CreateIntervention() {
   )
 
   const renderStep4 = () => (
-          <div className="space-y-10 animate-in fade-in zoom-in-95 duration-500">
+          <div className="ui-card space-y-6 p-4 animate-in fade-in zoom-in-95 duration-300 sm:p-6">
             <div className="pb-6 border-b-2 border-slate-100">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-lg">
@@ -612,20 +612,20 @@ export default function CreateIntervention() {
 
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 overflow-x-hidden">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-canvas">
 
       {/* ── Header ── */}
-      <div className="bg-white border-b-2 border-slate-200 px-4 sm:px-8 py-4 sm:py-6 flex items-center justify-between shrink-0 shadow-sm">
+      <header className="sticky top-0 z-30 flex shrink-0 items-center justify-between gap-3 border-b border-line bg-white/95 px-4 py-3 backdrop-blur sm:px-6 sm:py-4">
         <div className="flex items-center gap-3 sm:gap-6 min-w-0">
           <button
             onClick={() => navigate('/interventions')}
-            className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 rounded-xl transition-all active:scale-95 shadow-sm shrink-0"
+            className="ui-icon-btn h-10 w-10 shrink-0"
           >
             <ChevronLeft size={22} strokeWidth={2.5} />
           </button>
           <div className="min-w-0">
             <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-              <h1 className="text-lg sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight truncate">Nouvelle Intervention</h1>
+              <h1 className="truncate font-display text-lg font-bold tracking-tight text-ink sm:text-2xl">Nouvelle Intervention</h1>
               <span className="hidden sm:inline px-3 py-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-[10px] font-black rounded-full uppercase tracking-wider shadow-lg shadow-blue-200 shrink-0">
                 SAV Administration
               </span>
@@ -638,23 +638,23 @@ export default function CreateIntervention() {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-          <button className="hidden sm:flex items-center gap-2 px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm hover:shadow-md active:scale-95">
+          <button className="ui-btn-secondary hidden sm:inline-flex">
             <Printer size={18} /> Brouillon
           </button>
         </div>
-      </div>
+      </header>
 
       {/* ── Mobile / Tablet horizontal stepper ── */}
       <HorizontalStepper steps={steps} currentStep={currentStep} alwaysVisible={useHorizontalProgress} />
 
-      <div className="flex flex-1 overflow-hidden min-w-0">
+      <div className="flex min-w-0 flex-1 overflow-hidden">
 
         {/* ── Desktop left stepper sidebar ── */}
         <VerticalStepper steps={steps} currentStep={currentStep} hidden={useHorizontalProgress} />
 
         {/* ── Form area ── */}
-        <div className="flex-1 overflow-y-auto no-scrollbar bg-white flex flex-col min-w-0">
-          <div className="flex-1 px-4 sm:px-8 md:px-12 py-8 sm:py-12 md:py-16 max-w-4xl mx-auto w-full min-w-0">
+        <div className="flex min-w-0 flex-1 flex-col overflow-y-auto bg-canvas">
+          <div className="mx-auto w-full max-w-4xl min-w-0 flex-1 px-4 py-5 sm:px-7 sm:py-7">
             <form
               onSubmit={(e) => {
                 e.preventDefault()
@@ -673,7 +673,7 @@ export default function CreateIntervention() {
                     <button
                       type="button"
                       onClick={nextStep}
-                      className="w-full sm:w-auto group flex items-center justify-center gap-2 sm:gap-3 bg-gradient-to-r from-slate-900 to-slate-800 hover:from-[#0052CC] hover:to-blue-700 text-white px-6 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-xl shadow-slate-300 hover:shadow-blue-300 active:scale-95"
+                      className="ui-btn-primary w-full sm:w-auto"
                     >
                       Continuer
                       <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" strokeWidth={3} />
@@ -682,7 +682,7 @@ export default function CreateIntervention() {
                     <button
                       type="button"
                       onClick={createIntervention}
-                      className="w-full sm:w-auto flex items-center justify-center gap-2 sm:gap-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 sm:px-12 py-4 sm:py-5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-xl shadow-green-300 active:scale-95"
+                      className="ui-btn-primary w-full sm:w-auto"
                     >
                       <Check size={18} strokeWidth={3} />
                       Valider
@@ -696,11 +696,7 @@ export default function CreateIntervention() {
                     type="button"
                     onClick={prevStep}
                     disabled={currentStep === 1}
-                    className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 sm:px-8 py-3.5 sm:py-4 rounded-xl font-bold text-xs sm:text-sm uppercase tracking-wider transition-all ${
-                      currentStep === 1
-                        ? 'text-slate-300 cursor-not-allowed bg-slate-50'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:scale-95 shadow-sm hover:shadow-md border border-slate-200'
-                    }`}
+className="ui-btn-secondary flex-1 sm:flex-none"
                   >
                     <ChevronLeft size={18} />
                     <span className="hidden sm:inline">Étape </span>Précédente
@@ -710,7 +706,7 @@ export default function CreateIntervention() {
                   <button
                     type="button"
                     onClick={() => setShowMobilePreview(true)}
-                    className="xl:hidden flex-1 flex items-center justify-center gap-2 px-4 py-3.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl font-black text-xs uppercase tracking-wider transition-all active:scale-95 border border-indigo-200"
+                    className="ui-btn-secondary flex-1 xl:hidden"
                   >
                     <Eye size={16} />
                     Aperçu
@@ -727,7 +723,7 @@ export default function CreateIntervention() {
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Aperçu de la fiche officielle</h4>
               <div className="flex gap-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-[#0052CC]"></div>
+                <div className="w-1.5 h-1.5 rounded-full bg-brand-600"></div>
               </div>
             </div>
 

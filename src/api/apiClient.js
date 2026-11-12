@@ -57,26 +57,8 @@ function createUnauthorizedResponse(message = 'Unauthorized') {
   })
 }
 
-function shouldLogAuthDiagnostic(path) {
-  return typeof path === 'string' && path.startsWith('/recommendations')
-}
-
-function logAuthDiagnostic(path, details) {
-  if (!shouldLogAuthDiagnostic(path)) return
-  try {
-    console.log('[apiFetch] auth diagnostic:', details)
-  } catch {
-    // Console logging is diagnostic-only.
-  }
-}
-
-function applyAuthHeader(finalHeaders, path, auth) {
+function applyAuthHeader(finalHeaders) {
   const token = getAuthToken()
-  logAuthDiagnostic(path, {
-    authRequested: Boolean(auth),
-    tokenExists: Boolean(token),
-    tokenLooksLikeJwt: typeof token === 'string' && token.trim().startsWith('eyJ'),
-  })
   if (!token) {
     return createUnauthorizedResponse('Missing authorization token')
   }
@@ -137,18 +119,11 @@ export async function apiFetch(path, options = {}) {
 
   const finalHeaders = new Headers(headers)
   if (auth) {
-    const unauthorizedResponse = applyAuthHeader(finalHeaders, path, auth)
+    const unauthorizedResponse = applyAuthHeader(finalHeaders)
     if (unauthorizedResponse) return unauthorizedResponse
   }
 
   const finalBody = prepareRequestBody(body, finalHeaders)
-  logAuthDiagnostic(path, {
-    authorizationHeaderAdded: finalHeaders.has('Authorization'),
-    authorizationHeaderStartsWithBearer: finalHeaders
-      .get('Authorization')
-      ?.startsWith('Bearer ') || false,
-  })
-
   // Timeout client : si le backend met plus de N ms, on annule la requête
   // pour ne JAMAIS laisser un loader bloqué côté UI.
   const timeoutSignal = createTimeoutSignal(signal, timeoutMs)

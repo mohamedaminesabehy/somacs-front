@@ -323,13 +323,13 @@ export default function EmployeeHistory() {
         {/* ── En-tête ── */}
         <div className="flex flex-col gap-5 sm:flex-row sm:justify-between sm:items-center bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm">
           <div className="flex items-center gap-4 sm:gap-5 min-w-0">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-[#0052CC] to-blue-700 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 shrink-0">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-brand-600 to-blue-700 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 shrink-0">
               <History size={24} className="text-white" />
             </div>
             <div className="min-w-0">
               <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">Historique des interventions</h1>
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#0052CC]/10 text-[#0052CC] text-[11px] font-black rounded-lg uppercase tracking-wider">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-brand-600/10 text-brand-600 text-[11px] font-black rounded-lg uppercase tracking-wider">
                   <User size={11} /> {employeeName || '—'}
                 </span>
                 {resolvedRole && (
@@ -357,13 +357,13 @@ export default function EmployeeHistory() {
         {/* ── Filtres ── */}
         <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row gap-4">
           <div className="relative flex-1 min-w-0 group">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" />
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" />
             <input
               type="text"
               placeholder="Rechercher (réf, fiche, client, machine, site)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] hover:border-slate-300 transition-all placeholder:text-slate-400"
+              className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 hover:border-slate-300 transition-all placeholder:text-slate-400"
             />
           </div>
 
@@ -380,7 +380,7 @@ export default function EmployeeHistory() {
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
                   aria-label="Date de début"
-                  className="w-full sm:w-auto xl:w-[160px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-base sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] hover:border-slate-300 transition-all min-w-0"
+                  className="w-full sm:w-auto xl:w-[160px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-base sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 hover:border-slate-300 transition-all min-w-0"
                 />
                 {!fromDate && (
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-medium pointer-events-none sm:hidden">
@@ -400,7 +400,7 @@ export default function EmployeeHistory() {
                   value={toDate}
                   onChange={(e) => setToDate(e.target.value)}
                   aria-label="Date de fin"
-                  className="w-full sm:w-auto xl:w-[160px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-base sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-[#0052CC]/20 focus:border-[#0052CC] hover:border-slate-300 transition-all min-w-0"
+                  className="w-full sm:w-auto xl:w-[160px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-base sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 hover:border-slate-300 transition-all min-w-0"
                 />
                 {!toDate && (
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-medium pointer-events-none sm:hidden">

@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { apiFetch } from '../../api/apiClient'
 import { ChevronLeft, ChevronDown, Save, Loader2, Upload, X, FileText, Image as ImageIcon, AlertCircle, Cpu, Truck, ClipboardCheck, Shield, CheckCircle2, ImagePlus, Hash, Calendar, Tag, Package, Clock } from 'lucide-react'
-import { getStepLabelColor } from '../../utils/stepStyles'
 
 const STATUS_OPTIONS = ['En stock', 'Disponible', 'En utilisation', 'En maintenance', 'Hors service']
 const CATEGORY_OPTIONS = ['Compresseur', 'Pompe', 'Moteur', 'Groupe electrogene', 'Climatisation', 'Autre']
@@ -141,166 +140,90 @@ export default function MachineForm() {
   const totalImages = existingImages.length + imageFiles.length
 
   if (loading) return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-[#0052CC]" />
+    <div className="flex min-h-screen items-center justify-center bg-canvas">
+      <Loader2 className="h-8 w-8 animate-spin text-brand-600" aria-label="Chargement" />
     </div>
   )
 
+  const current = STEPS[activeStep - 1]
+
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 overflow-x-hidden">
-      {/* Header */}
-      <div className="bg-white border-b-2 border-slate-200 px-4 sm:px-8 py-4 sm:py-6 flex items-center justify-between shrink-0 shadow-sm">
-        <div className="flex items-center gap-3 sm:gap-6 min-w-0">
-          <button
-            type="button"
-            onClick={() => navigate('/machines')}
-            className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 rounded-xl transition-all active:scale-95 shadow-sm shrink-0"
-          >
-            <ChevronLeft size={22} strokeWidth={2.5} />
+    <div className="min-h-screen overflow-x-hidden bg-canvas">
+      <header className="sticky top-0 z-30 border-b border-line bg-white/95 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6">
+          <button type="button" onClick={() => navigate('/machines')} className="ui-btn-ghost h-10 w-10 shrink-0 px-0" aria-label="Retour au parc machines">
+            <ChevronLeft size={20} aria-hidden="true" />
           </button>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-              <h1 className="text-lg sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight truncate">
-                {isEdit ? 'Modifier la machine' : 'Nouvelle Machine'}
-              </h1>
-              <span className="hidden sm:inline px-3 py-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-[10px] font-black rounded-full uppercase tracking-wider shadow-lg shadow-blue-200 shrink-0">
-                Équipement SOMACS
-              </span>
-            </div>
-            <p className="hidden sm:flex text-slate-500 text-sm font-semibold mt-1 items-center gap-2">
-              <Calendar size={14} />
-              Enregistrement et suivi des équipements internes
-            </p>
+          <div className="min-w-0 flex-1">
+            <p className="ui-eyebrow">Parc machines</p>
+            <h1 className="truncate font-display text-lg font-bold text-ink sm:text-xl">
+              {isEdit ? `Modifier ${form.designation || 'la machine'}` : 'Nouvelle machine'}
+            </h1>
           </div>
-        </div>
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <button
-            type="button"
-            onClick={() => navigate('/machines')}
-            className="hidden sm:flex items-center gap-2 px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm hover:shadow-md active:scale-95"
-          >
-            Annuler
-          </button>
-          <button
-            form="machine-form"
-            type="submit"
-            disabled={saving || activeStep < STEPS.length}
-            className="inline-flex items-center gap-2 px-5 py-3 bg-[#0052CC] hover:bg-[#0747A6] text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-200 active:scale-95 disabled:opacity-60"
-          >
-            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+          <button type="button" onClick={() => navigate('/machines')} className="ui-btn-secondary hidden sm:inline-flex">Annuler</button>
+          <button form="machine-form" type="submit" disabled={saving || activeStep < STEPS.length} className="ui-btn-primary">
+            {saving ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
             <span className="hidden sm:inline">Enregistrer</span>
           </button>
         </div>
-      </div>
-
-      {/* Mobile horizontal stepper (visible on small screens only) */}
-      <div className="lg:hidden bg-white border-b border-slate-100 px-4 py-3 shrink-0">
-        <div className="flex items-center justify-between max-w-lg mx-auto">
-          {STEPS.map((step, index) => {
-            const isActive = activeStep === step.id
-            const isCompleted = activeStep > step.id
-            const Icon = step.icon
-            return (
-              <div key={step.id} className="contents">
-                <button
-                  type="button"
-                  onClick={() => setActiveStep(step.id)}
-                  className="flex flex-col items-center gap-1"
-                >
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 ${
-                    isActive ? 'bg-[#0052CC] text-white shadow-lg shadow-blue-200 scale-110'
-                    : isCompleted ? 'bg-green-500 text-white'
-                    : 'bg-slate-100 text-slate-400'
-                  }`}>
-                    {isCompleted ? <CheckCircle2 size={16} strokeWidth={3} /> : <Icon size={16} />}
-                  </div>
-                  <span className={`text-[9px] font-black uppercase tracking-wide ${getStepLabelColor(isActive, isCompleted)}`}>
-                    {step.title}
-                  </span>
-                </button>
-                {index < STEPS.length - 1 && (
-                  <div className={`flex-1 h-0.5 mx-1 rounded-full transition-colors duration-300 ${activeStep > step.id ? 'bg-green-400' : 'bg-slate-200'}`} />
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      <div className="flex flex-1 overflow-hidden min-w-0">
-        {/* Desktop vertical stepper sidebar */}
-        <div className="hidden lg:flex w-[300px] border-r border-slate-100 bg-slate-50/30 flex-col p-8 shrink-0 min-w-0">
-          <div className="space-y-2 mb-12">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Progression</h4>
-            <div className="h-1 w-12 bg-[#0052CC] rounded-full"></div>
-          </div>
-
-          <div className="space-y-1">
+        <nav aria-label="Étapes du formulaire" className="mx-auto max-w-6xl px-4 pb-3 sm:px-6">
+          <ol className="grid grid-cols-4 gap-1.5">
             {STEPS.map((step) => {
               const isActive = activeStep === step.id
               const isCompleted = activeStep > step.id
               const Icon = step.icon
               return (
-                <div key={step.id} className="relative pb-10 last:pb-0">
-                  {step.id !== STEPS.length && (
-                    <div className={`absolute left-6 top-14 bottom-0 w-0.5 rounded-full ${isCompleted ? 'bg-[#0052CC]' : 'bg-slate-100'}`}></div>
-                  )}
+                <li key={step.id}>
                   <button
                     type="button"
                     onClick={() => setActiveStep(step.id)}
-                    className="flex items-start gap-5 group cursor-pointer w-full text-left"
+                    aria-current={isActive ? 'step' : undefined}
+                    className={`flex w-full min-w-0 items-center gap-2 rounded-xl px-2 py-2 text-left transition-colors sm:px-3 ${isActive ? 'bg-brand-50' : 'hover:bg-slate-50'}`}
                   >
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-500 z-10 ${
-                      isActive
-                        ? 'bg-[#0052CC] text-white shadow-xl shadow-blue-200 scale-110'
-                        : isCompleted
-                          ? 'bg-green-500 text-white shadow-lg shadow-green-100'
-                          : 'bg-white text-slate-300 border-2 border-slate-100 group-hover:border-slate-200'
+                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
+                      isActive ? 'bg-brand-600 text-white' : isCompleted ? 'bg-teal-600 text-white' : 'bg-slate-100 text-ink-faint'
                     }`}>
-                      {isCompleted ? <CheckCircle2 size={20} className="stroke-[3px]" /> : <Icon size={20} className={isActive ? 'stroke-[3px]' : 'stroke-[2px]'} />}
-                    </div>
-                    <div className="pt-1">
-                      <p className={`text-[10px] font-black uppercase tracking-widest leading-none mb-1 transition-colors ${isActive ? 'text-[#0052CC]' : 'text-slate-300'}`}>Étape 0{step.id}</p>
-                      <p className={`text-base font-black tracking-tight transition-colors ${isActive ? 'text-slate-900' : 'text-slate-400'}`}>{step.title}</p>
-                      <p className={`text-[11px] font-bold mt-0.5 transition-colors ${isActive ? 'text-slate-500' : 'text-slate-300'}`}>{step.description}</p>
-                    </div>
+                      {isCompleted ? <CheckCircle2 size={15} aria-hidden="true" /> : <Icon size={15} aria-hidden="true" />}
+                    </span>
+                    <span className="hidden min-w-0 sm:block">
+                      <span className={`block truncate text-sm font-semibold ${isActive ? 'text-brand-800' : 'text-ink'}`}>{step.title}</span>
+                      <span className="block truncate text-xs text-ink-faint">{step.description}</span>
+                    </span>
                   </button>
-                </div>
+                  <span className={`mt-1 block h-1 rounded-full ${isActive || isCompleted ? 'bg-brand-600' : 'bg-slate-200'}`} aria-hidden="true" />
+                </li>
               )
             })}
-          </div>
-        </div>
+          </ol>
+          <p className="mt-2 text-xs font-medium text-ink-muted sm:hidden">Étape {activeStep} sur {STEPS.length} · {current.title}</p>
+        </nav>
+      </header>
 
-        {/* Form area */}
-        <div className="flex-1 overflow-y-auto bg-white min-w-0">
-          <div className="px-5 sm:px-10 lg:px-14 py-8 sm:py-10 w-full">
-            {error && (
-              <div className="flex items-start gap-3 rounded-2xl border-2 border-red-200 bg-red-50 p-5 text-red-700 animate-in fade-in duration-300 mb-6">
-                <AlertCircle size={20} className="shrink-0 mt-0.5" />
-                <p className="text-sm font-semibold">{error}</p>
-              </div>
-            )}
-
-            <form id="machine-form" onSubmit={handleSubmit} noValidate className="space-y-8">
-              {activeStep === 1 && <Step1 form={form} handleChange={handleChange} />}
-              {activeStep === 2 && <Step2 form={form} handleChange={handleChange} fieldErrors={fieldErrors} />}
-              {activeStep === 3 && <Step3 form={form} handleChange={handleChange} />}
-              {activeStep === 4 && (
-                <Step4
-                  imagePreviews={imagePreviews} existingImages={existingImages}
-                  imageInputRef={imageInputRef} handleImageChange={handleImageChange} clearImage={clearImage}
-                  totalImages={totalImages}
-                  totalDocs={totalDocs} existingDocs={existingDocs} docFiles={docFiles}
-                  removeExistingDoc={removeExistingDoc} removeNewDoc={removeNewDoc}
-                  docInputRef={docInputRef} handleDocChange={handleDocChange}
-                  isEdit={isEdit} traceability={traceability}
-                />
-              )}
-              <Nav activeStep={activeStep} setActiveStep={setActiveStep} saving={saving} />
-            </form>
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+        {error && (
+          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700" role="alert">
+            <AlertCircle size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+            <p className="text-sm font-medium">{error}</p>
           </div>
-        </div>
-      </div>
+        )}
+        <form id="machine-form" onSubmit={handleSubmit} noValidate className="flex flex-col gap-6">
+          {activeStep === 1 && <Step1 form={form} handleChange={handleChange} />}
+          {activeStep === 2 && <Step2 form={form} handleChange={handleChange} fieldErrors={fieldErrors} />}
+          {activeStep === 3 && <Step3 form={form} handleChange={handleChange} />}
+          {activeStep === 4 && (
+            <Step4
+              imagePreviews={imagePreviews} existingImages={existingImages}
+              imageInputRef={imageInputRef} handleImageChange={handleImageChange} clearImage={clearImage}
+              totalImages={totalImages}
+              totalDocs={totalDocs} existingDocs={existingDocs} docFiles={docFiles}
+              removeExistingDoc={removeExistingDoc} removeNewDoc={removeNewDoc}
+              docInputRef={docInputRef} handleDocChange={handleDocChange}
+              isEdit={isEdit} traceability={traceability}
+            />
+          )}
+          <Nav activeStep={activeStep} setActiveStep={setActiveStep} saving={saving} />
+        </form>
+      </main>
     </div>
   )
 }
@@ -308,16 +231,15 @@ export default function MachineForm() {
 /* ─── Step 1: Origine & Fournisseur ─── */
 function Step1({ form, handleChange }) {
   return (
-    <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
+    <div className="flex flex-col gap-5 animate-fade-up">
       <SectionHeader
         icon={Truck}
-        color="blue"
         title="Origine & Fournisseur"
         desc="Provenance, réception et informations de garantie"
       />
 
-      <div className="bg-white rounded-3xl border-2 border-slate-200 shadow-sm p-6 sm:p-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="ui-card p-5 sm:p-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Field label="Fournisseur" icon={Package} name="supplier" value={form.supplier} onChange={handleChange} placeholder="Nom du fournisseur" />
           <Field label="Référence fournisseur" icon={Hash} name="referenceFournisseur" value={form.referenceFournisseur} onChange={handleChange} placeholder="REF-XXX" />
           <Field label="Date d'arrivée" icon={Calendar} name="receptionDate" type="date" value={form.receptionDate} onChange={handleChange} />
@@ -338,18 +260,17 @@ function Step1({ form, handleChange }) {
 /* ─── Step 2: Identification Machine ─── */
 function Step2({ form, handleChange, fieldErrors }) {
   return (
-    <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
+    <div className="flex flex-col gap-5 animate-fade-up">
       <SectionHeader
         icon={Cpu}
-        color="indigo"
         title="Identification Machine"
         desc="Code interne, caractéristiques techniques et statut"
       />
 
-      <div className="bg-white rounded-3xl border-2 border-slate-200 shadow-sm p-6 sm:p-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Field label="Code interne" icon={Hash} name="code" value={form.code} onChange={handleChange} placeholder="MACH-001" required error={fieldErrors.code} dotColor="bg-[#0052CC]" />
-          <Field label="Désignation" icon={Tag} name="designation" value={form.designation} onChange={handleChange} placeholder="Compresseur à vis" required error={fieldErrors.designation} dotColor="bg-[#0052CC]" />
+      <div className="ui-card p-5 sm:p-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Field label="Code interne" icon={Hash} name="code" value={form.code} onChange={handleChange} placeholder="MACH-001" required error={fieldErrors.code} />
+          <Field label="Désignation" icon={Tag} name="designation" value={form.designation} onChange={handleChange} placeholder="Compresseur à vis" required error={fieldErrors.designation} />
           <Field label="Marque" icon={Package} name="brand" value={form.brand} onChange={handleChange} placeholder="Atlas Copco" />
           <Field label="Modèle" name="model" value={form.model} onChange={handleChange} placeholder="GA 15" />
           <Field label="N° de série" icon={Cpu} name="serialNumber" value={form.serialNumber} onChange={handleChange} placeholder="SN-XXX" mono />
@@ -359,14 +280,9 @@ function Step2({ form, handleChange, fieldErrors }) {
         </div>
       </div>
 
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl p-5 flex items-start gap-4">
-        <div className="w-10 h-10 bg-[#0052CC] text-white rounded-xl flex items-center justify-center shrink-0">
-          <AlertCircle size={20} />
-        </div>
-        <div>
-          <h4 className="font-black text-blue-900 text-sm mb-1">Champs obligatoires</h4>
-          <p className="text-blue-800 text-xs leading-relaxed">Le code interne et la désignation sont requis pour identifier la machine dans le système.</p>
-        </div>
+      <div className="flex items-start gap-3 rounded-2xl border border-brand-100 bg-brand-50 p-4">
+        <AlertCircle size={18} className="mt-0.5 shrink-0 text-brand-700" aria-hidden="true" />
+        <p className="text-sm leading-relaxed text-brand-900"><span className="font-semibold">Champs obligatoires.</span> Le code interne et la désignation identifient la machine dans le système.</p>
       </div>
     </div>
   )
@@ -375,16 +291,15 @@ function Step2({ form, handleChange, fieldErrors }) {
 /* ─── Step 3: Contrôle avant livraison ─── */
 function Step3({ form, handleChange }) {
   return (
-    <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500">
+    <div className="flex flex-col gap-5 animate-fade-up">
       <SectionHeader
         icon={ClipboardCheck}
-        color="emerald"
         title="Contrôle Avant Livraison"
         desc="Vérification technique et validation avant affectation"
       />
 
-      <div className="bg-white rounded-3xl border-2 border-slate-200 shadow-sm p-6 sm:p-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="ui-card p-5 sm:p-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <SelectField label="Emplacement machine" name="emplacementInterne" value={form.emplacementInterne} onChange={handleChange} options={EMPLACEMENT_OPTIONS} />
           <SelectField label="État général" name="etatGeneral" value={form.etatGeneral} onChange={handleChange} options={ETAT_GENERAL_OPTIONS} />
           <SelectField label="Test fonctionnement" name="testFonctionnement" value={form.testFonctionnement} onChange={handleChange} options={TEST_OPTIONS} />
@@ -409,23 +324,22 @@ function Step3({ form, handleChange }) {
 /* ─── Step 4: Images & Documents ─── */
 function Step4({ imagePreviews, existingImages, imageInputRef, handleImageChange, clearImage, totalImages, totalDocs, existingDocs, docFiles, removeExistingDoc, removeNewDoc, docInputRef, handleDocChange, isEdit, traceability }) {
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
+    <div className="flex flex-col gap-5 animate-fade-up">
       <SectionHeader
         icon={ImagePlus}
-        color="violet"
         title="Images & Documents"
         desc="Photos de la machine et fichiers techniques associés"
       />
 
       {/* Images */}
-      <div className="bg-white rounded-3xl border-2 border-slate-200 shadow-sm p-6 sm:p-8">
+      <div className="ui-card p-5 sm:p-6">
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-9 h-9 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center">
             <ImageIcon size={16} />
           </div>
           <div>
-            <h3 className="text-sm font-black text-slate-900">Images de la machine</h3>
-            <p className="text-xs text-slate-500">JPG, PNG, WEBP — max 5 Mo par image — jusqu'à 10 images</p>
+            <h3 className="font-display text-[15px] font-bold text-ink">Images de la machine</h3>
+            <p className="text-xs text-ink-muted">JPG, PNG, WEBP — max 5 Mo par image — jusqu'à 10 images</p>
           </div>
         </div>
 
@@ -438,7 +352,7 @@ function Step4({ imagePreviews, existingImages, imageInputRef, handleImageChange
                   <div className="w-full aspect-square rounded-2xl border-2 border-slate-200 overflow-hidden bg-slate-50">
                     <img src={img.url} alt={img.name || 'image'} className="w-full h-full object-cover" />
                   </div>
-                  <button type="button" onClick={() => clearImage(idx, 'existing')} className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-600">
+                  <button type="button" onClick={() => clearImage(idx, 'existing')} className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition-opacity shadow-lg hover:bg-red-600">
                     <X size={14} />
                   </button>
                 </div>
@@ -449,7 +363,7 @@ function Step4({ imagePreviews, existingImages, imageInputRef, handleImageChange
                     <img src={src} alt="nouvelle image" className="w-full h-full object-cover" />
                   </div>
                   <span className="absolute top-2 left-2 rounded-full bg-blue-500 text-white px-2 py-0.5 text-[9px] font-black uppercase">Nouveau</span>
-                  <button type="button" onClick={() => clearImage(idx, 'new')} className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-600">
+                  <button type="button" onClick={() => clearImage(idx, 'new')} className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition-opacity shadow-lg hover:bg-red-600">
                     <X size={14} />
                   </button>
                 </div>
@@ -464,7 +378,7 @@ function Step4({ imagePreviews, existingImages, imageInputRef, handleImageChange
             </div>
           )}
 
-          <button type="button" onClick={() => imageInputRef.current?.click()} className="w-full inline-flex items-center justify-center gap-2 px-5 py-4 rounded-xl border-2 border-dashed border-slate-300 text-sm font-bold text-slate-600 hover:border-violet-400 hover:text-violet-600 hover:bg-violet-50/30 transition-all">
+          <button type="button" onClick={() => imageInputRef.current?.click()} className="w-full inline-flex items-center justify-center gap-2 px-5 py-4 rounded-xl border-2 border-dashed border-line text-sm font-semibold text-ink-muted hover:border-brand-400 hover:text-brand-700 hover:bg-brand-50/40 transition-all">
             <Upload size={16} /> Ajouter des images
           </button>
           <input ref={imageInputRef} type="file" multiple accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleImageChange} />
@@ -472,14 +386,14 @@ function Step4({ imagePreviews, existingImages, imageInputRef, handleImageChange
       </div>
 
       {/* Documents */}
-      <div className="bg-white rounded-3xl border-2 border-slate-200 shadow-sm p-6 sm:p-8">
+      <div className="ui-card p-5 sm:p-6">
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center">
             <FileText size={16} />
           </div>
           <div>
-            <h3 className="text-sm font-black text-slate-900">Documents techniques</h3>
-            <p className="text-xs text-slate-500">Fiches techniques, manuels, certificats — PDF, Word, Excel</p>
+            <h3 className="font-display text-[15px] font-bold text-ink">Documents techniques</h3>
+            <p className="text-xs text-ink-muted">Fiches techniques, manuels, certificats — PDF, Word, Excel</p>
           </div>
         </div>
 
@@ -492,7 +406,7 @@ function Step4({ imagePreviews, existingImages, imageInputRef, handleImageChange
           )}
           {existingDocs.map((doc) => <DocRow key={doc.publicId} name={doc.name} href={doc.url} onRemove={() => removeExistingDoc(doc.publicId)} />)}
           {docFiles.map((f, i) => <DocRow key={'new-' + i} name={f.name} isNew onRemove={() => removeNewDoc(i)} />)}
-          <button type="button" onClick={() => docInputRef.current?.click()} className="w-full inline-flex items-center justify-center gap-2 px-5 py-4 rounded-xl border-2 border-dashed border-slate-300 text-sm font-bold text-slate-600 hover:border-[#0052CC] hover:text-[#0052CC] hover:bg-blue-50/30 transition-all">
+          <button type="button" onClick={() => docInputRef.current?.click()} className="w-full inline-flex items-center justify-center gap-2 px-5 py-4 rounded-xl border-2 border-dashed border-line text-sm font-semibold text-ink-muted hover:border-brand-400 hover:text-brand-700 hover:bg-brand-50/40 transition-all">
             <Upload size={16} /> Ajouter un document
           </button>
           <input ref={docInputRef} type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={handleDocChange} />
@@ -501,14 +415,14 @@ function Step4({ imagePreviews, existingImages, imageInputRef, handleImageChange
 
       {/* Traçabilité */}
       {isEdit && (
-        <div className="bg-white rounded-3xl border-2 border-slate-200 shadow-sm p-6 sm:p-8">
+        <div className="ui-card p-5 sm:p-6">
           <div className="flex items-center gap-3 mb-5">
             <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
               <Shield size={16} />
             </div>
             <div>
-              <h3 className="text-sm font-black text-slate-900">Traçabilité</h3>
-              <p className="text-xs text-slate-500">Informations automatiques</p>
+              <h3 className="font-display text-[15px] font-bold text-ink">Traçabilité</h3>
+              <p className="text-xs text-ink-muted">Informations automatiques</p>
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -526,35 +440,17 @@ function Step4({ imagePreviews, existingImages, imageInputRef, handleImageChange
 /* ─── Navigation ─── */
 function Nav({ activeStep, setActiveStep, saving }) {
   return (
-    <div className="mt-10 pt-8 border-t-2 border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-      <button
-        type="button"
-        onClick={() => setActiveStep((s) => Math.max(1, s - 1))}
-        disabled={activeStep === 1}
-        className={`flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-black text-sm uppercase tracking-wider transition-all ${
-          activeStep === 1
-            ? 'text-slate-300 cursor-not-allowed bg-slate-50'
-            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:scale-95 shadow-sm hover:shadow-md border-2 border-slate-200'
-        }`}
-      >
-        <ChevronLeft size={18} /> Précédent
+    <div className="flex flex-col-reverse gap-3 border-t border-line pt-6 sm:flex-row sm:items-center sm:justify-between">
+      <button type="button" onClick={() => setActiveStep((s) => Math.max(1, s - 1))} disabled={activeStep === 1} className="ui-btn-secondary">
+        <ChevronLeft size={16} aria-hidden="true" /> Précédent
       </button>
       {activeStep < STEPS.length ? (
-        <button
-          type="button"
-          onClick={(e) => { e.preventDefault(); setActiveStep((s) => Math.min(STEPS.length, s + 1)) }}
-          className="group flex items-center justify-center gap-3 bg-gradient-to-r from-slate-900 to-slate-800 hover:from-[#0052CC] hover:to-blue-700 text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-xl shadow-slate-300 hover:shadow-blue-300 active:scale-95"
-        >
-          Suivant <ChevronLeft size={18} className="rotate-180 group-hover:translate-x-1 transition-transform" strokeWidth={3} />
+        <button type="button" onClick={(e) => { e.preventDefault(); setActiveStep((s) => Math.min(STEPS.length, s + 1)) }} className="ui-btn-primary">
+          Étape suivante <ChevronLeft size={16} className="rotate-180" aria-hidden="true" />
         </button>
       ) : (
-        <button
-          form="machine-form"
-          type="submit"
-          disabled={saving}
-          className="flex items-center justify-center gap-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-10 py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-xl shadow-green-300 active:scale-95 disabled:opacity-60"
-        >
-          {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} Enregistrer
+        <button form="machine-form" type="submit" disabled={saving} className="ui-btn-primary">
+          {saving ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Save size={16} aria-hidden="true" />} Enregistrer la machine
         </button>
       )}
     </div>
@@ -562,38 +458,31 @@ function Nav({ activeStep, setActiveStep, saving }) {
 }
 
 /* ─── Section Header ─── */
-function SectionHeader({ icon, color, title, desc }) {
+function SectionHeader({ icon, title, desc }) {
   const SectionIcon = icon
-  const colors = {
-    blue: 'from-blue-500 to-blue-600',
-    indigo: 'from-indigo-500 to-indigo-600',
-    emerald: 'from-emerald-500 to-emerald-600',
-    violet: 'from-violet-500 to-violet-600',
-  }
   return (
-    <div className="flex items-center gap-4">
-      <div className={`w-12 h-12 bg-gradient-to-br ${colors[color] || colors.blue} text-white rounded-2xl flex items-center justify-center shadow-lg`}>
-        <SectionIcon size={24} />
-      </div>
-      <div>
-        <h2 className="text-xl sm:text-2xl font-black text-slate-900">{title}</h2>
-        <p className="text-sm text-slate-500 font-medium">{desc}</p>
+    <div className="flex items-center gap-3">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-100">
+        <SectionIcon size={20} aria-hidden="true" />
+      </span>
+      <div className="min-w-0">
+        <h2 className="font-display text-lg font-bold text-ink sm:text-xl">{title}</h2>
+        <p className="text-sm leading-relaxed text-ink-muted">{desc}</p>
       </div>
     </div>
   )
 }
 
 /* ─── Field Components ─── */
-function Field({ label, icon: Icon, name, value, onChange, placeholder, type = 'text', required, error, dotColor, mono }) {
+function Field({ label, icon: Icon, name, value, onChange, placeholder, type = 'text', required, error, mono }) {
   return (
-    <div className="space-y-2.5 group">
-      <label htmlFor={name} className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-[#0052CC] transition-colors">
-        <span className={`w-2 h-2 rounded-full ${dotColor || (required ? 'bg-[#0052CC]' : 'bg-slate-300')}`}></span>
+    <div className="min-w-0">
+      <label htmlFor={name} className="ui-label">
         {label}
-        {required && <span className="text-red-500">*</span>}
+        {required && <span className="ml-0.5 text-red-500" aria-hidden="true">*</span>}
       </label>
       <div className="relative">
-        {Icon && <Icon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#0052CC] transition-colors" size={18} />}
+        {Icon && <Icon className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint" size={16} aria-hidden="true" />}
         <input
           id={name}
           type={type}
@@ -601,33 +490,26 @@ function Field({ label, icon: Icon, name, value, onChange, placeholder, type = '
           value={value}
           onChange={onChange}
           placeholder={placeholder}
-          className={`w-full ${Icon ? 'pl-12' : 'px-5'} pr-4 py-3.5 bg-white border-2 rounded-xl outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300 ${mono ? 'font-mono tracking-wider' : ''} ${error ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100' : 'border-slate-200 focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10'}`}
+          required={required}
+          aria-invalid={error ? true : undefined}
+          className={`ui-input ${Icon ? 'pl-10' : ''} ${mono ? 'font-mono' : ''} ${error ? 'border-red-300 focus:border-red-500 focus:ring-red-100' : ''}`}
         />
       </div>
-      {error && <p className="text-xs font-semibold text-red-600">{error}</p>}
+      {error && <p className="mt-1.5 text-xs font-medium text-red-600" role="alert">{error}</p>}
     </div>
   )
 }
 
 function SelectField({ label, name, value, onChange, options }) {
   return (
-    <div className="space-y-2.5 group">
-      <label htmlFor={name} className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-[#0052CC] transition-colors">
-        <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
-        {label}
-      </label>
+    <div className="min-w-0">
+      <label htmlFor={name} className="ui-label">{label}</label>
       <div className="relative">
-        <select
-          id={name}
-          name={name}
-          value={value}
-          onChange={onChange}
-          className="w-full px-5 py-3.5 pr-10 bg-white border-2 border-slate-200 rounded-xl outline-none appearance-none transition-all text-slate-800 font-semibold shadow-sm hover:border-slate-300 focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 cursor-pointer"
-        >
-          <option value="">Sélectionner...</option>
+        <select id={name} name={name} value={value} onChange={onChange} className="ui-select appearance-none pr-10">
+          <option value="">Sélectionner…</option>
           {options.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
-        <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+        <ChevronDown size={16} className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-ink-faint" aria-hidden="true" />
       </div>
     </div>
   )
@@ -635,47 +517,33 @@ function SelectField({ label, name, value, onChange, options }) {
 
 function TextareaField({ label, name, value, onChange, placeholder }) {
   return (
-    <div className="space-y-2.5 group">
-      <label htmlFor={name} className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-[#0052CC] transition-colors">
-        <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
-        {label}
-      </label>
-      <textarea
-        id={name}
-        name={name}
-        value={value}
-        onChange={onChange}
-        rows={3}
-        placeholder={placeholder}
-        className="w-full px-5 py-4 bg-white border-2 border-slate-200 rounded-xl outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal resize-y shadow-sm hover:border-slate-300 focus:border-[#0052CC] focus:ring-4 focus:ring-[#0052CC]/10 leading-relaxed"
-      />
+    <div className="min-w-0">
+      <label htmlFor={name} className="ui-label">{label}</label>
+      <textarea id={name} name={name} value={value} onChange={onChange} rows={3} placeholder={placeholder} className="ui-textarea" />
     </div>
   )
 }
 
 function ReadOnlyField({ label, value }) {
   return (
-    <div className="space-y-2">
-      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</span>
-      <div className="flex items-center px-5 py-3.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-700">
-        {value}
-      </div>
+    <div className="min-w-0 rounded-xl bg-slate-50 px-4 py-3">
+      <span className="block text-xs font-medium text-ink-muted">{label}</span>
+      <span className="mt-0.5 block break-words text-sm font-semibold text-ink">{value}</span>
     </div>
   )
 }
 
 function DocRow({ name, href, isNew, onRemove }) {
   return (
-    <div className="flex items-center justify-between gap-3 px-5 py-3.5 bg-slate-50 border-2 border-slate-200 rounded-xl hover:border-slate-300 transition-colors">
-      <div className="flex items-center gap-3 min-w-0">
-        <FileText size={16} className="text-slate-400 shrink-0" />
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-white px-4 py-3">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700"><FileText size={15} aria-hidden="true" /></span>
         {href
-          ? <a href={href} target="_blank" rel="noreferrer" className="text-sm font-bold text-slate-700 hover:text-[#0052CC] truncate transition-colors">{name}</a>
-          : <span className="text-sm font-bold text-slate-700 truncate">{name}</span>
-        }
-        {isNew && <span className="shrink-0 rounded-full bg-blue-50 text-[#0052CC] border border-blue-200 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider">Nouveau</span>}
+          ? <a href={href} target="_blank" rel="noreferrer" className="truncate text-sm font-semibold text-ink hover:text-brand-700">{name}</a>
+          : <span className="truncate text-sm font-semibold text-ink">{name}</span>}
+        {isNew && <span className="ui-badge shrink-0 bg-brand-50 text-brand-700 ring-brand-200">Nouveau</span>}
       </div>
-      <button type="button" onClick={onRemove} className="p-2 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
+      <button type="button" onClick={onRemove} className="rounded-lg p-2 text-ink-faint hover:bg-red-50 hover:text-red-600" aria-label={`Retirer ${name}`}>
         <X size={16} />
       </button>
     </div>

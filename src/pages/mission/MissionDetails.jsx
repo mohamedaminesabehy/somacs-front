@@ -76,7 +76,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
   const [isAuthenticated, setIsAuthenticated] = useState(() => isAuthTokenUsable(getAuthToken()))
   const [showLoginModal, setShowLoginModal] = useState(() => allowUnauthenticated && !isAuthTokenUsable(getAuthToken()))
 
-  const handleModalLoginSuccess = (_token, _user) => {
+  const handleModalLoginSuccess = () => {
     setIsAuthenticated(true)
     setShowLoginModal(false)
     // Use hard navigation to ensure the PWA reloads with the fresh auth token.
@@ -150,7 +150,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
   // ── Unauthenticated preview (notification flow) ──────────────────────────────
   if (!isAuthenticated && allowUnauthenticated) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-6">
+      <div className="min-h-screen bg-canvas flex flex-col items-center justify-center p-6">
         <LoginRequiredModal
           isOpen={showLoginModal}
           onLoginSuccess={handleModalLoginSuccess}
@@ -180,7 +180,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
           </div>
           <button
             onClick={() => setShowLoginModal(true)}
-            className="w-full px-6 py-3.5 bg-[#0052CC] hover:bg-[#0042a3] text-white rounded-xl text-sm font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-200"
+            className="w-full px-6 py-3.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-200"
           >
             Se connecter pour voir les détails
           </button>
@@ -199,7 +199,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
         <p className="text-slate-500 font-black text-lg">{missionActionError || 'Mission introuvable'}</p>
         <button
           onClick={() => navigate('/missions/my')}
-          className="flex items-center gap-2 px-6 py-3 bg-[#0052CC] text-white rounded-xl text-sm font-black shadow-lg shadow-blue-200 hover:bg-[#0042a3] transition-colors"
+          className="flex items-center gap-2 px-6 py-3 bg-brand-600 text-white rounded-xl text-sm font-black shadow-lg shadow-blue-200 hover:bg-brand-700 transition-colors"
         >
           <ArrowLeft size={16} strokeWidth={3} /> Retour à mes missions
         </button>
@@ -208,7 +208,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
   }
   if (!mission) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
+      <div className="min-h-screen bg-canvas flex flex-col">
         <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200">
           <div className="max-w-[1600px] mx-auto px-3 sm:px-4 h-14 sm:h-16 flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-slate-100 animate-pulse" />
@@ -238,7 +238,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
   const progressPct = PROGRESS_MAP[status] || 0
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col">
+    <div className="min-h-screen bg-canvas flex flex-col">
       {/* TOAST NOTIFICATION */}
       {showSaveToast && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-4">
@@ -277,7 +277,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
                 <button
                   type="button"
                   onClick={() => setShowInterventionClosedSuccess(false)}
-                  className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-[#0052CC] hover:bg-[#0042a3] text-white text-xs font-black uppercase tracking-wider transition-colors shadow-lg shadow-blue-100"
+                  className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-black uppercase tracking-wider transition-colors shadow-lg shadow-blue-100"
                 >
                   OK
                 </button>
@@ -300,7 +300,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
             <div className="hidden sm:block h-6 w-px bg-slate-200 mx-1" />
             <div className="min-w-0">
               <div className="hidden sm:flex items-center gap-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                <button onClick={() => navigate('/missions/my')} className="hover:text-[#0052CC]">Missions</button>
+                <button onClick={() => navigate('/missions/my')} className="hover:text-brand-600">Missions</button>
                 <ChevronRight size={10} />
                 <span className="text-slate-500">Détails</span>
               </div>
@@ -359,7 +359,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="text-[10px] font-black text-[#0052CC] bg-blue-50 px-2 py-0.5 rounded uppercase tracking-wider">
+                        <span className="text-[10px] font-black text-brand-600 bg-blue-50 px-2 py-0.5 rounded uppercase tracking-wider">
                           {mission.type}
                         </span>
                         <span className="text-[10px] font-bold text-slate-400">
@@ -389,11 +389,11 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
                 <div className="bg-slate-50 rounded-xl p-5 border border-slate-100">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-black text-slate-500 uppercase tracking-wider">Progression globale</span>
-                    <span className="text-xs font-black text-[#0052CC]">{progressPct}%</span>
+                    <span className="text-xs font-black text-brand-600">{progressPct}%</span>
                   </div>
                   <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
                     <div 
-                      className="h-full bg-[#0052CC] transition-all duration-500 ease-out"
+                      className="h-full bg-brand-600 transition-all duration-500 ease-out"
                       style={{ width: `${progressPct}%` }}
                     />
                   </div>
@@ -401,10 +401,10 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
                     {STATUS_STEPS.map((step, idx) => (
                       <div key={step} className="flex flex-col items-center">
                         <div className={`w-2 h-2 rounded-full mb-1 ${
-                          STATUS_STEPS.indexOf(status) >= idx ? 'bg-[#0052CC]' : 'bg-slate-300'
+                          STATUS_STEPS.indexOf(status) >= idx ? 'bg-brand-600' : 'bg-slate-300'
                         }`} />
                         <span className={`text-[10px] font-bold ${
-                          status === step ? 'text-[#0052CC]' : 'text-slate-400'
+                          status === step ? 'text-brand-600' : 'text-slate-400'
                         }`}>{step}</span>
                       </div>
                     ))}
@@ -457,7 +457,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
                               setVehicleKilometrageDepart(v)
                             }
                           }}
-                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-900 outline-none transition focus:border-[#0052CC] focus:ring-2 focus:ring-[#0052CC]/10"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-900 outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-600/10"
                           placeholder="0"
                         />
                       </label>
@@ -476,7 +476,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
                               setVehicleKilometrageRetour(v)
                             }
                           }}
-                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-900 outline-none transition focus:border-[#0052CC] focus:ring-2 focus:ring-[#0052CC]/10"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-900 outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-600/10"
                           placeholder="0"
                         />
                       </label>
@@ -539,7 +539,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
                         onClick={() => handleStatusChange(s)}
                         className={`flex flex-col items-center justify-center gap-3 p-4 rounded-xl border-2 transition-all ${
                           isActive
-                            ? `${cfg.border} ${cfg.bg} ${cfg.color} scale-[1.02] shadow-sm ${shouldAnimate ? 'ring-2 ring-offset-2 ring-[#0052CC] animate-in zoom-in-95 duration-200' : ''}`
+                            ? `${cfg.border} ${cfg.bg} ${cfg.color} scale-[1.02] shadow-sm ${shouldAnimate ? 'ring-2 ring-offset-2 ring-brand-600 animate-in zoom-in-95 duration-200' : ''}`
                             : 'border-slate-50 bg-slate-50 text-slate-400 hover:border-slate-200 hover:bg-white hover:text-slate-600'
                         }`}
                       >
@@ -562,7 +562,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="Ajoutez vos remarques, observations ou détails techniques ici..."
-                    className="w-full h-40 p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-700 focus:bg-white focus:ring-2 focus:ring-[#0052CC]/10 focus:border-[#0052CC] outline-none transition-all resize-none"
+                    className="w-full h-40 p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-700 focus:bg-white focus:ring-2 focus:ring-brand-600/10 focus:border-brand-600 outline-none transition-all resize-none"
                   />
                   <div className="absolute bottom-3 right-3 flex items-center gap-2 text-[10px] font-bold text-slate-400 bg-white px-2 py-1 rounded border border-slate-100">
                     <Edit2 size={10} />
@@ -574,7 +574,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
                     type="button"
                     onClick={handleSave}
                     disabled={isSaving}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0052CC] text-white text-xs font-black uppercase tracking-wider hover:bg-[#0042a3] active:scale-95 disabled:opacity-50"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 text-white text-xs font-black uppercase tracking-wider hover:bg-brand-700 active:scale-95 disabled:opacity-50"
                   >
                     <Save size={14} />
                     Enregistrer
@@ -597,7 +597,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
                 }`} />
                 <div className="p-4 sm:p-6 relative">
                   <SectionHeader icon={Wrench} title="Intervention liée">
-                    <span className="px-2 py-0.5 rounded bg-blue-100 text-[#0052CC] text-[10px] font-black uppercase tracking-wider">
+                    <span className="px-2 py-0.5 rounded bg-blue-100 text-brand-600 text-[10px] font-black uppercase tracking-wider">
                       SAV
                     </span>
                   </SectionHeader>
@@ -640,7 +640,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
                       className={`w-full mt-2 py-3 rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center gap-2 group ${
                         intervention.status === 'CLOSED'
                           ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-100'
-                          : 'bg-[#0052CC] hover:bg-[#0042a3] text-white shadow-blue-100'
+                          : 'bg-brand-600 hover:bg-brand-700 text-white shadow-blue-100'
                       }`}
                     >
                       {intervention.status === 'CLOSED' ? 'Intervention clôturée' : 'Ouvrir le dossier'}
@@ -699,7 +699,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
 
             {/* Summary Details */}
             <div className="bg-sky-50/40 lg:bg-white rounded-2xl border border-sky-100 lg:border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-4 sm:p-6 bg-[#F0F8FF]">
+              <div className="p-4 sm:p-6 bg-brand-50">
                 <SectionHeader icon={Info} title="Détails" />
                 <div className="mt-2">
                   <InfoItem label="Type" value={mission.type === 'Intervention' ? 'Intervention S.A.V' : mission.type} icon={Wrench} colorClass="text-blue-500" />
@@ -727,7 +727,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
             <div className="bg-rose-50/40 lg:bg-white rounded-2xl border border-rose-100 lg:border-slate-200 shadow-sm overflow-hidden">
               <div className="p-4 sm:p-6">
                 <SectionHeader icon={MapPin} title="Lieu & Document">
-                  <button className="text-[10px] font-black text-[#0052CC] flex items-center gap-1 hover:underline">
+                  <button className="text-[10px] font-black text-brand-600 flex items-center gap-1 hover:underline">
                     OUVRIR MAPS <ExternalLink size={10} />
                   </button>
                 </SectionHeader>
@@ -845,7 +845,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
                       href={docViewer.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center w-10 h-10 bg-blue-50 hover:bg-blue-100 text-[#0052CC] rounded-xl transition-colors"
+                      className="inline-flex items-center justify-center w-10 h-10 bg-blue-50 hover:bg-blue-100 text-brand-600 rounded-xl transition-colors"
                       title="Ouvrir dans un nouvel onglet"
                     >
                       <ExternalLink size={18} />
@@ -888,7 +888,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
                         href={docViewer.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-[#0052CC] text-white rounded-lg text-xs font-bold hover:bg-[#0042a3] transition-colors"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg text-xs font-bold hover:bg-brand-700 transition-colors"
                       >
                         <ExternalLink size={14} />
                         Ouvrir dans un nouvel onglet
@@ -902,7 +902,7 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
                     <button
                       type="button"
                       onClick={() => downloadDocument(docViewer.downloadUrl || docViewer.url, docViewer.name)}
-                      className="px-4 py-2 bg-[#0052CC] text-white rounded-lg text-sm font-bold hover:bg-[#0042a3] transition-colors flex items-center gap-2"
+                      className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-bold hover:bg-brand-700 transition-colors flex items-center gap-2"
                     >
                       <Download size={16} />
                       Télécharger le fichier

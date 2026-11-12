@@ -18,7 +18,7 @@ export default function VerticalStepper({ steps, currentStep, hidden = false }) 
     <div className={containerClass}>
       <div className="space-y-2 mb-12">
         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Progression</h4>
-        <div className="h-1 w-12 bg-[#0052CC] rounded-full"></div>
+        <div className="h-1 w-12 bg-brand-600 rounded-full"></div>
       </div>
 
       <div className="space-y-1">
@@ -28,12 +28,12 @@ export default function VerticalStepper({ steps, currentStep, hidden = false }) 
           return (
             <div key={step.id} className="relative pb-10 last:pb-0">
               {step.id !== steps.length && (
-                <div className={`absolute left-6 top-14 bottom-0 w-0.5 rounded-full ${isCompleted ? 'bg-[#0052CC]' : 'bg-slate-100'}`} />
+                <div className={`absolute left-6 top-14 bottom-0 w-0.5 rounded-full ${isCompleted ? 'bg-brand-600' : 'bg-slate-100'}`} />
               )}
               <div className="flex items-start gap-5 group cursor-default">
                 <StepIcon icon={step.icon} isActive={isActive} isCompleted={isCompleted} size="lg" />
                 <div className="pt-1">
-                  <p className={`text-[10px] font-black uppercase tracking-widest leading-none mb-1 transition-colors ${isActive ? 'text-[#0052CC]' : 'text-slate-300'}`}>
+                  <p className={`text-[10px] font-black uppercase tracking-widest leading-none mb-1 transition-colors ${isActive ? 'text-brand-600' : 'text-slate-300'}`}>
                     Étape 0{step.id}
                   </p>
                   <p className={`text-base font-black tracking-tight transition-colors ${isActive ? 'text-slate-900' : 'text-slate-400'}`}>

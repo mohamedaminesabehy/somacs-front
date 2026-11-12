@@ -16,7 +16,7 @@ export default function SignatureCaptureCard({
 }) {
   const inputId = `signature-input-${type}`
   const borderClass = canManageSignatures
-    ? 'bg-slate-50 border-slate-200 hover:border-[#0052CC] cursor-pointer'
+    ? 'bg-slate-50 border-slate-200 hover:border-brand-600 cursor-pointer'
     : 'bg-slate-50 border-slate-200 cursor-default'
 
   return (
@@ -42,7 +42,7 @@ export default function SignatureCaptureCard({
           <img src={signature.url} alt={title} className="absolute inset-0 h-full w-full object-contain bg-white p-3" />
         ) : (
           <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center">
-            <Camera size={20} className={canManageSignatures ? 'text-[#0052CC]' : 'text-slate-300'} />
+            <Camera size={20} className={canManageSignatures ? 'text-brand-600' : 'text-slate-300'} />
             <span className={['text-[9px] sm:text-[10px] font-black uppercase transition-colors', canManageSignatures ? 'text-slate-400' : 'text-slate-300'].join(' ')}>
               {isBusy ? 'Enregistrement...' : placeholder}
             </span>

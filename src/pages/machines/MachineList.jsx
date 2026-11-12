@@ -1,242 +1,226 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { apiFetch } from '../../api/apiClient'
 import CompactPagination from '../../components/common/CompactPagination'
+import PageHeader from '../../components/ui/PageHeader'
+import Modal from '../../components/ui/Modal'
+import StatusBadge from '../../components/ui/StatusBadge'
+import { EmptyState, SkeletonTableRows } from '../../components/ui/Feedback'
+import { StatStrip, SearchField, SegmentedFilter, Toolbar, Toast } from '../../components/ui/DataKit'
 import {
-  Search, Plus, Eye, Edit2, Trash2, Settings, RefreshCw,
-  LayoutGrid, LayoutList, Building2, Tag, AlertCircle,
-  MoreHorizontal, X, Cpu, FileText,
-  CheckCircle2, AlertTriangle,
-  Truck, CalendarDays,
+  Plus, Eye, Pencil, Trash2, Settings, RefreshCw, Cpu, Building2,
+  CheckCircle2, Wrench, AlertOctagon, CalendarClock, AlertTriangle,
 } from 'lucide-react'
 
-function normalizeRole(raw) {
-  return String(raw || '')
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+function normalize(raw) {
+  return String(raw || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 }
 
 function getStoredRole() {
   if (typeof window === 'undefined') return ''
-  const stored = window.localStorage.getItem('auth_user')
-  if (!stored) return ''
   try {
-    return JSON.parse(stored)?.role || ''
+    return JSON.parse(window.localStorage.getItem('auth_user') || 'null')?.role || ''
   } catch {
     return ''
   }
 }
 
-function ActionMenu({ machine, onEdit, onDelete, onView, canManage }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-  useEffect(() => {
-    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [])
+const STATUS_GROUPS = {
+  service: { label: 'En service', tone: 'teal', match: (s) => s.includes('service') && !s.includes('hors') },
+  maintenance: { label: 'En maintenance', tone: 'amber', match: (s) => s.includes('maintenance') },
+  panne: { label: 'En panne / Hors service', tone: 'red', match: (s) => s.includes('panne') || s.includes('hors') },
+}
+
+function statusGroup(status) {
+  const s = normalize(status)
+  return Object.keys(STATUS_GROUPS).find((key) => STATUS_GROUPS[key].match(s)) || null
+}
+
+function MachineStatus({ status }) {
+  const group = statusGroup(status)
+  return <StatusBadge tone={group ? STATUS_GROUPS[group].tone : 'slate'}>{status || 'Non renseigné'}</StatusBadge>
+}
+
+function formatDate(value) {
+  if (!value) return null
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+function maintenanceState(value) {
+  if (!value) return null
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return null
+  const days = Math.ceil((d.getTime() - Date.now()) / 86400000)
+  if (days < 0) return { label: `En retard de ${Math.abs(days)} j`, tone: 'text-red-600' }
+  if (days <= 14) return { label: `Dans ${days} j`, tone: 'text-amber-700' }
+  return { label: formatDate(value), tone: 'text-ink-muted' }
+}
+
+function MachineThumb({ machine, size = 'md' }) {
+  const src = typeof machine.imageUrl === 'string' ? machine.imageUrl.trim().replace(/^`+|`+$/g, '') : machine.imageUrl
+  const dims = size === 'lg' ? 'h-14 w-14' : 'h-11 w-11'
   return (
-    <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
-      <button onClick={() => setOpen(!open)} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors">
-        <MoreHorizontal size={16} />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-10 z-50 w-44 max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden">
-          <div className="px-3 py-2 border-b border-slate-50">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Actions</p>
-          </div>
-          <button onClick={() => { onView(machine); setOpen(false) }} className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">
-            <Eye size={14} /> Voir les détails
+    <span className={`flex ${dims} shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-50 ring-1 ring-inset ring-line`}>
+      {src ? (
+        <img src={src} alt="" loading="lazy" decoding="async" className="h-full w-full object-contain p-1" />
+      ) : (
+        <Cpu size={size === 'lg' ? 22 : 18} className="text-ink-faint" aria-hidden="true" />
+      )}
+    </span>
+  )
+}
+
+function RowActions({ machine, canManage, onDelete }) {
+  const base = 'flex h-8 w-8 items-center justify-center rounded-lg text-ink-faint transition-colors'
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <Link to={`/machines/${machine.id}`} className={`${base} hover:bg-brand-50 hover:text-brand-700`} aria-label={`Voir ${machine.designation}`}>
+        <Eye size={16} />
+      </Link>
+      {canManage && (
+        <>
+          <Link to={`/machines/${machine.id}/edit`} className={`${base} hover:bg-brand-50 hover:text-brand-700`} aria-label={`Modifier ${machine.designation}`}>
+            <Pencil size={15} />
+          </Link>
+          <button type="button" onClick={() => onDelete(machine)} className={`${base} hover:bg-red-50 hover:text-red-600`} aria-label={`Supprimer ${machine.designation}`}>
+            <Trash2 size={15} />
           </button>
-          {canManage && (
-            <>
-              <button onClick={() => { onEdit(machine); setOpen(false) }} className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">
-                <Edit2 size={14} /> Modifier
-              </button>
-              <div className="border-t border-slate-50" />
-              <button onClick={() => { onDelete(machine); setOpen(false) }} className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors">
-                <Trash2 size={14} /> Supprimer
-              </button>
-            </>
-          )}
-        </div>
+        </>
       )}
     </div>
   )
 }
 
-function MachineCard({ machine, onView, onEdit, onDelete, canManage }) {
-  const imageSrc =
-    typeof machine.imageUrl === 'string'
-      ? machine.imageUrl.trim().replace(/^`+|`+$/g, '')
-      : machine.imageUrl
-
+function MachineMobileCard({ machine, canManage, onDelete }) {
+  const next = maintenanceState(machine.nextMaintenanceDate)
   return (
-    <div
-      onClick={() => onView(machine)}
-      className="bg-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-lg hover:border-blue-200 transition-all cursor-pointer group"
-    >
-      <div className="relative h-40 bg-gradient-to-br from-slate-100 to-slate-200 overflow-hidden">
-        {imageSrc ? (
-          <img
-            src={imageSrc}
-            alt={machine.designation}
-            loading="lazy"
-            decoding="async"
-            className="w-full h-full object-contain bg-white/60 p-2 group-hover:scale-[1.02] transition-transform duration-300"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <Cpu size={48} className="text-slate-300" />
-          </div>
-        )}
-        {machine.category && (
-          <div className="absolute bottom-3 left-3">
-            <span className="bg-white/90 backdrop-blur-sm text-slate-700 text-[10px] font-black px-2 py-1 rounded-lg border border-white/50">
-              {machine.category}
-            </span>
-          </div>
-        )}
-      </div>
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <div className="min-w-0">
-            <p className="text-sm font-black text-slate-900 truncate group-hover:text-blue-600 transition-colors">{machine.designation}</p>
-            <p className="text-[11px] font-mono text-slate-400 mt-0.5">{machine.code}</p>
-          </div>
-          <div onClick={(e) => e.stopPropagation()}>
-            <ActionMenu machine={machine} onView={onView} onEdit={onEdit} onDelete={onDelete} canManage={canManage} />
-          </div>
+    <li className="ui-card flex flex-col gap-3 p-4">
+      <div className="flex items-start gap-3">
+        <MachineThumb machine={machine} />
+        <div className="min-w-0 flex-1">
+          <Link to={`/machines/${machine.id}`} className="block break-words text-sm font-bold leading-snug text-ink hover:text-brand-700">
+            {machine.designation}
+          </Link>
+          <p className="mt-0.5 font-mono text-xs text-ink-faint">{machine.code}</p>
         </div>
-        <div className="space-y-1.5">
-          {machine.brand && (
-            <div className="flex items-center gap-2 text-[11px] text-slate-500">
-              <Tag size={11} className="text-slate-300 shrink-0" />
-              <span className="truncate">{machine.brand}{machine.model ? ` — ${machine.model}` : ''}</span>
-            </div>
-          )}
-          {machine.supplier && (
-            <div className="flex items-center gap-2 text-[11px] text-slate-500">
-              <Truck size={11} className="text-slate-300 shrink-0" />
-              <span className="truncate">{machine.supplier}</span>
-            </div>
-          )}
-          {machine.receptionDate && (
-            <div className="flex items-center gap-2 text-[11px] text-slate-500">
-              <CalendarDays size={11} className="text-slate-300 shrink-0" />
-              <span className="truncate">Reception: {machine.receptionDate}</span>
-            </div>
-          )}
-        </div>
+        <MachineStatus status={machine.status} />
       </div>
-    </div>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl bg-slate-50 px-3 py-2.5 text-xs">
+        <div className="min-w-0">
+          <dt className="text-ink-faint">Marque / modèle</dt>
+          <dd className="truncate font-semibold text-ink">{[machine.brand, machine.model].filter(Boolean).join(' · ') || '—'}</dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="text-ink-faint">N° de série</dt>
+          <dd className="truncate font-mono font-semibold text-ink">{machine.serialNumber || '—'}</dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="text-ink-faint">Client</dt>
+          <dd className="truncate font-semibold text-ink">{machine.client || '—'}</dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="text-ink-faint">Prochaine maintenance</dt>
+          <dd className={`truncate font-semibold ${next?.tone || 'text-ink'}`}>{next?.label || '—'}</dd>
+        </div>
+      </dl>
+      <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
+        <span className="truncate text-xs font-medium text-ink-muted">{machine.category || 'Sans catégorie'}</span>
+        <RowActions machine={machine} canManage={canManage} onDelete={onDelete} />
+      </div>
+    </li>
   )
 }
 
-function DeleteMachineModal({ machine, deleting, onCancel, onConfirm }) {
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onCancel() }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onCancel])
-
-  return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
-        <button
-          onClick={onCancel}
-          disabled={deleting}
-          className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50"
-        >
-          <X size={18} />
-        </button>
-        <div className="flex flex-col items-center text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-500">
-            <AlertTriangle size={28} />
-          </div>
-          <h3 className="mt-4 text-lg font-black text-slate-900">Confirmer la suppression</h3>
-          <p className="mt-2 text-sm text-slate-500">
-            Êtes-vous sûr de vouloir supprimer <span className="font-bold text-slate-800">{machine.designation}</span>
-            {machine.code && <span className="font-mono text-slate-500"> ({machine.code})</span>} ?<br />
-            Cette action est irréversible.
-          </p>
-          <div className="mt-6 flex w-full gap-3">
-            <button
-              onClick={onCancel}
-              disabled={deleting}
-              className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 disabled:opacity-50"
-            >
-              Annuler
-            </button>
-            <button
-              onClick={onConfirm}
-              disabled={deleting}
-              className="flex-1 rounded-2xl bg-red-600 px-4 py-3 text-sm font-bold text-white transition-all hover:bg-red-700 disabled:opacity-50"
-            >
-              {deleting ? 'Suppression...' : 'Supprimer'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
+const PAGE_SIZE = 10
 
 export default function MachineList({ currentUser }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [machines, setMachines] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [viewMode, setViewMode] = useState('list')
+  const [statusFilter, setStatusFilter] = useState(null)
+  const [category, setCategory] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [toast, setToast] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
-  const toastRef = useRef(null)
-  const ITEMS_PER_PAGE = 10
-  const normalizedRole = normalizeRole(currentUser?.role || getStoredRole())
-  const canManageMachines = !normalizedRole || normalizedRole !== 'technicien'
+  const toastTimer = useRef(null)
+  const canManage = normalize(currentUser?.role || getStoredRole()) !== 'technicien'
+
+  const showToast = (next, delay = 3500) => {
+    setToast(next)
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(null), delay)
+  }
 
   const fetchMachines = async () => {
     setLoading(true)
     try {
       const res = await apiFetch('/machines', { auth: true })
       if (res.ok) setMachines(await res.json())
-    } catch (e) { console.error(e) }
-    finally { setLoading(false) }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { fetchMachines() }, [])
 
   useEffect(() => {
-    const state = location.state
-    if (state?.toast) {
-      setToast(state.toast)
-      if (toastRef.current) clearTimeout(toastRef.current)
-      toastRef.current = setTimeout(() => setToast(null), 3500)
+    if (location.state?.toast) {
+      showToast(location.state.toast)
       navigate(location.pathname, { replace: true, state: {} })
     }
   }, [location.state, location.pathname, navigate])
 
-  const filtered = useMemo(() => {
-    return machines.filter((m) => {
-      const q = search.toLowerCase()
-      return !q || [m.code, m.designation, m.brand, m.model, m.supplier, m.serialNumber, m.purchaseOrderNumber, m.receptionDate]
-        .some((v) => v && String(v).toLowerCase().includes(q))
+  useEffect(() => () => toastTimer.current && clearTimeout(toastTimer.current), [])
+
+  const counts = useMemo(() => {
+    const result = { service: 0, maintenance: 0, panne: 0, due: 0 }
+    const soon = Date.now() + 14 * 86400000
+    machines.forEach((m) => {
+      const group = statusGroup(m.status)
+      if (group) result[group] += 1
+      const next = m.nextMaintenanceDate ? new Date(m.nextMaintenanceDate).getTime() : NaN
+      if (!Number.isNaN(next) && next <= soon) result.due += 1
     })
-  }, [machines, search])
+    return result
+  }, [machines])
 
-  useEffect(() => { setCurrentPage(1) }, [search])
+  const categories = useMemo(() => {
+    const map = new Map()
+    machines.forEach((m) => m.category && map.set(m.category, (map.get(m.category) || 0) + 1))
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0], 'fr'))
+  }, [machines])
 
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
-  const paginated = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+  const filtered = useMemo(() => {
+    const q = normalize(search)
+    const soon = Date.now() + 14 * 86400000
+    return machines.filter((m) => {
+      if (category !== 'all' && m.category !== category) return false
+      if (statusFilter === 'due') {
+        const next = m.nextMaintenanceDate ? new Date(m.nextMaintenanceDate).getTime() : NaN
+        if (Number.isNaN(next) || next > soon) return false
+      } else if (statusFilter && statusGroup(m.status) !== statusFilter) return false
+      if (!q) return true
+      return [m.code, m.designation, m.brand, m.model, m.supplier, m.serialNumber, m.client, m.site, m.purchaseOrderNumber]
+        .some((v) => v && normalize(v).includes(q))
+    })
+  }, [machines, search, statusFilter, category])
 
-  const handleDelete = (machine) => {
-    setDeleteTarget(machine)
+  useEffect(() => { setCurrentPage(1) }, [search, statusFilter, category])
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const hasFilters = Boolean(search || statusFilter || category !== 'all')
+
+  const resetFilters = () => {
+    setSearch('')
+    setStatusFilter(null)
+    setCategory('all')
   }
 
   const handleDeleteConfirm = async () => {
@@ -246,287 +230,202 @@ export default function MachineList({ currentUser }) {
       const res = await apiFetch(`/machines/${deleteTarget.id}`, { method: 'DELETE', auth: true })
       if (res.ok) {
         setDeleteTarget(null)
-        setToast({ type: 'success', message: 'Machine supprimée avec succès.' })
-        if (toastRef.current) clearTimeout(toastRef.current)
-        toastRef.current = setTimeout(() => setToast(null), 3000)
+        showToast({ type: 'success', message: 'Machine supprimée avec succès.' }, 3000)
         fetchMachines()
       } else {
-        setToast({ type: 'error', message: 'Erreur lors de la suppression.' })
-        if (toastRef.current) clearTimeout(toastRef.current)
-        toastRef.current = setTimeout(() => setToast(null), 3500)
+        showToast({ type: 'error', message: 'Erreur lors de la suppression.' })
       }
     } catch (e) {
       console.error(e)
-      setToast({ type: 'error', message: 'Impossible de supprimer la machine.' })
-      if (toastRef.current) clearTimeout(toastRef.current)
-      toastRef.current = setTimeout(() => setToast(null), 3500)
+      showToast({ type: 'error', message: 'Impossible de supprimer la machine.' })
     } finally {
       setDeleting(false)
     }
   }
 
-  const listSummary = useMemo(() => {
-    const withSupplier = machines.filter((m) => Boolean(m.supplier)).length
-    const withDocumentation = machines.filter((m) => {
-      try {
-        const docs = m.documentsJson ? JSON.parse(m.documentsJson) : []
-        return Array.isArray(docs) && docs.length > 0
-      } catch {
-        return false
-      }
-    }).length
-    const recentReception = machines.filter((m) => {
-      if (!m.receptionDate) return false
-      const d = new Date(m.receptionDate)
-      if (Number.isNaN(d.getTime())) return false
-      const now = new Date()
-      const diff = now.getTime() - d.getTime()
-      return diff >= 0 && diff <= 1000 * 60 * 60 * 24 * 30
-    }).length
-
-    return { withSupplier, withDocumentation, recentReception }
-  }, [machines])
-
   return (
-    <div className="min-h-screen bg-[#F8FAFC] overflow-x-hidden">
-      {/* Toast */}
-      {toast && (
-        <div className="fixed top-4 left-4 right-4 sm:left-auto sm:right-5 z-[120] animate-in fade-in duration-200">
-          <div className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl border text-sm font-semibold ${
-            toast.type === 'success' ? 'bg-white border-emerald-200 text-emerald-700' : 'bg-white border-red-200 text-red-700'
-          }`}>
-            {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
-            <div className="min-w-0 flex-1">
-              <span className="block truncate">{toast.message}</span>
-            </div>
-            <button onClick={() => setToast(null)} className="shrink-0 ml-2 text-slate-400 hover:text-slate-600"><X size={14} /></button>
-          </div>
-        </div>
-      )}
+    <div className="min-h-screen overflow-x-hidden bg-canvas">
+      <Toast toast={toast} onClose={() => setToast(null)} />
 
-      {/* Header */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200">
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 sm:py-0 sm:h-20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4 min-w-0">
-            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-100">
-              <Settings size={24} className="text-white" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-xl font-black text-slate-900 tracking-tight truncate">Parc Machines</h1>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded uppercase tracking-wider">{machines.length} machines</span>
-                <div className="w-1 h-1 bg-slate-300 rounded-full" />
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Gestion équipements</span>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center justify-end gap-3 w-full sm:w-auto">
-            <button onClick={fetchMachines} disabled={loading} className="hidden sm:flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all">
-              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Actualiser
-            </button>
-            {canManageMachines && (
-              <button onClick={() => navigate('/machines/create')} className="flex items-center justify-center gap-2 w-full sm:w-auto px-5 sm:px-6 py-3 bg-[#0052CC] text-white rounded-xl text-xs font-black shadow-lg shadow-blue-200 hover:bg-[#0042a3] transition-all active:scale-95">
-                <Plus size={18} strokeWidth={3} /> Nouvelle machine
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+        <PageHeader
+          eyebrow="Équipements"
+          title="Parc machines"
+          description={`${machines.length} équipement(s) suivis chez les clients SOMACS.`}
+          icon={Settings}
+          actions={
+            <>
+              <button type="button" onClick={fetchMachines} disabled={loading} className="ui-btn-secondary hidden sm:inline-flex">
+                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} aria-hidden="true" /> Actualiser
               </button>
-            )}
-          </div>
-        </div>
-      </header>
+              {canManage && (
+                <button type="button" onClick={() => navigate('/machines/create')} className="ui-btn-primary">
+                  <Plus size={18} strokeWidth={2.25} aria-hidden="true" /> Nouvelle machine
+                </button>
+              )}
+            </>
+          }
+        />
 
-      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 flex items-center gap-4">
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-slate-100">
-              <Building2 size={20} className="text-slate-700" />
-            </div>
-            <div>
-              <p className="text-xl font-black text-slate-900">{listSummary.withSupplier}</p>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Avec fournisseur renseigne</p>
-            </div>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-4">
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-blue-50">
-              <FileText size={20} className="text-blue-700" />
-            </div>
-            <div>
-              <p className="text-xl font-black text-slate-900">{listSummary.withDocumentation}</p>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Avec documentation PDF</p>
-            </div>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-4">
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-emerald-50">
-              <CalendarDays size={20} className="text-emerald-700" />
-            </div>
-            <div>
-              <p className="text-xl font-black text-slate-900">{listSummary.recentReception}</p>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Receptions sur 30 jours</p>
-            </div>
-          </div>
-        </div>
+        <StatStrip
+          total={machines.length}
+          activeKey={statusFilter}
+          onSelect={setStatusFilter}
+          items={[
+            { key: 'service', label: 'En service', value: counts.service, icon: CheckCircle2, tone: 'teal' },
+            { key: 'maintenance', label: 'En maintenance', value: counts.maintenance, icon: Wrench, tone: 'amber' },
+            { key: 'panne', label: 'En panne / Hors service', value: counts.panne, icon: AlertOctagon, tone: 'red', hint: counts.panne ? 'Intervention à planifier' : undefined, hintTone: 'alert' },
+            { key: 'due', label: 'Maintenance sous 14 j', value: counts.due, icon: CalendarClock, tone: 'brand', showShare: false },
+          ]}
+        />
 
-        {/* Filters */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative w-full sm:flex-1 min-w-0">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input
-                type="text"
-                placeholder="Rechercher par code, designation, marque, fournisseur..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all"
-              />
-            </div>
-            {search && (
-              <button onClick={() => setSearch('')} className="p-2.5 text-red-500 hover:bg-red-50 rounded-xl transition-all" title="Reinitialiser la recherche">
-                <RefreshCw size={16} />
-              </button>
-            )}
-            <div className="w-full sm:w-auto sm:ml-auto flex items-center justify-end gap-2">
-              <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-xl transition-all ${viewMode === 'list' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:bg-slate-100'}`}>
-                <LayoutList size={18} />
-              </button>
-              <button onClick={() => setViewMode('grid')} className={`hidden sm:block p-2.5 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:bg-slate-100'}`}>
-                <LayoutGrid size={18} />
-              </button>
-            </div>
-          </div>
-        </div>
+        <Toolbar
+          summary={`${filtered.length} machine(s) affichée(s) sur ${machines.length}`}
+          onReset={hasFilters ? resetFilters : undefined}
+        >
+          <SearchField
+            value={search}
+            onChange={setSearch}
+            label="machines"
+            placeholder="Code, désignation, marque, n° de série, client…"
+            className="lg:max-w-md lg:flex-1"
+          />
+          {categories.length > 0 && (
+            <SegmentedFilter
+              label="Catégorie"
+              value={category}
+              onChange={setCategory}
+              className="lg:ml-auto"
+              options={[{ value: 'all', label: 'Toutes', count: machines.length }, ...categories.map(([name, count]) => ({ value: name, label: name, count }))]}
+            />
+          )}
+        </Toolbar>
 
-        {/* Content */}
         {loading ? (
-          <div className="flex items-center justify-center py-24">
-            <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <div className="ui-card overflow-hidden">
+            <table className="ui-table w-full">
+              <tbody><SkeletonTableRows rows={5} columns={5} /></tbody>
+            </table>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center">
-            <Cpu size={48} className="text-slate-200 mx-auto mb-4" />
-            <p className="text-slate-500 font-semibold">Aucune machine trouvée</p>
-            <p className="text-slate-400 text-sm mt-1">Modifiez vos filtres ou ajoutez une nouvelle machine.</p>
-          </div>
-        ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
-            {paginated.map((machine) => (
-              <MachineCard key={machine.id} machine={machine}
-                onView={(item) => navigate(`/machines/${item.id}`)}
-                onEdit={(item) => navigate(`/machines/${item.id}/edit`)}
-                onDelete={handleDelete}
-                canManage={canManageMachines}
-              />
-            ))}
-          </div>
+          <EmptyState
+            icon={Cpu}
+            title={hasFilters ? 'Aucune machine ne correspond' : 'Aucune machine enregistrée'}
+            description={hasFilters ? 'Modifiez la recherche ou réinitialisez les filtres.' : 'Ajoutez le premier équipement du parc.'}
+            action={hasFilters ? (
+              <button type="button" onClick={resetFilters} className="ui-btn-secondary">Réinitialiser les filtres</button>
+            ) : canManage ? (
+              <button type="button" onClick={() => navigate('/machines/create')} className="ui-btn-primary"><Plus size={16} /> Nouvelle machine</button>
+            ) : null}
+          />
         ) : (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            {/* Mobile / tablet cards */}
-            <div className="lg:hidden p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <>
+            <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:hidden">
               {paginated.map((machine) => (
-                <MachineCard key={machine.id} machine={machine}
-                  onView={(item) => navigate(`/machines/${item.id}`)}
-                  onEdit={(item) => navigate(`/machines/${item.id}/edit`)}
-                  onDelete={handleDelete}
-                  canManage={canManageMachines}
-                />
+                <MachineMobileCard key={machine.id} machine={machine} canManage={canManage} onDelete={setDeleteTarget} />
               ))}
-            </div>
+            </ul>
 
-            {/* Desktop table */}
-            <div className="hidden lg:block overflow-x-auto">
-              <table className="w-full min-w-[980px] text-left">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100">
-                    <th className="px-6 py-4 text-[11px] font-black text-slate-500 uppercase tracking-widest">Machine</th>
-                    <th className="px-6 py-4 text-[11px] font-black text-slate-500 uppercase tracking-widest">Marque / Modèle</th>
-                    <th className="px-6 py-4 text-[11px] font-black text-slate-500 uppercase tracking-widest">Fournisseur / Reception</th>
-                    <th className="px-6 py-4 text-[11px] font-black text-slate-500 uppercase tracking-widest">Catégorie</th>
-                    <th className="px-6 py-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {paginated.map((m, idx) => (
-                    <tr
-                      key={m.id}
-                      onClick={() => navigate(`/machines/${m.id}`)}
-                      className={`cursor-pointer hover:bg-blue-50/50 transition-colors group ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`}
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-10 h-10 rounded-xl bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center">
-                            {m.imageUrl
-                              ? <img src={m.imageUrl} alt={m.designation} className="w-full h-full object-cover" />
-                              : <Cpu size={18} className="text-slate-400" />
-                            }
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-black text-slate-900 group-hover:text-blue-600 transition-colors truncate">{m.designation}</p>
-                            <p className="text-[11px] font-mono text-slate-400 truncate">{m.code}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-semibold text-slate-700">{m.brand || '—'}</p>
-                        {m.model && <p className="text-[11px] text-slate-400">{m.model}</p>}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-1.5 text-sm text-slate-700 min-w-0">
-                          <Truck size={13} className="text-slate-300" />
-                          <span className="truncate">{m.supplier || '—'}</span>
-                        </div>
-                        {m.receptionDate && (
-                          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5 min-w-0">
-                            <CalendarDays size={11} className="text-slate-300" />
-                            <span className="truncate">{m.receptionDate}</span>
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        {m.category
-                          ? <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">{m.category}</span>
-                          : <span className="text-slate-300">—</span>
-                        }
-                      </td>
-                      <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => navigate(`/machines/${m.id}`)} className="p-2 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors" title="Voir">
-                            <Eye size={15} />
-                          </button>
-                          {canManageMachines && (
-                            <>
-                              <button onClick={() => navigate(`/machines/${m.id}/edit`)} className="p-2 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors" title="Modifier">
-                                <Edit2 size={15} />
-                              </button>
-                              <button onClick={() => handleDelete(m)} className="p-2 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors" title="Supprimer">
-                                <Trash2 size={15} />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
+            <div className="ui-card hidden overflow-hidden lg:block">
+              <div className="overflow-x-auto">
+                <table className="ui-table w-full min-w-[960px] text-left">
+                  <thead>
+                    <tr>
+                      <th scope="col">Équipement</th>
+                      <th scope="col">Marque / modèle</th>
+                      <th scope="col">Client / site</th>
+                      <th scope="col">Statut</th>
+                      <th scope="col">Prochaine maintenance</th>
+                      <th scope="col" className="text-right"><span className="sr-only">Actions</span></th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {paginated.map((machine) => {
+                      const next = maintenanceState(machine.nextMaintenanceDate)
+                      return (
+                        <tr key={machine.id}>
+                          <td>
+                            <div className="flex items-center gap-3">
+                              <MachineThumb machine={machine} />
+                              <div className="min-w-0">
+                                <Link to={`/machines/${machine.id}`} className="block truncate font-semibold text-ink hover:text-brand-700">
+                                  {machine.designation}
+                                </Link>
+                                <p className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
+                                  <span className="font-mono">{machine.code}</span>
+                                  {machine.category && <><span aria-hidden="true">·</span><span>{machine.category}</span></>}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <p className="font-medium text-ink">{machine.brand || '—'}</p>
+                            <p className="mt-0.5 text-xs text-ink-faint">
+                              {machine.model || '—'}
+                              {machine.serialNumber && <span className="font-mono"> · {machine.serialNumber}</span>}
+                            </p>
+                          </td>
+                          <td>
+                            <p className="flex items-center gap-1.5 font-medium text-ink">
+                              <Building2 size={13} className="shrink-0 text-ink-faint" aria-hidden="true" />
+                              <span className="truncate">{machine.client || '—'}</span>
+                            </p>
+                            <p className="mt-0.5 text-xs text-ink-faint">{machine.site || machine.location || '—'}</p>
+                          </td>
+                          <td><MachineStatus status={machine.status} /></td>
+                          <td>
+                            <p className={`text-sm font-semibold ${next?.tone || 'text-ink-faint'}`}>{next?.label || 'Non planifiée'}</p>
+                            {machine.lastMaintenanceDate && (
+                              <p className="mt-0.5 text-xs text-ink-faint">Dernière : {formatDate(machine.lastMaintenanceDate)}</p>
+                            )}
+                          </td>
+                          <td><RowActions machine={machine} canManage={canManage} onDelete={setDeleteTarget} /></td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            {/* Pagination */}
-            <CompactPagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              pageSize={ITEMS_PER_PAGE}
-              totalItems={filtered.length}
-              onPageChange={setCurrentPage}
-            />
-          </div>
-        )}
-      </main>
 
-      {/* Modale de confirmation de suppression */}
-      {deleteTarget && (
-        <DeleteMachineModal
-          machine={deleteTarget}
-          deleting={deleting}
-          onCancel={() => !deleting && setDeleteTarget(null)}
-          onConfirm={handleDeleteConfirm}
-        />
-      )}
+            {totalPages > 1 && (
+              <div className="ui-card overflow-hidden">
+                <CompactPagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  pageSize={PAGE_SIZE}
+                  totalItems={filtered.length}
+                  onPageChange={setCurrentPage}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      <Modal
+        open={Boolean(deleteTarget)}
+        onClose={() => !deleting && setDeleteTarget(null)}
+        title="Supprimer cette machine ?"
+        icon={AlertTriangle}
+        size="sm"
+        footer={
+          <>
+            <button type="button" onClick={() => setDeleteTarget(null)} disabled={deleting} className="ui-btn-secondary">Annuler</button>
+            <button type="button" onClick={handleDeleteConfirm} disabled={deleting} className="ui-btn-danger">
+              {deleting ? 'Suppression…' : 'Supprimer'}
+            </button>
+          </>
+        }
+      >
+        {deleteTarget && (
+          <p className="text-sm leading-relaxed text-ink-muted">
+            <span className="font-semibold text-ink">{deleteTarget.designation}</span>
+            {deleteTarget.code && <span className="font-mono"> ({deleteTarget.code})</span>} sera définitivement retirée du parc.
+            L&apos;historique d&apos;interventions associé ne sera plus accessible depuis cette fiche.
+          </p>
+        )}
+      </Modal>
     </div>
   )
 }

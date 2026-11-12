@@ -266,7 +266,7 @@ export default function VehicleForm({
   else if (saving) submitButtonLabel = "Enregistrement..."
 
   return (
-    <div className="min-h-screen bg-[#F6F9FC]">
+    <div className="min-h-screen bg-canvas">
       <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
         {error && (
           <div className="mb-6 flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 font-semibold">

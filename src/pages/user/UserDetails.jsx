@@ -33,11 +33,6 @@ const BUSINESS_ACTIONS = [
   'UPDATE_INTERVENTION',
   'ASSIGN_USER_INTERVENTION',
   'USE_AI_ASSISTANT',
-  // Commercial / Devis-Suivi
-  'CHANGE_STATUS_DEVIS_SUIVI',
-  'MARK_DEVIS_PURCHASED',
-  'MARK_DEVIS_LOST',
-  'RELANCE_DEVIS',
 ]
 
 const TECHNICIEN_ACTIONS = [
@@ -45,13 +40,6 @@ const TECHNICIEN_ACTIONS = [
   'UPDATE_INTERVENTION',
   'ASSIGN_USER_INTERVENTION',
   'USE_AI_ASSISTANT',
-]
-
-const COMMERCIAL_ACTIONS = [
-  'CHANGE_STATUS_DEVIS_SUIVI',
-  'MARK_DEVIS_PURCHASED',
-  'MARK_DEVIS_LOST',
-  'RELANCE_DEVIS',
 ]
 
 const actionBadgeColors = {
@@ -65,10 +53,6 @@ const actionBadgeColors = {
   UPDATE_INTERVENTION: 'bg-indigo-100 text-indigo-700',
   ASSIGN_USER_INTERVENTION: 'bg-amber-100 text-amber-700',
   USE_AI_ASSISTANT: 'bg-teal-100 text-teal-700',
-  CHANGE_STATUS_DEVIS_SUIVI: 'bg-amber-100 text-amber-700',
-  MARK_DEVIS_PURCHASED: 'bg-emerald-100 text-emerald-700',
-  MARK_DEVIS_LOST: 'bg-rose-100 text-rose-700',
-  RELANCE_DEVIS: 'bg-purple-100 text-purple-700',
 }
 
 const actionLabels = {
@@ -82,10 +66,6 @@ const actionLabels = {
   UPDATE_INTERVENTION: 'Modification intervention',
   ASSIGN_USER_INTERVENTION: 'Affectation utilisateur',
   USE_AI_ASSISTANT: 'Assistant IA',
-  CHANGE_STATUS_DEVIS_SUIVI: 'Changement statut devis',
-  MARK_DEVIS_PURCHASED: 'Devis acheté',
-  MARK_DEVIS_LOST: 'Devis perdu',
-  RELANCE_DEVIS: 'Relance commerciale',
 }
 
 const moduleMeta = {
@@ -104,10 +84,6 @@ const moduleMeta = {
   Interventions: {
     icon: AlertCircle,
     pill: 'bg-violet-50 text-violet-700 border-violet-200',
-  },
-  'Suivi Devis': {
-    icon: BarChart3,
-    pill: 'bg-blue-50 text-blue-700 border-blue-200',
   },
 }
 
@@ -172,7 +148,6 @@ function moduleFromLog(log) {
   if (log.entity === 'MACHINE') return 'Parc Machine'
   if (log.entity === 'MISSION') return 'Missions'
   if (log.entity === 'INTERVENTION') return 'Interventions'
-  if (log.entity === 'DEVIS_SUIVI') return 'Suivi Devis'
   return log.entity || '-'
 }
 
@@ -320,27 +295,16 @@ export default function UserDetails() {
       interventionCreate: Number(map.CREATE_INTERVENTION || 0),
       interventionUpdate: Number(map.UPDATE_INTERVENTION || 0),
       interventionAssign: Number(map.ASSIGN_USER_INTERVENTION || 0),
-      // Commercial / Devis-Suivi
-      devisSuiviCreate: Number(map.CREATE_DEVIS_SUIVI || 0),
-      devisSuiviUpdate: Number(map.UPDATE_DEVIS_SUIVI || 0),
-      devisStatusChange: Number(map.CHANGE_STATUS_DEVIS_SUIVI || 0),
-      devisPurchased: Number(map.MARK_DEVIS_PURCHASED || 0),
-      devisLost: Number(map.MARK_DEVIS_LOST || 0),
-      devisRelance: Number(map.RELANCE_DEVIS || 0),
     }
   }, [auditStats])
 
   const userRole = userDetails?.role || ''
   const isTechnicien = userRole === 'Technicien'
-  const isCommercial = userRole === 'Commerciale'
-  const isAdminLike = !isTechnicien && !isCommercial
+  const isAdminLike = !isTechnicien
 
   const totalActions = useMemo(() => {
     if (isTechnicien) {
       return counts.ai + counts.missionUpdate + counts.interventionUpdate + counts.interventionAssign
-    }
-    if (isCommercial) {
-      return counts.devisPurchased + counts.devisLost + counts.devisStatusChange + counts.devisRelance
     }
     return (
       counts.ai +
@@ -354,16 +318,12 @@ export default function UserDetails() {
       counts.interventionUpdate +
       counts.interventionAssign
     )
-  }, [counts, isTechnicien, isCommercial])
+  }, [counts, isTechnicien])
 
   const logsForTable = useMemo(() => {
-    const allowedActions = isTechnicien
-      ? TECHNICIEN_ACTIONS
-      : isCommercial
-        ? COMMERCIAL_ACTIONS
-        : BUSINESS_ACTIONS
+    const allowedActions = isTechnicien ? TECHNICIEN_ACTIONS : BUSINESS_ACTIONS
     return (auditLogs.items || []).filter((item) => allowedActions.includes(item.action))
-  }, [auditLogs.items, isTechnicien, isCommercial])
+  }, [auditLogs.items, isTechnicien])
 
   const totalTablePages = useMemo(
     () => Math.max(1, Math.ceil(logsForTable.length / tableRowsPerPage)),
@@ -762,7 +722,7 @@ export default function UserDetails() {
           <button
             type="button"
             onClick={handleExportPdf}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#0052CC] px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-[#0052CC]/25 transition hover:bg-[#0042a3]"
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-brand-600/25 transition hover:bg-brand-700"
           >
             <Download size={15} />
             Exporter PDF
@@ -784,7 +744,7 @@ export default function UserDetails() {
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
               <div className="md:col-span-2 flex items-center gap-4">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0052CC] to-blue-700 text-xl font-black text-white shadow-md">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-600 to-blue-700 text-xl font-black text-white shadow-md">
                   {String(userDetails.name || 'U').slice(0, 1).toUpperCase()}
                 </div>
                 <div>
@@ -795,14 +755,14 @@ export default function UserDetails() {
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Role</p>
                 <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-slate-800">
-                  <Shield size={14} className="text-[#0052CC]" />
+                  <Shield size={14} className="text-brand-600" />
                   {userDetails.role || '-'}
                 </p>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Derniere connexion</p>
                 <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-slate-800">
-                  <Clock size={14} className="text-[#0052CC]" />
+                  <Clock size={14} className="text-brand-600" />
                   {formatDateTime(userDetails.lastLogin)}
                 </p>
               </div>
@@ -813,7 +773,7 @@ export default function UserDetails() {
             <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div className="w-full flex-1">
                 <h3 className="mb-4 inline-flex items-center gap-2 text-sm font-black uppercase tracking-widest text-slate-700">
-                  <Calendar size={16} className="text-[#0052CC]" />
+                  <Calendar size={16} className="text-brand-600" />
                   Selectionner la periode
                 </h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -824,7 +784,7 @@ export default function UserDetails() {
                       type="date"
                       value={dateStart}
                       onChange={handleDateStartChange}
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-400 focus:border-[#0052CC] focus:outline-none focus:ring-2 focus:ring-[#0052CC]/25"
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/25"
                     />
                   </div>
                   <div className="flex flex-col">
@@ -834,14 +794,14 @@ export default function UserDetails() {
                       type="date"
                       value={dateEnd}
                       onChange={handleDateEndChange}
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-400 focus:border-[#0052CC] focus:outline-none focus:ring-2 focus:ring-[#0052CC]/25"
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/25"
                     />
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={handleSearch}
-                  className="mt-4 mr-2 inline-flex items-center gap-2 rounded-lg bg-[#0052CC] px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-sm transition hover:bg-[#0042a3]"
+                  className="mt-4 mr-2 inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-sm transition hover:bg-brand-700"
                 >
                   Rechercher
                 </button>
@@ -858,8 +818,8 @@ export default function UserDetails() {
                 )}
               </div>
 
-              <div className="rounded-xl border border-[#0052CC]/25 bg-[#0052CC]/8 p-4">
-                <p className="text-xs font-black uppercase tracking-widest text-[#0052CC]">Periode analysee</p>
+              <div className="rounded-xl border border-brand-600/25 bg-brand-600/8 p-4">
+                <p className="text-xs font-black uppercase tracking-widest text-brand-600">Periode analysee</p>
                 <p className="mt-1 text-sm font-bold text-slate-900">
                   du {formatDateForDisplay(committedDateStart)} au {formatDateForDisplay(committedDateEnd)}
                 </p>
@@ -870,10 +830,10 @@ export default function UserDetails() {
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h2 className="inline-flex items-center gap-2 text-lg font-black uppercase tracking-widest text-slate-800">
-                <BarChart3 size={18} className="text-[#0052CC]" />
+                <BarChart3 size={18} className="text-brand-600" />
                 Statistiques metier
               </h2>
-              <div className="inline-flex items-center gap-2 rounded-lg border border-[#0052CC]/20 bg-[#0052CC]/5 px-3 py-1.5 text-xs font-semibold text-[#0052CC]">
+              <div className="inline-flex items-center gap-2 rounded-lg border border-brand-600/20 bg-brand-600/5 px-3 py-1.5 text-xs font-semibold text-brand-600">
                 <Sparkles size={14} />
                 {totalActions} action(s) sur la periode
               </div>
@@ -996,58 +956,6 @@ export default function UserDetails() {
                 </div>
               </div>
               </>)}
-
-              {/* ─── COMMERCIAL ─── */}
-              {isCommercial && (<>
-              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 transition hover:shadow-sm">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-sm font-black uppercase tracking-widest text-slate-600">Devis</p>
-                  <span className="rounded-md bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700">
-                    {counts.devisPurchased + counts.devisLost}
-                  </span>
-                </div>
-                <div className="space-y-1 text-sm leading-relaxed text-slate-700">
-                  {(counts.devisPurchased + counts.devisLost) === 0 ? (
-                    <p>- Aucune activité commerciale n'a été enregistrée durant cette période.</p>
-                  ) : (<>
-                    <p>- Nombre de devis achetés : {counts.devisPurchased}</p>
-                    <p>- Nombre de devis refusés : {counts.devisLost}</p>
-                  </>)}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 transition hover:shadow-sm">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-sm font-black uppercase tracking-widest text-slate-600">Changements de statut</p>
-                  <span className="rounded-md bg-amber-100 px-2 py-1 text-xs font-bold text-amber-700">
-                    {counts.devisStatusChange}
-                  </span>
-                </div>
-                <div className="space-y-1 text-sm leading-relaxed text-slate-700">
-                  {counts.devisStatusChange === 0 ? (
-                    <p>- Aucun changement de statut devis n'a été enregistré durant cette période.</p>
-                  ) : (
-                    <p>- {counts.devisStatusChange} changement(s) de statut de devis effectué(s) durant cette période.</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 transition hover:shadow-sm lg:col-span-2">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-sm font-black uppercase tracking-widest text-slate-600">Relances commerciales</p>
-                  <span className="rounded-md bg-purple-100 px-2 py-1 text-xs font-bold text-purple-700">
-                    {counts.devisRelance}
-                  </span>
-                </div>
-                <div className="space-y-1 text-sm leading-relaxed text-slate-700">
-                  {counts.devisRelance === 0 ? (
-                    <p>- Aucune relance commerciale n'a été planifiée durant cette période.</p>
-                  ) : (
-                    <p>- {counts.devisRelance} relance(s) commerciale(s) planifiée(s) durant cette période.</p>
-                  )}
-                </div>
-              </div>
-              </>)}
             </div>
 
             {noActivity && (
@@ -1059,7 +967,7 @@ export default function UserDetails() {
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="mb-4 inline-flex items-center gap-2 text-lg font-black uppercase tracking-widest text-slate-800">
-              <Activity size={18} className="text-[#0052CC]" />
+              <Activity size={18} className="text-brand-600" />
               Historique des actions
             </h2>
 

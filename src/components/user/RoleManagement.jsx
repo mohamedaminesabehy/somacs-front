@@ -5,9 +5,8 @@ import { apiFetch } from '../../api/apiClient'
 const colorByRole = {
   Administrateur: 'bg-purple-600',
   Technicien: 'bg-gray-600',
-  Commerciale: 'bg-[#0052CC]',
   Coordinateur: 'bg-blue-500',
-  'Responsable technicien': 'bg-[#0052CC]',
+  'Responsable technicien': 'bg-brand-600',
 }
 
 function getRolesPagination(totalRoles, currentPage, itemsPerPage) {

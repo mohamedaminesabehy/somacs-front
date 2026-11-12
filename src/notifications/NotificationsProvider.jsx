@@ -58,12 +58,10 @@ export function NotificationsProvider({ children }) {
     const handler = (event) => {
       const { type, url, missionId } = event.data || {}
       if (type !== 'NOTIFICATION_CLICK') return
-      console.log('[Notifications] SW click received — url:', url, 'missionId:', missionId)
 
       // Always navigate to the notification-aware mission page.
       // MissionDetails handles auth internally (shows login modal if needed).
       const target = missionId ? `/missions/${missionId}/notification` : (url || '/')
-      console.log('[Notifications] Navigating to:', target)
       if (navigateRef.current) {
         navigateRef.current(target)
       } else {
