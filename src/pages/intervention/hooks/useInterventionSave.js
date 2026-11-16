@@ -1,6 +1,13 @@
 import { useState } from 'react'
 import { apiFetch } from '../../../api/apiClient'
 
+const HTTP_MESSAGES = {
+  401: 'Votre session a expiré. Reconnectez-vous.',
+  403: 'Vous n’avez pas les droits pour modifier ce dossier.',
+  404: 'Ce dossier d’intervention est introuvable.',
+  409: 'Le dossier a été modifié entre-temps. Rechargez la page.',
+}
+
 /**
  * Encapsulates the intervention save logic including finalize and navigation.
  */
@@ -17,6 +24,7 @@ export function useInterventionSave({
   setStatus,
   setIsEditing,
   navigate,
+  onError,
 }) {
   const [isSaving, setIsSaving] = useState(false)
 
@@ -35,9 +43,13 @@ export function useInterventionSave({
         method: 'PATCH',
         body: payload,
       })
+      const title = isFinalSave ? 'Clôture refusée' : 'Enregistrement impossible'
       if (!response.ok) {
-        alert("Erreur lors de l\u2019enregistrement.")
-        return
+        const body = await response.json().catch(() => null)
+        const detail = Array.isArray(body?.message) ? body.message.join(' ') : body?.message
+        const fallback = HTTP_MESSAGES[response.status] || `Le serveur a répondu avec une erreur (${response.status}).`
+        onError?.(detail || fallback, title)
+        return false
       }
       const saved = await response.json().catch(() => null)
       if (saved) setDbEntry(saved)
@@ -45,8 +57,10 @@ export function useInterventionSave({
       handlePostSaveNavigation({
         isFinalSave, options, id, missionId, saved, navigate, setStatus, setIsEditing,
       })
+      return true
     } catch {
-      alert('Impossible de joindre le serveur.')
+      onError?.('Impossible de joindre le serveur. Vérifiez la connexion puis réessayez.', 'Serveur injoignable')
+      return false
     } finally {
       setIsSaving(false)
     }

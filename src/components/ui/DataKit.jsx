@@ -1,4 +1,5 @@
-import { Search, X } from 'lucide-react'
+import { useEffect } from 'react'
+import { AlertCircle, AlertTriangle, CheckCircle2, Info, Search, X } from 'lucide-react'
 
 const STAT_TONES = {
   brand: { icon: 'bg-brand-50 text-brand-700 ring-brand-100', bar: 'bg-brand-600' },
@@ -190,18 +191,70 @@ export function DetailList({ items, columns = 2 }) {
   )
 }
 
-export function Toast({ toast, onClose }) {
-  if (!toast) return null
-  const isSuccess = toast.type === 'success'
+const TOAST_TONES = {
+  success: { Icon: CheckCircle2, ring: 'border-teal-200', icon: 'bg-teal-50 text-teal-600', bar: 'bg-teal-500', title: 'Succès', duration: 3500, role: 'status' },
+  error: { Icon: AlertCircle, ring: 'border-red-200', icon: 'bg-red-50 text-red-600', bar: 'bg-red-500', title: 'Erreur', duration: 7000, role: 'alert' },
+  warning: { Icon: AlertTriangle, ring: 'border-amber-200', icon: 'bg-amber-50 text-amber-600', bar: 'bg-amber-500', title: 'Attention', duration: 5500, role: 'alert' },
+  info: { Icon: Info, ring: 'border-brand-200', icon: 'bg-brand-50 text-brand-600', bar: 'bg-brand-500', title: 'Information', duration: 4000, role: 'status' },
+}
+
+function ToastItem({ toast, onClose }) {
+  const tone = TOAST_TONES[toast.type] || TOAST_TONES.info
+  const duration = toast.duration ?? tone.duration
+  const { Icon } = tone
+
+  useEffect(() => {
+    if (!duration) return undefined
+    const timer = window.setTimeout(() => onClose?.(toast), duration)
+    return () => window.clearTimeout(timer)
+    // Le minuteur ne doit repartir que pour un nouveau message.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toast.message, toast.type, duration])
+
   return (
-    <div className="fixed inset-x-4 top-4 z-[120] animate-fade-up sm:left-auto sm:right-5 sm:w-96" role="status" aria-live="polite">
-      <div className={`flex items-start gap-3 rounded-2xl border bg-white px-4 py-3 shadow-raised ${isSuccess ? 'border-teal-200' : 'border-red-200'}`}>
-        <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${isSuccess ? 'bg-teal-500' : 'bg-red-500'}`} aria-hidden="true" />
-        <p className={`flex-1 text-sm font-medium leading-relaxed ${isSuccess ? 'text-teal-900' : 'text-red-800'}`}>{toast.message}</p>
-        <button type="button" onClick={onClose} className="shrink-0 rounded-md p-0.5 text-ink-faint hover:text-ink" aria-label="Fermer la notification">
-          <X size={14} />
+    <div
+      role={tone.role}
+      className={`toast-enter pointer-events-auto relative w-full overflow-hidden rounded-2xl border bg-white shadow-raised ${tone.ring}`}
+    >
+      <div className="flex items-start gap-3 px-4 py-3.5">
+        <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${tone.icon}`} aria-hidden="true">
+          <Icon size={17} strokeWidth={2.25} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-bold leading-5 text-ink">{toast.title || tone.title}</p>
+          <p className="break-words text-[13px] leading-relaxed text-ink-soft">{toast.message}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onClose?.(toast)}
+          className="-mr-1 shrink-0 rounded-lg p-1.5 text-ink-faint transition-colors hover:bg-slate-100 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+          aria-label="Fermer la notification"
+        >
+          <X size={14} aria-hidden="true" />
         </button>
       </div>
+      {duration > 0 && (
+        <div className="h-0.5 w-full bg-slate-100" aria-hidden="true">
+          <div className={`toast-progress h-full origin-left ${tone.bar}`} style={{ animationDuration: `${duration}ms` }} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Toast latéral (en haut à droite). Accepte une notification, un tableau
+ * (empilement) ou null. Types : success | error | warning | info.
+ * Un Toast « success » ne doit être émis qu'après confirmation du backend.
+ */
+export function Toast({ toast, onClose }) {
+  const items = (Array.isArray(toast) ? toast : [toast]).filter((t) => t && t.message)
+  if (items.length === 0) return null
+  return (
+    <div className="pointer-events-none fixed inset-x-3 top-16 z-[120] flex flex-col gap-2.5 sm:inset-x-auto sm:right-5 sm:top-[4.5rem] sm:w-[22rem]" aria-live="polite">
+      {items.map((item, index) => (
+        <ToastItem key={item.id ?? `${item.type}-${item.message}-${index}`} toast={item} onClose={onClose} />
+      ))}
     </div>
   )
 }

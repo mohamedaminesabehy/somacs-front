@@ -4,10 +4,10 @@ import { useNavigate } from 'react-router-dom'
 import {
   Wrench,
   ClipboardList,
-  XCircle,
+
   ChevronRight, Link2, Building2,
-  Calendar, User,
-  ChevronLeft, LayoutList, CalendarDays,
+  Calendar, MapPin, Settings,
+  ChevronLeft, CalendarDays,
   Zap,
 } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
@@ -102,77 +102,105 @@ function StatusBadge({ status, spin }) {
   )
 }
 
-// ── Composant : carte liste ───────────────────────────────────────────────────
-function MissionRow({ mission, onStatusChange, onOpen }) {
-  const cfg = STATUS_CONFIG[mission.status] || STATUS_CONFIG['À faire']
+// ── Composant : carte mission mobile ──────────────────────────────────────────
+function formatDueLabel(mission) {
+  const date = parseDueDate(mission?.dueDate)
+  if (!date) return mission?.dueDate || 'Date non définie'
+  const now = new Date()
+  const tomorrow = new Date(now)
+  tomorrow.setDate(now.getDate() + 1)
+  const label = isSameDay(date, now)
+    ? "Aujourd'hui"
+    : isSameDay(date, tomorrow)
+      ? 'Demain'
+      : date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
+  return mission?.dueTime ? `${label} · ${mission.dueTime}` : label
+}
+
+function MissionCard({ mission, intervention, onStatusChange, onOpen }) {
+  const isIntervention = mission.type === 'Intervention'
+  const reference = mission.reference || mission.code || `#${mission.id}`
+  const machine = mission.machine || intervention?.machine
+  const address = mission.address || intervention?.address
 
   return (
-    <div
-      className="bg-white rounded-xl border border-slate-100 hover:border-brand-600/30 hover:shadow-sm transition-all duration-200 overflow-hidden cursor-pointer group"
-      onClick={() => onOpen(mission.id)}
-    >
-      {/* Priority bar */}
-      <div className={`h-0.5 w-full ${PRIORITY_BAR[mission.priorityColor] || 'bg-slate-200'}`} />
-
-      <div className="px-3 py-2.5 flex items-center gap-3">
-        {/* Icon */}
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-          mission.type === 'Intervention' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-500'
-        }`}>
-          {mission.type === 'Intervention' ? <Wrench size={14} /> : <ClipboardList size={14} />}
-        </div>
-
-        {/* Main info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <span
-              className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider ${
-                mission.type === 'Intervention'
-                  ? 'bg-brand-600/10 text-brand-600'
-                  : 'bg-slate-100 text-slate-700'
-              }`}
-            >
-              {mission.type === 'Intervention' ? 'Intervention' : 'Normal'}
-            </span>
-            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${priorityColors[mission.priorityColor] || 'bg-slate-100 text-slate-600'}`}>
-              {mission.priority}
-            </span>
+    <article className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <span aria-hidden="true" className={`absolute inset-y-0 left-0 w-1 ${PRIORITY_BAR[mission.priorityColor] || 'bg-slate-200'}`} />
+      <button
+        type="button"
+        onClick={() => onOpen(mission.id)}
+        className="block w-full py-4 pl-5 pr-4 text-left transition-colors active:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-600"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              {isIntervention ? <Wrench size={12} aria-hidden="true" /> : <ClipboardList size={12} aria-hidden="true" />}
+              <span className="truncate">{mission.type || 'Mission'}</span>
+              <span className="font-mono normal-case tracking-normal text-slate-400">{reference}</span>
+            </p>
+            <h3 className="mt-1 text-pretty text-[15px] font-bold leading-snug text-slate-900">{mission.title}</h3>
           </div>
-          <p className="font-black text-slate-900 text-xs leading-snug truncate">{mission.title}</p>
-          <div className="flex items-center gap-2 mt-0.5">
-            {mission.dueDate && (
-              <span className="flex items-center gap-0.5 text-[10px] text-slate-400"><Calendar size={9} />{mission.dueDate}</span>
-            )}
-            {mission.site && (
-              <span className="flex items-center gap-0.5 text-[10px] text-slate-400 truncate"><Building2 size={9} />{mission.site}</span>
-            )}
-          </div>
-        </div>
-
-        {/* Status + quick switcher */}
-        <div className="shrink-0 flex flex-col items-end gap-1.5" onClick={(e) => e.stopPropagation()}>
           <StatusBadge status={mission.status} spin />
-          <div className="flex gap-0.5">
-            {statusList.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => onStatusChange(mission.id, s)}
-                title={s}
-                className={`w-2 h-2 rounded-full border transition-all ${
-                  mission.status === s
-                    ? `${cfg.dot} border-transparent scale-125`
-                    : 'bg-white border-slate-200 hover:border-slate-400'
-                }`}
-              />
-            ))}
-          </div>
         </div>
 
-        {/* Arrow */}
-        <ChevronRight size={13} className="text-slate-300 group-hover:text-brand-600 transition-colors shrink-0" />
+        <ul className="mt-3 flex flex-col gap-1.5 text-[13px] leading-relaxed text-slate-600">
+          {mission.site && (
+            <li className="flex items-start gap-2">
+              <Building2 size={15} className="mt-0.5 shrink-0 text-slate-400" aria-hidden="true" />
+              <span className="min-w-0 break-words font-semibold text-slate-800">{mission.site}</span>
+            </li>
+          )}
+          {address && (
+            <li className="flex items-start gap-2">
+              <MapPin size={15} className="mt-0.5 shrink-0 text-slate-400" aria-hidden="true" />
+              <span className="min-w-0 break-words">{address}</span>
+            </li>
+          )}
+          {machine && (
+            <li className="flex items-start gap-2">
+              <Settings size={15} className="mt-0.5 shrink-0 text-slate-400" aria-hidden="true" />
+              <span className="min-w-0 break-words">{machine}</span>
+            </li>
+          )}
+          <li className="flex items-start gap-2">
+            <Calendar size={15} className="mt-0.5 shrink-0 text-slate-400" aria-hidden="true" />
+            <span>{formatDueLabel(mission)}</span>
+          </li>
+        </ul>
+
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <span className={`rounded-md px-2 py-0.5 text-[11px] font-bold ${priorityColors[mission.priorityColor] || 'bg-slate-100 text-slate-600'}`}>
+            Priorité {String(mission.priority || '—').toLowerCase()}
+          </span>
+          {intervention && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-bold text-slate-700">
+              <Link2 size={11} aria-hidden="true" />{intervention.id}
+            </span>
+          )}
+        </div>
+      </button>
+
+      <div className="flex items-center gap-2 border-t border-slate-100 bg-slate-50/70 py-2.5 pl-5 pr-4">
+        <label htmlFor={`mission-status-${mission.id}`} className="sr-only">
+          Statut de la mission {mission.title}
+        </label>
+        <select
+          id={`mission-status-${mission.id}`}
+          value={mission.status}
+          onChange={(e) => onStatusChange(mission.id, e.target.value)}
+          className="h-11 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20"
+        >
+          {statusList.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <button
+          type="button"
+          onClick={() => onOpen(mission.id)}
+          className="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl bg-brand-600 px-4 text-sm font-bold text-white shadow-sm transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2"
+        >
+          Ouvrir <ChevronRight size={16} aria-hidden="true" />
+        </button>
       </div>
-    </div>
+    </article>
   )
 }
 
@@ -259,8 +287,10 @@ function MissionCalendar({ missions, interventions = [], onOpen }) {
           </div>
           <div className="flex items-center gap-1.5 self-end sm:self-auto">
             <button
+              type="button"
               onClick={prevMonth}
-              className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 border border-slate-200 hover:border-brand-600/40 hover:bg-brand-600/5 text-slate-600 hover:text-brand-600 transition-all active:scale-95"
+              aria-label="Mois précédent"
+              className="w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg bg-slate-100 border border-slate-200 hover:border-brand-600/40 hover:bg-brand-600/5 text-slate-600 hover:text-brand-600 transition-all active:scale-95"
             >
               <ChevronLeft size={15} strokeWidth={2.5} />
             </button>
@@ -271,8 +301,10 @@ function MissionCalendar({ missions, interventions = [], onOpen }) {
               Aujourd'hui
             </button>
             <button
+              type="button"
               onClick={nextMonth}
-              className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 border border-slate-200 hover:border-brand-600/40 hover:bg-brand-600/5 text-slate-600 hover:text-brand-600 transition-all active:scale-95"
+              aria-label="Mois suivant"
+              className="w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg bg-slate-100 border border-slate-200 hover:border-brand-600/40 hover:bg-brand-600/5 text-slate-600 hover:text-brand-600 transition-all active:scale-95"
             >
               <ChevronRight size={15} strokeWidth={2.5} />
             </button>
@@ -303,6 +335,11 @@ function MissionCalendar({ missions, interventions = [], onOpen }) {
               <div
                 key={idx}
                 onClick={() => date && setSelected(date)}
+                role={date ? 'button' : undefined}
+                tabIndex={date ? 0 : undefined}
+                aria-pressed={date ? Boolean(isSelected) : undefined}
+                aria-label={date ? `${date.getDate()} ${MONTHS_LABEL[calMonth]} — ${dayMissions.length} mission${dayMissions.length > 1 ? 's' : ''}` : undefined}
+                onKeyDown={(e) => { if (date && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setSelected(date) } }}
                 className={`min-h-[60px] sm:min-h-[90px] border-b border-slate-100 p-1.5 sm:p-2 flex flex-col transition-colors ${
                   !date      ? 'bg-slate-50' :
                   isSelected ? 'bg-blue-50 cursor-pointer' :
@@ -546,8 +583,8 @@ export default function EmployeeMissions() {
 
   const [missions, setMissions] = useState([])
   const [interventions, setInterventions] = useState([])
-  const [filterStatus, setFilterStatus] = useState('Tous')
-  const [filterType,   setFilterType]   = useState('Tous')
+  const [activeTab, setActiveTab] = useState('today')
+  const [onlyPriority, setOnlyPriority] = useState(false)
 
   const refreshMissions = useCallback(async () => {
     try {
@@ -584,6 +621,8 @@ export default function EmployeeMissions() {
   }, [currentUser])
 
   useEffect(() => {
+    // refreshMissions() only sets state after awaiting the API, so it cannot cascade synchronous renders.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshMissions()
   }, [refreshMissions])
 
@@ -681,192 +720,192 @@ export default function EmployeeMissions() {
     })()
   }
 
-  // Missions d'aujourd'hui filtrées par statut et priorité
-  const todayFiltered = useMemo(() => {
+  const missionLists = useMemo(() => {
     const todayRef = new Date()
-    return missions
-      .filter((m) => {
-        // Filtrer uniquement les missions d'aujourd'hui
-        const parsed = parseDueDate(m?.dueDate)
-        if (!parsed) return false
-        if (!isSameDay(parsed, todayRef)) return false
-        // Filtre statut
-        if (filterStatus !== 'Tous' && m.status !== filterStatus) return false
-        // Filtre prioritaire (Critique ou Haute uniquement)
-        if (filterType === 'Prioritaire' && m.priority !== 'Critique' && m.priority !== 'Haute') return false
-        return true
-      })
-      .sort((a, b) => (PRIORITY_ORDER[a.priority] || 9) - (PRIORITY_ORDER[b.priority] || 9))
-  }, [missions, filterStatus, filterType])
+    todayRef.setHours(0, 0, 0, 0)
+    const byPriority = (a, b) => (PRIORITY_ORDER[a.priority] || 9) - (PRIORITY_ORDER[b.priority] || 9)
+    const timeOf = (m) => parseDueDate(m?.dueDate)?.getTime() ?? Number.MAX_SAFE_INTEGER
+    const pool = onlyPriority
+      ? missions.filter((m) => m.priority === 'Critique' || m.priority === 'Haute')
+      : missions
+    return {
+      today: pool.filter((m) => {
+        const d = parseDueDate(m?.dueDate)
+        return d && isSameDay(d, todayRef)
+      }).sort(byPriority),
+      upcoming: pool.filter((m) => {
+        const d = parseDueDate(m?.dueDate)
+        return d && d > todayRef && !isSameDay(d, todayRef) && m.status !== 'Terminée'
+      }).sort((a, b) => timeOf(a) - timeOf(b)),
+      active: pool.filter((m) => m.status === 'En cours' || m.status === 'Bloquée').sort(byPriority),
+      done: pool.filter((m) => m.status === 'Terminée').sort((a, b) => timeOf(b) - timeOf(a)),
+    }
+  }, [missions, onlyPriority])
 
-  const total     = missions.length
+  const todayCount = missions.filter((m) => {
+    const d = parseDueDate(m?.dueDate)
+    return d && isSameDay(d, today)
+  }).length
   const enCours   = missions.filter((m) => m.status === 'En cours').length
   const terminees = missions.filter((m) => m.status === 'Terminée').length
   const bloquees  = missions.filter((m) => m.status === 'Bloquée').length
 
-  // Prochaine mission urgente (Critique / Haute non terminée)
   const nextUrgent = useMemo(() =>
     missions
       .filter((m) => m.status !== 'Terminée' && (m.priority === 'Critique' || m.priority === 'Haute'))
       .sort((a, b) => (PRIORITY_ORDER[a.priority] || 9) - (PRIORITY_ORDER[b.priority] || 9))[0]
   , [missions])
 
+  const firstName = (currentUser?.name || '').split(' ')[0]
+  const dateLabel = today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+  const openMission = (id) => navigate('/missions/' + id)
+  const findIntervention = (m) => (m.interventionId ? interventions.find((iv) => iv.id === m.interventionId) : null)
+
+  const TABS = [
+    { key: 'today', label: "Aujourd'hui", count: missionLists.today.length },
+    { key: 'upcoming', label: 'À venir', count: missionLists.upcoming.length },
+    { key: 'active', label: 'En cours', count: missionLists.active.length },
+    { key: 'done', label: 'Terminées', count: missionLists.done.length },
+    { key: 'calendar', label: 'Calendrier' },
+  ]
+  const EMPTY_MESSAGES = {
+    today: "Aucune mission planifiée pour aujourd'hui.",
+    upcoming: 'Aucune mission à venir.',
+    active: 'Aucune mission en cours ou bloquée.',
+    done: 'Aucune mission terminée pour le moment.',
+  }
+  const KPIS = [
+    { label: "Aujourd'hui", value: todayCount, tab: 'today' },
+    { label: 'En cours', value: enCours, tab: 'active' },
+    { label: 'Bloquées', value: bloquees, tab: 'active' },
+    { label: 'Terminées', value: terminees, tab: 'done' },
+  ]
+  const visibleMissions = activeTab === 'calendar' ? [] : missionLists[activeTab]
+
   return (
-    <div className="flex flex-col min-h-screen lg:h-screen lg:overflow-hidden bg-slate-50">
+    <div className="min-h-full bg-slate-50">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 pb-8 pt-4 sm:px-6 lg:pt-6">
 
-      {/* ═══════════════════ HEADER ═══════════════════ */}
-      <div className="bg-white border-b-2 border-slate-200 px-4 lg:px-6 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shrink-0 shadow-sm z-10">
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 bg-gradient-to-br from-brand-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 shrink-0">
-            <ClipboardList size={18} className="text-white" />
+        {/* ═══ Résumé du jour ═══ */}
+        <section aria-labelledby="tech-greeting" className="rounded-3xl bg-brand-700 p-5 text-white shadow-lg shadow-brand-700/20 sm:p-6">
+          <p className="text-xs font-semibold capitalize text-white/70">{dateLabel}</p>
+          <h1 id="tech-greeting" className="mt-1 text-balance font-display text-2xl font-bold leading-tight">
+            Bonjour{firstName ? `, ${firstName}` : ''}
+          </h1>
+          <p className="mt-1 text-sm leading-relaxed text-white/80">
+            {todayCount === 0
+              ? "Aucune mission prévue aujourd'hui."
+              : `${todayCount} mission${todayCount > 1 ? 's' : ''} prévue${todayCount > 1 ? 's' : ''} aujourd'hui.`}
+          </p>
+          <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {KPIS.map(({ label, value, tab }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className="flex min-w-0 items-center gap-2.5 rounded-2xl bg-white/10 px-3 py-2.5 text-left transition active:scale-95 hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              >
+                <span className="font-display text-xl font-bold leading-none">{value}</span>
+                <span className="min-w-0 truncate text-xs font-medium text-white/80">{label}</span>
+              </button>
+            ))}
           </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg font-black text-slate-900 tracking-tight">Mes Missions</h1>
-              <span className="px-2 py-0.5 bg-brand-600/10 text-brand-600 text-[10px] font-black rounded-full uppercase tracking-wider">
-                Technicien
+        </section>
+
+        {/* ═══ Mission prioritaire ═══ */}
+        {nextUrgent && (
+          <section aria-labelledby="tech-priority" className="rounded-2xl border border-red-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-500 text-white">
+                <Zap size={14} aria-hidden="true" />
               </span>
-              <span className="lg:hidden flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 border border-blue-100 rounded-lg">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                <span className="text-sm font-black text-blue-600 leading-none">{total}</span>
-                <span className="text-[10px] font-bold text-slate-500">Total</span>
-              </span>
+              <h2 id="tech-priority" className="text-xs font-bold uppercase tracking-wider text-red-600">À traiter en priorité</h2>
+              <span className="ml-auto"><StatusBadge status={nextUrgent.status} spin /></span>
             </div>
-            <p className="text-slate-400 text-xs font-semibold flex items-center gap-1 mt-0.5">
-              <User size={10} /> {currentUser?.name || '—'} <span className="hidden sm:inline">— {today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+            <p className="mt-3 text-pretty text-base font-bold leading-snug text-slate-900">{nextUrgent.title}</p>
+            <p className="mt-1 text-sm leading-relaxed text-slate-500">
+              {[nextUrgent.site, formatDueLabel(nextUrgent)].filter(Boolean).join(' · ')}
             </p>
-          </div>
-        </div>
-
-        {/* KPI inline dans le header */}
-        <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap pb-2 lg:pb-0 w-full lg:w-auto">
-          {[
-            { label: 'Total',     value: total,     bg: 'bg-blue-50',   text: 'text-blue-600',  ring: 'border-blue-100',  dot: 'bg-blue-500', hideOnMobile: true  },
-            { label: 'En cours',  value: enCours,   bg: 'bg-amber-50',  text: 'text-amber-600', ring: 'border-amber-100', dot: 'bg-amber-500', hideOnMobile: false },
-            { label: 'Terminées', value: terminees, bg: 'bg-green-50',  text: 'text-green-600', ring: 'border-green-100', dot: 'bg-green-500', hideOnMobile: false },
-            { label: 'Bloquées',  value: bloquees,  bg: 'bg-red-50',    text: 'text-red-600',   ring: 'border-red-100',   dot: 'bg-red-500',  hideOnMobile: false },
-          ].map(({ label, value, bg, text, ring, dot, hideOnMobile }) => (
-            <div key={label} className={`flex items-center gap-2.5 px-3.5 py-2 ${bg} border ${ring} rounded-xl shrink-0 ${hideOnMobile ? 'hidden lg:flex' : ''}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
-              <span className={`text-lg font-black ${text} leading-none`}>{value}</span>
-              <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">{label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ═══════════════════ BODY : 2 colonnes ═══════════════════ */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-visible lg:overflow-hidden">
-
-        {/* ── COLONNE GAUCHE : Calendrier ── */}
-        <div className="flex flex-col w-full lg:flex-1 min-w-0 lg:overflow-y-auto scrollbar-gray border-b-2 lg:border-b-0 lg:border-r-2 border-slate-100 bg-white">
-
-          {/* Alerte urgente */}
-          {nextUrgent && (
-            <div
-              className="mx-4 mt-4 bg-red-50 border-2 border-red-200 rounded-2xl px-4 py-3 flex items-center gap-3 cursor-pointer hover:shadow-md transition-all shrink-0"
-              onClick={() => navigate('/missions/' + nextUrgent.id)}
+            <button
+              type="button"
+              onClick={() => openMission(nextUrgent.id)}
+              className="mt-4 inline-flex h-11 w-full items-center justify-center gap-1 rounded-xl bg-slate-900 text-sm font-bold text-white transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2 sm:w-auto sm:px-5"
             >
-              <div className="w-8 h-8 bg-red-500 text-white rounded-lg flex items-center justify-center shrink-0">
-                <Zap size={15} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-black text-red-500 uppercase tracking-wider leading-none mb-0.5">Prioritaire</p>
-                <p className="font-black text-slate-900 text-xs truncate">{nextUrgent.title}</p>
-              </div>
-              <StatusBadge status={nextUrgent.status} />
-            </div>
-          )}
+              Voir la mission <ChevronRight size={16} aria-hidden="true" />
+            </button>
+          </section>
+        )}
 
-          {/* Calendrier */}
-          <div className="flex-1 p-4 sm:p-6 lg:p-4">
-            <MissionCalendar
-              missions={missions}
-              interventions={interventions}
-              onOpen={(id) => navigate('/missions/' + id)}
-            />
+        {/* ═══ Onglets ═══ */}
+        <section aria-label="Mes missions" className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-display text-lg font-bold text-slate-900">Mes missions</h2>
+            <button
+              type="button"
+              aria-pressed={onlyPriority}
+              onClick={() => setOnlyPriority((v) => !v)}
+              className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 ${
+                onlyPriority ? 'border-red-200 bg-red-50 text-red-600' : 'border-slate-200 bg-white text-slate-600'
+              }`}
+            >
+              <Zap size={13} aria-hidden="true" /> Prioritaires
+            </button>
           </div>
-        </div>
 
-        {/* ── COLONNE DROITE : Liste missions ── */}
-        <div className="w-full lg:w-[380px] shrink-0 flex flex-col bg-slate-50 lg:overflow-hidden">
-
-          {/* En-tête colonne droite */}
-          <div className="px-4 pt-4 pb-3 border-b border-slate-100 shrink-0 bg-white sm:bg-slate-50/60 transition-all sticky top-0 z-10 lg:static">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-black text-slate-800 flex items-center gap-2 tracking-tight">
-                <div className="w-6 h-6 bg-brand-600 rounded-md flex items-center justify-center shrink-0">
-                  <LayoutList size={13} className="text-white" />
-                </div>
-                Missions d'aujourd'hui
-                <span className="px-2 py-0.5 bg-brand-600/10 text-brand-600 rounded-md text-[10px] font-black">{todayFiltered.length}</span>
-              </h2>
-              {(filterStatus !== 'Tous' || filterType !== 'Tous') && (
+          <div role="tablist" aria-label="Filtrer les missions" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 [scrollbar-width:none]">
+            {TABS.map(({ key, label, count }) => {
+              const selected = activeTab === key
+              return (
                 <button
+                  key={key}
                   type="button"
-                  onClick={() => { setFilterStatus('Tous'); setFilterType('Tous') }}
-                  className="flex items-center gap-1 text-[11px] font-black text-red-500 hover:text-red-700 transition-colors"
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => setActiveTab(key)}
+                  className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-full px-4 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 ${
+                    selected ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-600'
+                  }`}
                 >
-                  <XCircle size={12} /> Reset
+                  {key === 'calendar' && <CalendarDays size={15} aria-hidden="true" />}
+                  {label}
+                  {typeof count === 'number' && (
+                    <span className={`rounded-full px-1.5 text-[11px] font-bold ${selected ? 'bg-white/20' : 'bg-slate-100 text-slate-500'}`}>
+                      {count}
+                    </span>
+                  )}
                 </button>
-              )}
-            </div>
-
-            {/* Filtres : Prioritaire + Tous statuts */}
-            <div className="flex gap-2">
-              <select
-                value={filterType}
-                onChange={(e) => { setFilterType(e.target.value) }}
-                className="flex-1 px-2 py-1.5 border-2 border-slate-200 rounded-xl text-xs bg-white focus:border-brand-600 outline-none font-bold text-slate-600 hover:border-slate-300 transition-all"
-              >
-                <option value="Tous">Toutes priorités</option>
-                <option value="Prioritaire">Prioritaire</option>
-              </select>
-              <select
-                value={filterStatus}
-                onChange={(e) => { setFilterStatus(e.target.value) }}
-                className="flex-1 px-2 py-1.5 border-2 border-slate-200 rounded-xl text-xs bg-white focus:border-brand-600 outline-none font-bold text-slate-600 hover:border-slate-300 transition-all"
-              >
-                <option value="Tous">Tous statuts</option>
-                {statusList.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
+              )
+            })}
           </div>
 
-          {/* Liste scrollable — missions d'aujourd'hui uniquement */}
-          <div className="flex-1 lg:overflow-y-auto scrollbar-gray px-3 py-3 space-y-2 pb-10 lg:pb-3">
-            {todayFiltered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                <div className="w-12 h-12 bg-white border-2 border-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                  <CalendarDays size={22} className="text-slate-300" />
-                </div>
-                <p className="text-slate-600 font-black text-sm">Aucune mission aujourd'hui jusqu'à maintenant.</p>
-                <p className="text-slate-400 text-xs mt-1">Vous n'avez aucune mission planifiée pour aujourd'hui.</p>
+          <div role="tabpanel">
+            {activeTab === 'calendar' ? (
+              <MissionCalendar missions={missions} interventions={interventions} onOpen={openMission} />
+            ) : visibleMissions.length === 0 ? (
+              <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center">
+                <CalendarDays size={28} className="text-slate-300" aria-hidden="true" />
+                <p className="mt-3 text-sm font-semibold text-slate-600">{EMPTY_MESSAGES[activeTab]}</p>
+                {onlyPriority && (
+                  <button type="button" onClick={() => setOnlyPriority(false)} className="mt-3 text-sm font-bold text-brand-600">
+                    Afficher toutes les priorités
+                  </button>
+                )}
               </div>
             ) : (
-              todayFiltered.map((m) => (
-                <MissionRow
-                  key={m.id}
-                  mission={m}
-                  onStatusChange={handleStatusChange}
-                  onOpen={(id) => navigate('/missions/' + id)}
-                />
-              ))
+              <div className="grid gap-3 md:grid-cols-2">
+                {visibleMissions.map((m) => (
+                  <MissionCard
+                    key={m.id}
+                    mission={m}
+                    intervention={findIntervention(m)}
+                    onStatusChange={handleStatusChange}
+                    onOpen={openMission}
+                  />
+                ))}
+              </div>
             )}
           </div>
-
-          {/* Footer colonne droite */}
-          <div className="px-4 py-3 border-t border-slate-100 bg-white shrink-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              {Object.entries(STATUS_CONFIG).map(([label, cfg]) => (
-                <span key={label} className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
-                  <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />{label}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-
+        </section>
       </div>
     </div>
   )

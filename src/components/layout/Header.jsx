@@ -3,15 +3,20 @@ import { Menu, LogOut } from 'lucide-react'
 import NotificationBell from '../notifications/NotificationBell'
 import { getRouteMeta, getUserInitials } from './navigation'
 
-export default function Header({ onToggleSidebar, currentUser, onLogout }) {
+export default function Header({ onToggleSidebar, currentUser, onLogout, hideMobileMenu = false }) {
   const { pathname } = useLocation()
   const meta = getRouteMeta(pathname)
 
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-white/85 backdrop-blur-md supports-[backdrop-filter]:bg-white/75">
-      <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+      <div className="flex h-14 items-center justify-between gap-3 px-4 sm:h-16 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-3">
-          <button type="button" className="ui-icon-btn -ml-1 lg:hidden" onClick={onToggleSidebar} aria-label="Ouvrir le menu">
+          {hideMobileMenu && (
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 font-display text-xs font-bold text-brand-700 ring-1 ring-inset ring-brand-100 md:hidden" aria-hidden="true">
+              {getUserInitials(currentUser)}
+            </div>
+          )}
+          <button type="button" className={`ui-icon-btn -ml-1 lg:hidden ${hideMobileMenu ? 'hidden' : ''}`} onClick={onToggleSidebar} aria-label="Ouvrir le menu">
             <Menu size={20} />
           </button>
           <div className="min-w-0">

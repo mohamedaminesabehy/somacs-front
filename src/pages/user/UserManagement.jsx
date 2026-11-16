@@ -5,7 +5,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import CreateUserForm from '../../components/user/CreateUserForm'
 import { StatStrip, SearchField, SegmentedFilter, Toolbar, Toast } from '../../components/ui/DataKit'
 import { InlineAlert } from '../../components/ui/Feedback'
-import { ROLE_STYLES } from '../../components/user/roleStyles'
+import { ROLE_STYLES } from '../../components/user/roleStyleTokens'
 
 const ALL_ROLES = 'Tous les rôles'
 const ALL_STATUSES = 'Statut: Tous'

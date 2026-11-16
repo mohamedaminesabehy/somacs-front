@@ -2,8 +2,10 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Plus, Eye, Edit2, Trash2, Truck, CheckCircle2, Wrench, XCircle, RefreshCw,
-  AlertTriangle, MapPin, User, ChevronRight, CalendarDays,
+  AlertTriangle, MapPin, User, ChevronRight, CalendarDays, KeyRound,
 } from 'lucide-react'
+import ReleaseVehicleModal from '../components/vehicles/ReleaseVehicleModal'
+import { VEHICLE_RELEASE_ROLES, getStoredAuthUser } from '../components/vehicles/vehicleRelease'
 import { apiFetch } from '../api/apiClient'
 import CompactPagination from '../components/common/CompactPagination'
 import PageHeader from '../components/ui/PageHeader'
@@ -32,6 +34,7 @@ function formatVehicleUsage(vehicle) {
   return {
     missionId: mission.id,
     technicians,
+    driver: mission.driverName || '',
     location: mission.site || mission.address || mission.type || '',
   }
 }
@@ -51,7 +54,12 @@ function UsageCell({ vehicle }) {
     return (
       <div className="flex min-w-0 flex-col gap-1">
         <span className="text-sm font-semibold text-ink">Mission #{usage.missionId}</span>
-        <span className="flex min-w-0 items-center gap-3 text-xs text-ink-muted">
+        {usage.driver && (
+          <span className="inline-flex min-w-0 items-center gap-1 text-xs font-medium text-ink">
+            <Truck size={12} aria-hidden="true" /> <span className="truncate">Chauffeur : {usage.driver}</span>
+          </span>
+        )}
+        <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
           {usage.technicians && (
             <span className="inline-flex min-w-0 items-center gap-1">
               <User size={12} aria-hidden="true" /> <span className="truncate">{usage.technicians}</span>
@@ -88,6 +96,8 @@ export default function VehicleList() {
   const [toast, setToast] = useState(null)
   const [pendingDelete, setPendingDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [pendingRelease, setPendingRelease] = useState(null)
+  const canReleaseVehicles = useMemo(() => VEHICLE_RELEASE_ROLES.has(getStoredAuthUser()?.role), [])
   const toastRef = useRef(null)
 
   const showToast = useCallback((next, duration = 3500) => {
@@ -113,6 +123,12 @@ export default function VehicleList() {
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  useEffect(() => {
+    const onLiveUpdate = () => fetchData()
+    window.addEventListener('mission:live-update', onLiveUpdate)
+    return () => window.removeEventListener('mission:live-update', onLiveUpdate)
+  }, [fetchData])
 
   useEffect(() => {
     if (location.state?.toast) {
@@ -167,6 +183,12 @@ export default function VehicleList() {
     } finally {
       setDeleting(false)
     }
+  }
+
+  const handleReleased = (vehicle) => {
+    setPendingRelease(null)
+    showToast({ type: 'success', message: `Véhicule ${vehicle.matricule} rendu disponible. La mission reste en cours.` }, 4000)
+    fetchData()
   }
 
   const statItems = [
@@ -296,6 +318,11 @@ export default function VehicleList() {
                         <Trash2 size={14} aria-hidden="true" /> Supprimer
                       </button>
                     </div>
+                    {canReleaseVehicles && v.activeMission && (
+                      <button type="button" onClick={() => setPendingRelease(v)} className="flex h-11 items-center justify-center gap-1.5 border-t border-line text-xs font-semibold text-teal-700 hover:bg-teal-50">
+                        <KeyRound size={14} aria-hidden="true" /> Rendre disponible
+                      </button>
+                    )}
                   </li>
                 )
               })}
@@ -326,7 +353,12 @@ export default function VehicleList() {
                         <td><StatusBadge tone={meta?.tone}>{v.statut}</StatusBadge></td>
                         <td className="max-w-xs"><UsageCell vehicle={v} /></td>
                         <td onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end gap-1 opacity-70 transition-opacity group-hover:opacity-100">
+                          <div className="flex items-center justify-end gap-1 opacity-70 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                            {canReleaseVehicles && v.activeMission && (
+                              <button type="button" onClick={() => setPendingRelease(v)} className="ui-icon-btn h-9 w-9 hover:bg-teal-50 hover:text-teal-700" aria-label={`Rendre disponible ${v.matricule}`} title="Rendre disponible">
+                                <KeyRound size={15} />
+                              </button>
+                            )}
                             <button type="button" onClick={() => navigate(`/vehicles/${v.id}/edit`)} className="ui-icon-btn h-9 w-9" aria-label={`Modifier ${v.matricule}`}>
                               <Edit2 size={15} />
                             </button>
@@ -381,6 +413,12 @@ export default function VehicleList() {
           </div>
         )}
       </Modal>
+
+      <ReleaseVehicleModal
+        vehicle={pendingRelease}
+        onClose={() => setPendingRelease(null)}
+        onReleased={handleReleased}
+      />
     </div>
   )
 }

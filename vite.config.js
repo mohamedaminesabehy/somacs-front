@@ -1,3 +1,4 @@
+import process from 'node:process'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -13,6 +14,7 @@ export default defineConfig(({ mode }) => {
   // '.vercel.run' couvre les sous-domaines dynamiques des sandboxes Vercel (sb-xxxx.vercel.run).
   const previewHosts = [
     'optimisation-du-projet-somacs-somacs-frontend.v0.build',
+    'finalisation-technique-somacs-somacs-front.v0.build',
     'sb-1xfh8o2t5ske.vercel.run',
     '.vercel.run',
   ]

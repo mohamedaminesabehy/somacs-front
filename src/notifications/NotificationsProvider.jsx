@@ -1,7 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import { API_BASE_URL, getAuthToken, isAuthTokenUsable } from '../api/apiClient'
+import { responseCache } from '../api/responseCache'
 import {
   fetchNotifications,
   fetchUnreadCount,
@@ -9,8 +10,8 @@ import {
   markNotificationRead,
 } from './notificationsApi'
 import { onForegroundMessage, registerFcmToken } from './firebaseMessaging'
+import { NotificationsContext } from './useNotifications'
 
-const NotificationsContext = createContext(null)
 const noop = () => { /* no-op */ }
 
 function playNotificationSound() {
@@ -118,8 +119,10 @@ export function NotificationsProvider({ children }) {
       }
       return
     }
-
+    // refresh() only sets state after awaiting the API, so it cannot cascade synchronous renders.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh()
+    
     
     // Demander les permissions de notification dès la connexion
     if (typeof window !== 'undefined' && typeof window.Notification !== 'undefined') {
@@ -232,6 +235,12 @@ export function NotificationsProvider({ children }) {
       })
     })
 
+    socket.on('missionUpdated', (payload) => {
+      if (!payload || payload.missionId == null) return
+      responseCache.invalidateForMutation('/missions')
+      try { window.dispatchEvent(new CustomEvent('mission:live-update', { detail: payload })) } catch { /* best-effort */ }
+    })
+
     socket.on('notificationArchived', (payload) => {
       const id = payload && typeof payload.id === 'number' ? payload.id : null
       if (id == null) return
@@ -296,19 +305,4 @@ export function NotificationsProvider({ children }) {
       )}
     </NotificationsContext.Provider>
   )
-}
-
-export function useNotifications() {
-  const ctx = useContext(NotificationsContext)
-  if (!ctx) {
-    return {
-      notifications: [],
-      unreadCount: 0,
-      refresh: async () => { /* no provider */ },
-      markRead: async () => { /* no provider */ },
-      markAllRead: async () => { /* no provider */ },
-      enablePushNotifications: async () => ({ ok: false }),
-    }
-  }
-  return ctx
 }

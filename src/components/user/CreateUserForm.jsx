@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { UserPlus, AlertTriangle, Lock, KeyRound } from 'lucide-react'
-import { apiFetch } from '../../api/apiClient'
+import { apiFetch, readApiErrorMessage } from '../../api/apiClient'
 import Modal from '../ui/Modal'
 import { Field } from '../ui/DataKit'
 import { InlineAlert } from '../ui/Feedback'
-import { roleStyle } from './roleStyles'
+import { roleStyle } from './roleStyleTokens'
 
 const ROLE_DESCRIPTIONS = {
   Administrateur: 'Accès complet, gestion des comptes',
@@ -102,11 +102,12 @@ export default function CreateUserForm({ open, onClose, currentUser, onUserCreat
       })
 
       if (!response.ok) {
-        setError(
+        setError(await readApiErrorMessage(
+          response,
           response.status === 403
             ? "Vous n'avez pas l'autorisation de créer un utilisateur."
             : "Impossible de créer l'utilisateur. Vérifiez les informations ou réessayez.",
-        )
+        ))
         return
       }
 

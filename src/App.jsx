@@ -1,11 +1,14 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './components/layout/Sidebar'
 import Header from './components/layout/Header'
+import TechnicianBottomNav from './components/layout/TechnicianBottomNav'
+import { getRoleFlags } from './components/layout/navigation'
 import LoginForm from './components/user/LoginForm'
 import { NotificationsProvider } from './notifications/NotificationsProvider'
 import { getAuthToken, isAuthTokenUsable, logoutSession } from './api/apiClient'
 import { consumePendingNotificationUrl } from './utils/pendingNotification'
+import { ErrorBoundary } from './components/ui/ErrorBoundary'
 
 const UserManagement = lazy(() => import('./pages/user/UserManagement'))
 const UserDetails = lazy(() => import('./pages/user/UserDetails'))
@@ -27,6 +30,8 @@ const CreateVehicle = lazy(() => import('./pages/CreateVehicle'))
 const EditVehicle = lazy(() => import('./pages/EditVehicle'))
 const ClientsList = lazy(() => import('./pages/clients/ClientsList'))
 const ClientDetails360 = lazy(() => import('./pages/clients/ClientDetails360'))
+const SavPilotage = lazy(() => import('./pages/sav/SavPilotage'))
+const NotificationsCenter = lazy(() => import('./pages/notifications/NotificationsCenter'))
 
 function AppLayout({
   children,
@@ -36,22 +41,33 @@ function AppLayout({
   currentUser,
   onLogout,
 }) {
+  const { isTechnicien } = getRoleFlags(currentUser)
   return (
     <div className="flex flex-col min-h-screen bg-canvas lg:flex-row">
       <Sidebar
-        isMobileOpen={isSidebarOpen}
+        isMobileOpen={isSidebarOpen && !isTechnicien}
         onClose={onCloseSidebar}
         currentUser={currentUser}
         onLogout={onLogout}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         <NotificationsProvider>
-          <Header onToggleSidebar={onToggleSidebar} currentUser={currentUser} onLogout={onLogout} />
-          <main className="flex-1 overflow-y-auto scroll-smooth">
-            <Suspense fallback={null}>{children}</Suspense>
+          <Header
+            onToggleSidebar={onToggleSidebar}
+            currentUser={currentUser}
+            onLogout={onLogout}
+            hideMobileMenu={isTechnicien}
+          />
+          <main className={`flex-1 overflow-y-auto scroll-smooth ${isTechnicien ? 'pb-20 lg:pb-0' : ''}`}>
+            <ErrorBoundary>
+              <Suspense fallback={<div className="flex min-h-48 items-center justify-center" role="status" aria-live="polite">Chargement de la page…</div>}>
+                {children}
+              </Suspense>
+            </ErrorBoundary>
           </main>
         </NotificationsProvider>
       </div>
+      {isTechnicien && <TechnicianBottomNav currentUser={currentUser} />}
     </div>
   )
 }
@@ -61,6 +77,7 @@ export default function App() {
   const [pendingNotificationUrl, setPendingNotificationUrl] = useState(null)
   const [pendingChecked, setPendingChecked] = useState(false)
   const [pendingConsumed, setPendingConsumed] = useState(false)
+  const authGeneration = useRef(0)
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     if (typeof window === 'undefined') {
       return false
@@ -92,15 +109,31 @@ export default function App() {
 
   // ── On cold start: check if a notification click stored a pending URL ───────
   useEffect(() => {
+    let active = true
+    const generation = authGeneration.current
+    const timeoutId = window.setTimeout(() => {
+      if (active) setPendingChecked(true)
+      active = false
+    }, 1500)
+
     consumePendingNotificationUrl().then((url) => {
+      if (!active || generation !== authGeneration.current) return
+      window.clearTimeout(timeoutId)
       if (url) {
         setPendingNotificationUrl(url)
         setPendingConsumed(false) // Allow navigation
       }
       setPendingChecked(true)
     }).catch(() => {
+      if (!active) return
+      window.clearTimeout(timeoutId)
       setPendingChecked(true)
     })
+
+    return () => {
+      active = false
+      window.clearTimeout(timeoutId)
+    }
   }, [])
 
   const handleLoginSuccess = (token, user) => {
@@ -143,7 +176,15 @@ export default function App() {
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem('auth_token')
       window.localStorage.removeItem('auth_user')
+      window.sessionStorage.removeItem('post_login_redirect')
+      window.sessionStorage.removeItem('pending_notification_mission')
     }
+    authGeneration.current += 1
+    setPostLoginRedirect(null)
+    setPendingNotificationUrl(null)
+    setPendingConsumed(true)
+    setPendingChecked(true)
+    setIsSidebarOpen(false)
     setIsAuthenticated(false)
     setCurrentUser(null)
   }
@@ -187,7 +228,7 @@ export default function App() {
   }
 
   const renderInLayout = (children) => (
-    <AppLayout {...layoutProps}>
+    <AppLayout key={`${currentUser?.id ?? 'anonymous'}:${normalizedRole}`} {...layoutProps}>
       {children}
     </AppLayout>
   )
@@ -210,7 +251,11 @@ export default function App() {
 
   // ── Wait for pending notification check before rendering routes ──────────────
   if (!pendingChecked) {
-    return <div className="min-h-screen bg-canvas" />
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-canvas px-6 text-sm font-medium text-ink-muted" role="status" aria-live="polite">
+        Préparation de votre espace…
+      </div>
+    )
   }
 
   // ── If a pending notification URL was found, redirect immediately ────────────
@@ -246,13 +291,13 @@ export default function App() {
       />
       <Route path="/users" element={renderProtectedPage(<UserManagement currentUser={currentUser} />)} />
       <Route path="/users/:id/details" element={renderProtectedPage(<UserDetails currentUser={currentUser} />)} />
-      <Route path="/missions" element={renderProtectedPage(<ListMission />)} />
+      <Route path="/missions" element={renderProtectedPage(<ListMission currentUser={currentUser} />)} />
       <Route path="/missions/my" element={renderProtectedPage(<EmployeeMissions />)} />
       <Route path="/missions/assign" element={renderProtectedPage(<AssignMission />)} />
       <Route path="/missions/:id" element={renderProtectedPage(<MissionDetails />)} />
       <Route
         path="/missions/:id/notification"
-        element={<Suspense fallback={null}><MissionDetails allowUnauthenticated /></Suspense>}
+        element={<Suspense fallback={<div role="status" aria-live="polite">Chargement de la mission…</div>}><MissionDetails allowUnauthenticated /></Suspense>}
       />
       <Route path="/interventions" element={renderProtectedPage(<InterventionList />)} />
       <Route path="/interventions/create" element={renderProtectedPage(<CreateIntervention />)} />
@@ -276,6 +321,8 @@ export default function App() {
       <Route path="/vehicles/:id" element={renderProtectedPage(<VehicleDetails />)} />
       <Route path="/vehicles/:id/edit" element={renderProtectedPage(<EditVehicle />)} />
       <Route path="/employees/:employeeId/history" element={renderProtectedPage(<EmployeeHistory />)} />
+      <Route path="/sav" element={renderProtectedPage(<SavPilotage currentUser={currentUser} />)} />
+      <Route path="/notifications" element={renderProtectedPage(<NotificationsCenter />)} />
       <Route path="/clients" element={renderProtectedPage(<ClientsList />)} />
       <Route path="/clients/:id/360" element={renderProtectedPage(<ClientDetails360 />)} />
       <Route

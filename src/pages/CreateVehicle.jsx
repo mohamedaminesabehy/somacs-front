@@ -1,11 +1,11 @@
 
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import {
-  ChevronLeft, Save, Loader2, Truck, RefreshCw
-} from "lucide-react"
+import { ChevronLeft, Truck } from "lucide-react"
 import { apiFetch } from "../api/apiClient"
-import VehicleForm, { EMPTY_FORM, buildMatricule } from "../components/vehicle/VehicleForm"
+import PageHeader from "../components/ui/PageHeader"
+import VehicleForm from "../components/vehicle/VehicleForm"
+import { EMPTY_FORM, buildMatricule } from "../components/vehicle/vehicleFormOptions"
 
 export default function CreateVehicle() {
   const navigate = useNavigate()
@@ -61,44 +61,26 @@ export default function CreateVehicle() {
     }
   }
 
-  const headerContent = (
-    <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200">
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate("/vehicles")} className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-all">
-            <ChevronLeft size={20} />
-          </button>
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm">
-            <Truck size={15} className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-sm font-black text-slate-900">Nouveau vehicule</h1>
-            <p className="text-[11px] text-slate-500">Renseignez le matricule</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => navigate(0)}
-            className="hidden sm:flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all">
-            <RefreshCw size={14} /> Reinitialiser
-          </button>
-          <button form="vehicle-create-form" type="submit" disabled={loading}
-            className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black transition-all active:scale-95 disabled:opacity-60 shadow-lg shadow-blue-200">
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            {loading ? "Creation..." : "Enregistrer"}
-          </button>
-        </div>
-      </div>
-    </header>
-  )
-
   return (
-    <div className="min-h-screen bg-canvas">
-      {headerContent}
+    <div className="ui-page flex flex-col gap-5">
+      <PageHeader
+        eyebrow="Flotte"
+        title="Nouveau véhicule"
+        description="Enregistrez un véhicule de la flotte SAV avec son immatriculation et ses échéances."
+        icon={Truck}
+        breadcrumbs={[{ label: "Véhicules", to: "/vehicles" }, { label: "Nouveau" }]}
+        actions={
+          <button type="button" onClick={() => navigate("/vehicles")} className="ui-btn-secondary">
+            <ChevronLeft size={16} aria-hidden="true" /> Retour à la liste
+          </button>
+        }
+      />
       <VehicleForm
         mode="create"
         initialForm={EMPTY_FORM}
         initialMatricule={{ left: "", right: "" }}
         onSubmit={handleSubmit}
+        onReset={() => setError(null)}
         loading={loading}
         error={error}
         setError={setError}

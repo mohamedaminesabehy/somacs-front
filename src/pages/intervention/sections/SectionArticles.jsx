@@ -1,141 +1,72 @@
-import { Plus, Trash2, Package } from 'lucide-react'
+import { Plus, Trash2, Package, Banknote } from 'lucide-react'
 
 export default function SectionArticles({ parts, addPart, removePart, updatePart, laborPrice, setLaborPrice }) {
+  const totalQty = parts.reduce((sum, p) => sum + (Number(p.quantity) || 0), 0)
   return (
-    <div className="space-y-6 sm:space-y-10 animate-in fade-in zoom-in-95 duration-500">
-      <div className="pb-4 sm:pb-6 border-b-2 border-slate-100">
-        <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-1 sm:mb-2 flex items-center gap-2 sm:gap-3">
-          <Package className="text-purple-600" size={24} />
-          Articles Utilisés &amp; Tarification
-        </h2>
-        <p className="text-xs sm:text-sm text-slate-500 font-medium">Gérez les pièces consommables et le coût de main d&apos;œuvre</p>
-      </div>
-
-      <PartsTable parts={parts} addPart={addPart} removePart={removePart} updatePart={updatePart} />
-      <LaborPriceBox laborPrice={laborPrice} setLaborPrice={setLaborPrice} />
-    </div>
-  )
-}
-
-function PartsTable({ parts, addPart, removePart, updatePart }) {
-  return (
-    <div className="bg-white rounded-2xl border-2 border-slate-200 overflow-hidden shadow-sm">
-      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] sm:text-xs font-black text-slate-700 uppercase tracking-wider">{parts.length} Référence{parts.length > 1 ? 's' : ''}</span>
+    <div className="flex flex-col gap-5">
+      <div className="overflow-hidden rounded-2xl border border-line bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-slate-50/70 px-4 py-3">
+          <p className="text-sm text-ink-muted">
+            <span className="font-semibold text-ink tabular-nums">{parts.length}</span> référence{parts.length > 1 ? 's' : ''}
+            <span className="mx-1.5 text-ink-faint" aria-hidden="true">·</span>
+            <span className="font-semibold text-ink tabular-nums">{totalQty}</span> unité{totalQty > 1 ? 's' : ''}
+          </p>
+          <button type="button" onClick={addPart} className="ui-btn-primary ui-btn-sm">
+            <Plus size={14} aria-hidden="true" /> Ajouter un article
+          </button>
         </div>
-        <button onClick={addPart}
-          className="flex items-center gap-2 text-[9px] sm:text-[10px] font-black text-brand-600 hover:bg-brand-600/10 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl transition-all border border-blue-200">
-          <Plus size={14} /> Ajouter
-        </button>
-      </div>
 
-      {/* Mobile Card Layout */}
-      <div className="block sm:hidden divide-y divide-slate-100">
-        {parts.map((part) => (
-          <PartCardMobile key={part.id} part={part} updatePart={updatePart} removePart={removePart} />
-        ))}
-        {parts.length === 0 && <PartsEmptyState />}
-      </div>
-
-      {/* Desktop Table Layout */}
-      <div className="hidden sm:block overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-slate-50/30 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-              <th className="px-6 py-4">Référence</th>
-              <th className="px-6 py-4">Désignation</th>
-              <th className="px-6 py-4 w-28 text-center">Quantité</th>
-              <th className="px-6 py-4 w-16"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50 text-sm">
-            {parts.map((part) => (
-              <PartRowDesktop key={part.id} part={part} updatePart={updatePart} removePart={removePart} />
+        {parts.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-ink-faint ring-1 ring-inset ring-line">
+              <Package size={22} aria-hidden="true" />
+            </span>
+            <p className="text-sm font-semibold text-ink">Aucun article utilisé</p>
+            <p className="text-xs text-ink-muted">Ajoutez les pièces et consommables remplacés pendant l’intervention.</p>
+          </div>
+        ) : (
+          <ol className="divide-y divide-line">
+            {parts.map((part, index) => (
+              <li key={part.id} className="grid grid-cols-[2rem_1fr_auto] items-start gap-3 px-4 py-3 sm:grid-cols-[2rem_10rem_1fr_6rem_auto] sm:items-center">
+                <span className="mt-2 flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-ink-muted tabular-nums sm:mt-0">{index + 1}</span>
+                <div className="col-span-1 flex min-w-0 flex-col gap-2 sm:contents">
+                  <label className="sr-only" htmlFor={`part-ref-${part.id}`}>Référence</label>
+                  <input id={`part-ref-${part.id}`} type="text" value={part.reference} onChange={(e) => updatePart(part.id, 'reference', e.target.value)}
+                    placeholder="REF-…" className="ui-input h-10 w-full font-mono text-sm font-semibold text-brand-700" />
+                  <label className="sr-only" htmlFor={`part-des-${part.id}`}>Désignation</label>
+                  <input id={`part-des-${part.id}`} type="text" value={part.designation} onChange={(e) => updatePart(part.id, 'designation', e.target.value)}
+                    placeholder="Désignation de l’article" className="ui-input h-10 w-full text-sm" />
+                  <div className="flex items-center gap-2 sm:block">
+                    <label className="text-xs font-semibold text-ink-muted sm:sr-only" htmlFor={`part-qty-${part.id}`}>Quantité</label>
+                    <input id={`part-qty-${part.id}`} type="number" min="0" value={part.quantity} onChange={(e) => updatePart(part.id, 'quantity', parseInt(e.target.value) || 0)}
+                      className="ui-input h-10 w-20 text-center text-sm font-semibold tabular-nums sm:w-full" />
+                  </div>
+                </div>
+                <button type="button" onClick={() => removePart(part.id)} aria-label={`Retirer l’article ${index + 1}`}
+                  className="mt-1 flex h-9 w-9 items-center justify-center rounded-xl text-ink-faint transition-colors hover:bg-red-50 hover:text-red-600 sm:mt-0">
+                  <Trash2 size={16} aria-hidden="true" />
+                </button>
+              </li>
             ))}
-            {parts.length === 0 && (
-              <tr><td colSpan="4" className="px-6 py-12 text-center"><PartsEmptyState /></td></tr>
-            )}
-          </tbody>
-        </table>
+          </ol>
+        )}
       </div>
-    </div>
-  )
-}
 
-function PartCardMobile({ part, updatePart, removePart }) {
-  return (
-    <div className="p-4 space-y-3">
-      <div className="flex justify-between items-start">
-        <div className="flex-1 space-y-2">
-          <input type="text" value={part.reference} onChange={(e) => updatePart(part.id, 'reference', e.target.value)}
-            placeholder="Référence"
-            className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-mono font-bold text-brand-600 outline-none" />
-          <input type="text" value={part.designation} onChange={(e) => updatePart(part.id, 'designation', e.target.value)}
-            placeholder="Désignation"
-            className="w-full bg-slate-50 border-none rounded-lg px-3 py-2 text-xs font-bold text-slate-600 outline-none" />
+      <div className="flex flex-col gap-4 rounded-2xl bg-navy p-5 text-white sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 ring-1 ring-inset ring-white/15">
+            <Banknote size={18} aria-hidden="true" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold">Prix main d&apos;œuvre (HT)</p>
+            <p className="text-xs text-brand-100/80">Coût de la main d&apos;œuvre hors taxes</p>
+          </div>
         </div>
-        <button onClick={() => removePart(part.id)} className="p-2 text-slate-300 hover:text-red-500 ml-2">
-          <Trash2 size={18} />
-        </button>
-      </div>
-      <div className="flex items-center gap-3">
-        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Quantité:</span>
-        <input type="number" value={part.quantity} onChange={(e) => updatePart(part.id, 'quantity', parseInt(e.target.value) || 0)}
-          className="w-20 bg-slate-50 rounded-lg px-3 py-1.5 text-center font-black text-xs text-slate-700 outline-none focus:ring-2 focus:ring-brand-600/20" />
-      </div>
-    </div>
-  )
-}
-
-function PartRowDesktop({ part, updatePart, removePart }) {
-  return (
-    <tr className="hover:bg-slate-50/50 transition-colors">
-      <td className="px-6 py-4">
-        <input type="text" value={part.reference} onChange={(e) => updatePart(part.id, 'reference', e.target.value)}
-          placeholder="REF-..."
-          className="w-full bg-transparent border-none p-0 focus:ring-0 font-mono font-bold text-brand-600 outline-none" />
-      </td>
-      <td className="px-6 py-4">
-        <input type="text" value={part.designation} onChange={(e) => updatePart(part.id, 'designation', e.target.value)}
-          placeholder="Désignation de l'article"
-          className="w-full bg-transparent border-none p-0 focus:ring-0 font-bold text-slate-600 outline-none" />
-      </td>
-      <td className="px-6 py-4">
-        <input type="number" value={part.quantity} onChange={(e) => updatePart(part.id, 'quantity', parseInt(e.target.value) || 0)}
-          className="w-full bg-slate-50 rounded-lg px-3 py-1 text-center font-black text-slate-700 outline-none focus:ring-2 focus:ring-brand-600/20" />
-      </td>
-      <td className="px-6 py-4 text-right">
-        <button onClick={() => removePart(part.id)} className="p-2 text-slate-200 hover:text-red-500 transition-colors">
-          <Trash2 size={16} />
-        </button>
-      </td>
-    </tr>
-  )
-}
-
-function PartsEmptyState() {
-  return (
-    <div className="flex flex-col items-center gap-2 py-12">
-      <Package size={24} className="text-slate-200" />
-      <p className="text-sm font-semibold text-slate-400">Aucun article ajouté</p>
-      <p className="text-xs text-slate-300">Cliquez sur &quot;Ajouter&quot; pour commencer</p>
-    </div>
-  )
-}
-
-function LaborPriceBox({ laborPrice, setLaborPrice }) {
-  return (
-    <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 sm:p-8 text-white shadow-xl">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Prix Main d&apos;Œuvre (HT)</p>
-          <p className="text-[10px] sm:text-xs text-slate-500 font-medium">Coût de la main d&apos;œuvre hors taxes</p>
-        </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-          <input type="number" value={laborPrice} onChange={(e) => setLaborPrice(e.target.value)}
-            className="w-full sm:w-32 bg-slate-800 border-2 border-slate-700 rounded-xl px-4 py-2.5 sm:py-3 text-right font-black text-white focus:ring-2 focus:ring-brand-600 focus:border-brand-600 outline-none text-base sm:text-lg" />
-          <span className="text-base sm:text-lg font-black text-slate-400">DT</span>
+        <div className="flex items-center gap-2">
+          <label htmlFor="laborPrice" className="sr-only">Prix main d&apos;œuvre en dinars</label>
+          <input id="laborPrice" type="number" min="0" value={laborPrice} onChange={(e) => setLaborPrice(e.target.value)}
+            className="h-11 w-full rounded-xl border border-white/15 bg-white/10 px-4 text-right font-display text-lg font-bold text-white outline-none tabular-nums focus:border-brand-300 focus:ring-4 focus:ring-brand-400/25 sm:w-36" />
+          <span className="font-display text-base font-bold text-brand-200">DT</span>
         </div>
       </div>
     </div>

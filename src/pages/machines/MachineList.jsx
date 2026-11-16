@@ -41,21 +41,6 @@ function MachineStatus({ status }) {
   return <StatusBadge tone={group ? STATUS_GROUPS[group].tone : 'slate'}>{status || 'Non renseigné'}</StatusBadge>
 }
 
-function formatDate(value) {
-  if (!value) return null
-  const d = new Date(value)
-  return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
-}
-
-function maintenanceState(value) {
-  if (!value) return null
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return null
-  const days = Math.ceil((d.getTime() - Date.now()) / 86400000)
-  if (days < 0) return { label: `En retard de ${Math.abs(days)} j`, tone: 'text-red-600' }
-  if (days <= 14) return { label: `Dans ${days} j`, tone: 'text-amber-700' }
-  return { label: formatDate(value), tone: 'text-ink-muted' }
-}
 
 function MachineThumb({ machine, size = 'md' }) {
   const src = typeof machine.imageUrl === 'string' ? machine.imageUrl.trim().replace(/^`+|`+$/g, '') : machine.imageUrl
@@ -93,7 +78,6 @@ function RowActions({ machine, canManage, onDelete }) {
 }
 
 function MachineMobileCard({ machine, canManage, onDelete }) {
-  const next = maintenanceState(machine.nextMaintenanceDate)
   return (
     <li className="ui-card flex flex-col gap-3 p-4">
       <div className="flex items-start gap-3">
@@ -120,8 +104,8 @@ function MachineMobileCard({ machine, canManage, onDelete }) {
           <dd className="truncate font-semibold text-ink">{machine.client || '—'}</dd>
         </div>
         <div className="min-w-0">
-          <dt className="text-ink-faint">Prochaine maintenance</dt>
-          <dd className={`truncate font-semibold ${next?.tone || 'text-ink'}`}>{next?.label || '—'}</dd>
+          <dt className="text-ink-faint">Site</dt>
+          <dd className="truncate font-semibold text-ink">{machine.site || machine.location || '—'}</dd>
         </div>
       </dl>
       <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
@@ -328,30 +312,35 @@ export default function MachineList({ currentUser }) {
 
             <div className="ui-card hidden overflow-hidden lg:block">
               <div className="overflow-x-auto">
-                <table className="ui-table w-full min-w-[960px] text-left">
+                <table className="ui-table w-full min-w-[820px] table-fixed text-left">
+                  <colgroup>
+                    <col className="w-[36%]" />
+                    <col className="w-[22%]" />
+                    <col className="w-[22%]" />
+                    <col className="w-[10rem]" />
+                    <col className="w-[8.5rem]" />
+                  </colgroup>
                   <thead>
                     <tr>
                       <th scope="col">Équipement</th>
                       <th scope="col">Marque / modèle</th>
                       <th scope="col">Client / site</th>
                       <th scope="col">Statut</th>
-                      <th scope="col">Prochaine maintenance</th>
                       <th scope="col" className="text-right"><span className="sr-only">Actions</span></th>
                     </tr>
                   </thead>
                   <tbody>
                     {paginated.map((machine) => {
-                      const next = maintenanceState(machine.nextMaintenanceDate)
                       return (
                         <tr key={machine.id}>
                           <td>
-                            <div className="flex items-center gap-3">
+                            <div className="flex min-w-0 items-center gap-3">
                               <MachineThumb machine={machine} />
                               <div className="min-w-0">
-                                <Link to={`/machines/${machine.id}`} className="block truncate font-semibold text-ink hover:text-brand-700">
+                                <Link to={`/machines/${machine.id}`} className="block break-words font-semibold leading-snug text-ink hover:text-brand-700">
                                   {machine.designation}
                                 </Link>
-                                <p className="mt-0.5 flex items-center gap-2 text-xs text-ink-faint">
+                                <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-ink-faint">
                                   <span className="font-mono">{machine.code}</span>
                                   {machine.category && <><span aria-hidden="true">·</span><span>{machine.category}</span></>}
                                 </p>
@@ -359,26 +348,20 @@ export default function MachineList({ currentUser }) {
                             </div>
                           </td>
                           <td>
-                            <p className="font-medium text-ink">{machine.brand || '—'}</p>
-                            <p className="mt-0.5 text-xs text-ink-faint">
+                            <p className="break-words font-medium text-ink">{machine.brand || '—'}</p>
+                            <p className="mt-0.5 break-words text-xs text-ink-faint">
                               {machine.model || '—'}
                               {machine.serialNumber && <span className="font-mono"> · {machine.serialNumber}</span>}
                             </p>
                           </td>
                           <td>
-                            <p className="flex items-center gap-1.5 font-medium text-ink">
+                            <p className="flex min-w-0 items-center gap-1.5 font-medium text-ink">
                               <Building2 size={13} className="shrink-0 text-ink-faint" aria-hidden="true" />
                               <span className="truncate">{machine.client || '—'}</span>
                             </p>
-                            <p className="mt-0.5 text-xs text-ink-faint">{machine.site || machine.location || '—'}</p>
+                            <p className="mt-0.5 break-words text-xs text-ink-faint">{machine.site || machine.location || '—'}</p>
                           </td>
                           <td><MachineStatus status={machine.status} /></td>
-                          <td>
-                            <p className={`text-sm font-semibold ${next?.tone || 'text-ink-faint'}`}>{next?.label || 'Non planifiée'}</p>
-                            {machine.lastMaintenanceDate && (
-                              <p className="mt-0.5 text-xs text-ink-faint">Dernière : {formatDate(machine.lastMaintenanceDate)}</p>
-                            )}
-                          </td>
                           <td><RowActions machine={machine} canManage={canManage} onDelete={setDeleteTarget} /></td>
                         </tr>
                       )

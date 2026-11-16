@@ -11,6 +11,7 @@ import { InlineAlert } from '../../components/ui/Feedback'
 import { StatStrip, SearchField, SegmentedFilter, Toast } from '../../components/ui/DataKit'
 import { useListMissionData } from './hooks/useListMissionData'
 import { useMissionGrouping } from './hooks/useMissionGrouping'
+import { useOverdueMissions } from './hooks/useOverdueMissions'
 
 function buildDeleteMissionSummary(mission) {
   const interventionId = String(mission?.interventionId || '').trim()
@@ -46,7 +47,7 @@ function getDeltaDirection(value) {
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
-export default function ListMission() {
+export default function ListMission({ currentUser }) {
   const navigate = useNavigate()
   const location = useLocation()
   const tableRef = useRef(null)
@@ -62,16 +63,34 @@ export default function ListMission() {
 
   const [search, setSearch]                 = useState('')
   const [filterEmployee, setFilterEmployee] = useState('all')
-  const [filterStatus, setFilterStatus]     = useState('all')
+  const initialStatus = new URLSearchParams(location.search).get('status') === 'overdue' ? 'overdue' : 'all'
+  const [filterStatus, setFilterStatus]     = useState(initialStatus)
   const [filterPriority, setFilterPriority] = useState('all')
   const [filterType, setFilterType]         = useState('all')
   const [dateMode, setDateMode]             = useState('range')
   const [startDate, setStartDate]           = useState('')
   const [endDate, setEndDate]               = useState('')
-  const [activeTab, setActiveTab]           = useState('all')
-
-
+  const [activeTab, setActiveTab]           = useState(initialStatus)
   const todayKey = useMemo(() => new Date().toISOString().slice(0, 10), [])
+
+  const overdueFilters = {
+    search,
+    priority: filterPriority,
+    type: filterType,
+    employee: filterEmployee,
+    dateFrom: dateMode === 'today' ? todayKey : startDate,
+    dateTo: dateMode === 'today' ? todayKey : endDate,
+  }
+  const overdueFilterKey = JSON.stringify(overdueFilters)
+  const [overduePageState, setOverduePageState] = useState({ key: '', page: 1 })
+  const overduePage = overduePageState.key === overdueFilterKey ? overduePageState.page : 1
+  const overdue = useOverdueMissions({
+    active: filterStatus === 'overdue',
+    page: overduePage,
+    filters: overdueFilters,
+    refreshKey: missions,
+  })
+  const goToOverduePage = (page) => setOverduePageState({ key: overdueFilterKey, page })
 
   const parseMissionDate = (mission) => {
     const raw = mission?.dueDate
@@ -134,15 +153,19 @@ export default function ListMission() {
       { key: 'En cours', label: 'En cours', count: countFor('En cours') },
       { key: 'Terminée', label: 'Terminées', count: countFor('Terminée') },
       { key: 'Bloquée', label: 'Bloquées', count: countFor('Bloquée') },
+      { key: 'overdue', label: 'En retard', count: overdue.loading ? '…' : overdue.total },
     ]
-  }, [baseFiltered])
+  }, [baseFiltered, overdue.loading, overdue.total])
 
   const visibleMissions = useMemo(() => {
-    return baseFiltered.filter((m) => {
-      if (filterStatus !== 'all' && m.status !== filterStatus) return false
-      return true
-    })
-  }, [baseFiltered, filterStatus])
+    // Onglet « En retard » : les filtres sont appliqués par le backend (pagination serveur).
+    if (filterStatus === 'overdue') {
+      return groupedMissionRows.filter(
+        (m) => overdue.ids.has(Number(m.id)) || (m.assignmentGroupId && overdue.groupIds.has(String(m.assignmentGroupId))),
+      )
+    }
+    return baseFiltered.filter((m) => filterStatus === 'all' || m.status === filterStatus)
+  }, [baseFiltered, groupedMissionRows, filterStatus, overdue.ids, overdue.groupIds])
 
   const employeeOptions = useMemo(() => {
     const names = new Set()
@@ -386,7 +409,7 @@ export default function ListMission() {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
               <div className="flex items-center gap-2.5">
                 <h2 id="missions-heading" className="font-display text-base font-bold text-ink">Toutes les missions</h2>
-                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold tabular-nums text-ink-muted">{visibleMissions.length}</span>
+                <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold tabular-nums text-ink-muted">{filterStatus === 'overdue' ? overdue.total : visibleMissions.length}</span>
                 <span className="hidden items-center gap-1.5 rounded-md bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700 sm:inline-flex">
                   <Wrench size={12} aria-hidden="true" /> {interventionsLinkedCount} SAV liées
                 </span>
@@ -438,7 +461,7 @@ export default function ListMission() {
                   <label htmlFor="filter-type" className="ui-label">Type de mission</label>
                   <select id="filter-type" value={filterType} onChange={(e) => setFilterType(e.target.value)} className="ui-select">
                     <option value="all">Tous les types</option>
-                    <option value="Normal">Normal</option>
+                    <option value="Normal">Mission normale</option>
                     <option value="Intervention">Intervention S.A.V</option>
                   </select>
                 </div>
@@ -492,7 +515,7 @@ export default function ListMission() {
             </div>
           </div>
 
-          <MissionTable
+          <MissionTable currentUser={currentUser}
             ref={tableRef}
             missions={visibleMissions}
             highlightMissionId={highlightMissionId}
@@ -500,6 +523,22 @@ export default function ListMission() {
             onMissionsChanged={refreshMissions}
             onRequestDelete={(mission) => setDeleteDialog({ open: true, mission, isDeleting: false })}
           />
+
+          {filterStatus === 'overdue' && (
+            <nav aria-label="Pagination des missions en retard" className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 sm:px-5">
+              <p className="text-xs font-medium text-ink-muted" aria-live="polite">
+                {overdue.error || `${overdue.total} mission${overdue.total > 1 ? 's' : ''} en retard · page ${overduePage} / ${overdue.totalPages}`}
+              </p>
+              <div className="flex items-center gap-2">
+                <button type="button" className="ui-btn-secondary" disabled={overduePage <= 1 || overdue.loading} onClick={() => goToOverduePage(overduePage - 1)}>
+                  Précédent
+                </button>
+                <button type="button" className="ui-btn-secondary" disabled={overduePage >= overdue.totalPages || overdue.loading} onClick={() => goToOverduePage(overduePage + 1)}>
+                  Suivant
+                </button>
+              </div>
+            </nav>
+          )}
         </section>
       </div>
     </div>

@@ -35,10 +35,18 @@ export function useOperationsDashboardData() {
         apiFetch('/interventions/summary', { auth: true }),
         apiFetch('/machines/summary', { auth: true }),
       ])
+      const savResult = await Promise.allSettled([apiFetch('/sav/dashboard', { auth: true, noCache: true })])
       if (cancelled) return
       const [users, missions, interventions, machines] = await Promise.all(results.map((r) => readArray(r)))
+      let overdueMissions = null
+      const savResponse = savResult[0].status === 'fulfilled' ? savResult[0].value : null
+      if (savResponse?.ok) {
+        const body = await savResponse.json().catch(() => null)
+        const value = Number(body?.missions?.overdue)
+        overdueMissions = Number.isFinite(value) ? value : null
+      }
       if (cancelled) return
-      setState({ isLoading: false, users, missions, interventions, machines })
+      setState({ isLoading: false, users, missions, interventions, machines, overdueMissions })
     }
     loadAll()
     return () => { cancelled = true }

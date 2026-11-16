@@ -302,7 +302,7 @@ export default function EmployeeHistory() {
   )
 
   const renderSkeletonCard = (key) => (
-    <div key={key} className="animate-pulse rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+    <div key={key} className="animate-pulse rounded-2xl border border-line bg-white p-4 space-y-3">
       <div className="flex items-center justify-between">
         <div className="h-4 w-24 bg-slate-200 rounded" />
         <div className="h-6 w-20 bg-slate-200 rounded-full" />
@@ -321,21 +321,21 @@ export default function EmployeeHistory() {
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-8 space-y-5 sm:space-y-6">
 
         {/* ── En-tête ── */}
-        <div className="flex flex-col gap-5 sm:flex-row sm:justify-between sm:items-center bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="flex flex-col gap-5 sm:flex-row sm:justify-between sm:items-center bg-white p-5 sm:p-6 rounded-2xl border border-line shadow-sm">
           <div className="flex items-center gap-4 sm:gap-5 min-w-0">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-brand-600 to-blue-700 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 shrink-0">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-brand-600 to-brand-700 rounded-2xl flex items-center justify-center shadow-lg shadow-brand-200 shrink-0">
               <History size={24} className="text-white" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">Historique des interventions</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-ink tracking-tight leading-tight">Historique des interventions</h1>
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-brand-600/10 text-brand-600 text-[11px] font-black rounded-lg uppercase tracking-wider">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-brand-600/10 text-brand-600 text-[11px] font-bold rounded-lg uppercase tracking-wider">
                   <User size={11} /> {employeeName || '—'}
                 </span>
                 {resolvedRole && (
-                  <span className="px-2.5 py-1 bg-slate-100 text-slate-600 text-[11px] font-bold rounded-lg">{resolvedRole}</span>
+                  <span className="px-2.5 py-1 bg-slate-100 text-ink-muted text-[11px] font-bold rounded-lg">{resolvedRole}</span>
                 )}
-                <span className="text-xs text-slate-400 font-semibold hidden sm:inline">Interventions clôturées et validées</span>
+                <span className="text-xs text-ink-faint font-semibold hidden sm:inline">Interventions clôturées et validées</span>
               </div>
             </div>
           </div>
@@ -347,31 +347,31 @@ export default function EmployeeHistory() {
                 <CheckCircle2 size={20} />
               </div>
               <div>
-                <p className="text-[10px] font-black text-green-600/80 uppercase tracking-wider leading-none">Clôturées</p>
-                <p className="text-xl font-black text-slate-900 leading-tight">{filtered.length}</p>
+                <p className="text-[10px] font-bold text-green-600/80 uppercase tracking-wider leading-none">Clôturées</p>
+                <p className="text-xl font-bold text-ink leading-tight">{filtered.length}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* ── Filtres ── */}
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row gap-4">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-line shadow-sm flex flex-col xl:flex-row gap-4">
           <div className="relative flex-1 min-w-0 group">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" />
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint group-focus-within:text-brand-600 transition-colors" />
             <input
               type="text"
               placeholder="Rechercher (réf, fiche, client, machine, site)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-base sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 hover:border-slate-300 transition-all placeholder:text-slate-400"
+              className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-line rounded-xl text-base sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 hover:border-slate-300 transition-all placeholder:text-ink-faint"
             />
           </div>
 
           {/* Filtres date : empilés sur mobile, 2 colonnes sur tablette */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:flex xl:items-end gap-3">
             <div className="flex flex-col gap-1.5 min-w-0">
-              <label htmlFor="filter-from-date" className="text-[11px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                <Calendar size={13} className="text-slate-400" /> Date de début
+              <label htmlFor="filter-from-date" className="text-[11px] font-bold text-ink-muted uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar size={13} className="text-ink-faint" /> Date de début
               </label>
               <div className="relative min-w-0">
                 <input
@@ -380,18 +380,18 @@ export default function EmployeeHistory() {
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
                   aria-label="Date de début"
-                  className="w-full sm:w-auto xl:w-[160px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-base sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 hover:border-slate-300 transition-all min-w-0"
+                  className="w-full sm:w-auto xl:w-[160px] bg-slate-50 border border-line rounded-xl px-3 py-3 text-base sm:text-sm text-ink font-medium focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 hover:border-slate-300 transition-all min-w-0"
                 />
                 {!fromDate && (
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-medium pointer-events-none sm:hidden">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-faint font-medium pointer-events-none sm:hidden">
                     JJ/MM/AAAA
                   </span>
                 )}
               </div>
             </div>
             <div className="flex flex-col gap-1.5 min-w-0">
-              <label htmlFor="filter-to-date" className="text-[11px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                <Calendar size={13} className="text-slate-400" /> Date de fin
+              <label htmlFor="filter-to-date" className="text-[11px] font-bold text-ink-muted uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar size={13} className="text-ink-faint" /> Date de fin
               </label>
               <div className="relative min-w-0">
                 <input
@@ -400,10 +400,10 @@ export default function EmployeeHistory() {
                   value={toDate}
                   onChange={(e) => setToDate(e.target.value)}
                   aria-label="Date de fin"
-                  className="w-full sm:w-auto xl:w-[160px] bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-base sm:text-sm text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 hover:border-slate-300 transition-all min-w-0"
+                  className="w-full sm:w-auto xl:w-[160px] bg-slate-50 border border-line rounded-xl px-3 py-3 text-base sm:text-sm text-ink font-medium focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 hover:border-slate-300 transition-all min-w-0"
                 />
                 {!toDate && (
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-medium pointer-events-none sm:hidden">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-faint font-medium pointer-events-none sm:hidden">
                     JJ/MM/AAAA
                   </span>
                 )}
@@ -413,7 +413,7 @@ export default function EmployeeHistory() {
               <button
                 type="button"
                 onClick={resetFilters}
-                className="sm:col-span-2 xl:col-span-1 inline-flex items-center justify-center gap-1.5 px-3.5 py-3 rounded-xl border border-red-200 bg-red-50 text-red-600 text-sm font-black hover:bg-red-100 transition-colors active:scale-95"
+                className="sm:col-span-2 xl:col-span-1 inline-flex items-center justify-center gap-1.5 px-3.5 py-3 rounded-xl border border-red-200 bg-red-50 text-red-600 text-sm font-bold hover:bg-red-100 transition-colors active:scale-95"
               >
                 <X size={16} /> Réinitialiser
               </button>
@@ -426,14 +426,14 @@ export default function EmployeeHistory() {
           {isLoading ? (
             <>{renderSkeletonCard('s1')}{renderSkeletonCard('s2')}{renderSkeletonCard('s3')}</>
           ) : filtered.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center px-6 py-12">
-              <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center mb-3">
-                <AlertCircle size={24} className="text-slate-400" />
+            <div className="bg-white rounded-2xl border border-line shadow-sm flex flex-col items-center justify-center text-center px-6 py-12">
+              <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-line flex items-center justify-center mb-3">
+                <AlertCircle size={24} className="text-ink-faint" />
               </div>
-              <p className="text-sm font-black text-slate-700">Aucune intervention clôturée</p>
-              <p className="text-xs text-slate-500 mt-1">{hasActiveFilters ? 'Modifiez vos filtres ou réinitialisez la recherche.' : 'Les interventions validées apparaîtront ici.'}</p>
+              <p className="text-sm font-bold text-ink-muted">Aucune intervention clôturée</p>
+              <p className="text-xs text-ink-muted mt-1">{hasActiveFilters ? 'Modifiez vos filtres ou réinitialisez la recherche.' : 'Les interventions validées apparaîtront ici.'}</p>
               {hasActiveFilters && (
-                <button type="button" onClick={resetFilters} className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black active:scale-95 transition-transform">
+                <button type="button" onClick={resetFilters} className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold active:scale-95 transition-transform">
                   <X size={14} /> Réinitialiser
                 </button>
               )}
@@ -444,38 +444,38 @@ export default function EmployeeHistory() {
                 key={row.id}
                 ref={row.id === highlightId ? highlightRowRef : null}
                 className={`rounded-2xl border bg-white shadow-sm overflow-hidden transition-all ${
-                  row.id === highlightId ? 'border-amber-300 ring-2 ring-amber-200 animate-pulse' : 'border-slate-200'
+                  row.id === highlightId ? 'border-amber-300 ring-2 ring-amber-200 animate-pulse' : 'border-line'
                 }`}
               >
                 <div className="h-1 w-full bg-green-500" />
                 <div className="p-4">
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-ink-faint uppercase tracking-wider mb-0.5">
                         <Hash size={11} /> {row.ficheNumber || row.id}
                       </div>
-                      <p className="text-base font-black text-slate-900 leading-tight truncate">{row.clientName || '—'}</p>
+                      <p className="text-base font-bold text-ink leading-tight truncate">{row.clientName || '—'}</p>
                     </div>
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-black border bg-green-50 text-green-700 border-green-200 shrink-0">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold border bg-green-50 text-green-700 border-green-200 shrink-0">
                       <CheckCircle2 size={11} /> Clôturée
                     </span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2.5 mb-4">
-                    <div className="flex items-center gap-2 text-xs text-slate-600 font-semibold min-w-0">
-                      <Calendar size={13} className="text-slate-400 shrink-0" />
+                    <div className="flex items-center gap-2 text-xs text-ink-muted font-semibold min-w-0">
+                      <Calendar size={13} className="text-ink-faint shrink-0" />
                       <span className="truncate">{row.interventionDate || '—'}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-slate-600 font-semibold min-w-0">
-                      <Building2 size={13} className="text-slate-400 shrink-0" />
+                    <div className="flex items-center gap-2 text-xs text-ink-muted font-semibold min-w-0">
+                      <Building2 size={13} className="text-ink-faint shrink-0" />
                       <span className="truncate">{row.siteName || '—'}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-slate-600 font-semibold min-w-0">
-                      <Wrench size={13} className="text-slate-400 shrink-0" />
+                    <div className="flex items-center gap-2 text-xs text-ink-muted font-semibold min-w-0">
+                      <Wrench size={13} className="text-ink-faint shrink-0" />
                       <span className="truncate">{row.machine || '—'}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-slate-600 font-semibold min-w-0">
-                      <User size={13} className="text-slate-400 shrink-0" />
+                    <div className="flex items-center gap-2 text-xs text-ink-muted font-semibold min-w-0">
+                      <User size={13} className="text-ink-faint shrink-0" />
                       <span className="truncate">{row.assignedEmployeesDisplay || row.technicianName || '—'}</span>
                     </div>
                   </div>
@@ -484,7 +484,7 @@ export default function EmployeeHistory() {
                     <button
                       type="button"
                       onClick={() => handleOpenDetails(row)}
-                      className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-900 hover:bg-slate-950 text-white rounded-xl text-xs font-black transition-colors active:scale-95"
+                      className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 bg-slate-900 hover:bg-slate-950 text-white rounded-xl text-xs font-bold transition-colors active:scale-95"
                     >
                       <Eye size={14} /> Détails
                     </button>
@@ -500,7 +500,7 @@ export default function EmployeeHistory() {
                             },
                           })
                         }
-                        className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-black transition-colors active:scale-95"
+                        className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 bg-white hover:bg-slate-50 text-ink-muted border border-line rounded-xl text-xs font-bold transition-colors active:scale-95"
                       >
                         <Edit3 size={14} /> Modifier
                       </button>
@@ -513,17 +513,17 @@ export default function EmployeeHistory() {
         </div>
 
         {/* ── Vue desktop : tableau ── */}
-        <div className="hidden lg:flex bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex-col">
+        <div className="hidden lg:flex bg-white rounded-2xl border border-line shadow-sm overflow-hidden flex-col">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200">
-                  <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-wider">Référence</th>
-                  <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-wider">Client</th>
-                  <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-wider">Machine</th>
-                  <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-wider">Statut</th>
-                  <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                <tr className="bg-slate-50/80 border-b border-line">
+                  <th className="px-6 py-4 text-xs font-bold text-ink-muted uppercase tracking-wider">Référence</th>
+                  <th className="px-6 py-4 text-xs font-bold text-ink-muted uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-4 text-xs font-bold text-ink-muted uppercase tracking-wider">Client</th>
+                  <th className="px-6 py-4 text-xs font-bold text-ink-muted uppercase tracking-wider">Machine</th>
+                  <th className="px-6 py-4 text-xs font-bold text-ink-muted uppercase tracking-wider">Statut</th>
+                  <th className="px-6 py-4 text-xs font-bold text-ink-muted uppercase tracking-wider text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -537,13 +537,13 @@ export default function EmployeeHistory() {
                   <tr>
                     <td colSpan={6} className="px-6 py-12">
                       <div className="flex flex-col items-center justify-center text-center">
-                        <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center mb-3">
-                          <AlertCircle size={24} className="text-slate-400" />
+                        <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-line flex items-center justify-center mb-3">
+                          <AlertCircle size={24} className="text-ink-faint" />
                         </div>
-                        <p className="text-sm font-black text-slate-700">Aucune intervention clôturée</p>
-                        <p className="text-xs text-slate-500 mt-1">{hasActiveFilters ? 'Modifiez vos filtres ou effectuez une autre recherche.' : 'Les interventions validées apparaîtront ici.'}</p>
+                        <p className="text-sm font-bold text-ink-muted">Aucune intervention clôturée</p>
+                        <p className="text-xs text-ink-muted mt-1">{hasActiveFilters ? 'Modifiez vos filtres ou effectuez une autre recherche.' : 'Les interventions validées apparaîtront ici.'}</p>
                         {hasActiveFilters && (
-                          <button type="button" onClick={resetFilters} className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black hover:bg-slate-950 transition-colors">
+                          <button type="button" onClick={resetFilters} className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-950 transition-colors">
                             <X size={14} /> Réinitialiser les filtres
                           </button>
                         )}
@@ -563,23 +563,23 @@ export default function EmployeeHistory() {
                     >
                       <td className="px-6 py-4">
                         <div className="min-w-0">
-                          <p className="text-sm font-black text-slate-900">{row.id}</p>
-                          <p className="text-xs text-slate-500 font-semibold truncate">{row.ficheNumber || '—'}</p>
+                          <p className="text-sm font-bold text-ink">{row.id}</p>
+                          <p className="text-xs text-ink-muted font-semibold truncate">{row.ficheNumber || '—'}</p>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm font-semibold text-slate-700">{row.interventionDate || '—'}</p>
-                        <p className="text-xs text-slate-500 font-semibold">{row.siteName || '—'}</p>
+                        <p className="text-sm font-semibold text-ink-muted">{row.interventionDate || '—'}</p>
+                        <p className="text-xs text-ink-muted font-semibold">{row.siteName || '—'}</p>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm font-semibold text-slate-900">{row.clientName || '—'}</p>
-                        <p className="text-xs text-slate-500 font-semibold">{row.assignedEmployeesDisplay || row.technicianName || ''}</p>
+                        <p className="text-sm font-semibold text-ink">{row.clientName || '—'}</p>
+                        <p className="text-xs text-ink-muted font-semibold">{row.assignedEmployeesDisplay || row.technicianName || ''}</p>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm font-semibold text-slate-700">{row.machine || '—'}</p>
+                        <p className="text-sm font-semibold text-ink-muted">{row.machine || '—'}</p>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold border ${statusBadgeByStatus[row.status] || 'bg-slate-50 text-slate-700 border-slate-200'}`}>
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold border ${statusBadgeByStatus[row.status] || 'bg-slate-50 text-ink-muted border-line'}`}>
                           <CheckCircle2 size={12} /> Clôturée
                         </span>
                       </td>
@@ -588,7 +588,7 @@ export default function EmployeeHistory() {
                           <button
                             type="button"
                             onClick={() => handleOpenDetails(row)}
-                            className="inline-flex items-center gap-2 px-3 py-2 bg-slate-900 hover:bg-slate-950 text-white rounded-xl text-xs font-black transition-colors"
+                            className="inline-flex items-center gap-2 px-3 py-2 bg-slate-900 hover:bg-slate-950 text-white rounded-xl text-xs font-bold transition-colors"
                           >
                             <Eye size={14} /> Détails
                           </button>
@@ -604,7 +604,7 @@ export default function EmployeeHistory() {
                                   },
                                 })
                               }
-                              className="inline-flex items-center gap-2 px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-black transition-colors"
+                              className="inline-flex items-center gap-2 px-3 py-2 bg-white hover:bg-slate-50 text-ink-muted border border-line rounded-xl text-xs font-bold transition-colors"
                             >
                               <Edit3 size={14} /> Modifier
                             </button>
@@ -621,22 +621,22 @@ export default function EmployeeHistory() {
 
         {showDetails && selected && createPortal(
           <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm overscroll-contain" onClick={handleCloseDetails}>
-            <div className="relative w-full max-w-5xl bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col h-[92vh]" onClick={(e) => e.stopPropagation()}>
-              <div className="px-5 py-4 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
+            <div className="relative w-full max-w-5xl bg-white rounded-3xl border border-line shadow-modal overflow-hidden flex flex-col h-[92vh]" onClick={(e) => e.stopPropagation()}>
+              <div className="px-5 py-4 bg-white border-b border-line flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-8 h-8 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center">
                     <Eye size={18} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aperçu de la fiche officielle</p>
-                    <p className="text-sm font-black text-slate-900 truncate">{selected.id}</p>
+                    <p className="text-[10px] font-bold text-ink-faint uppercase tracking-wider">Aperçu de la fiche officielle</p>
+                    <p className="text-sm font-bold text-ink truncate">{selected.id}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={handleCloseDetails}
-                    className="w-10 h-10 flex items-center justify-center bg-slate-100 text-slate-400 rounded-full hover:bg-slate-200 transition-colors"
+                    className="w-10 h-10 flex items-center justify-center bg-slate-100 text-ink-faint rounded-full hover:bg-slate-200 transition-colors"
                   >
                     <X size={18} />
                   </button>
@@ -645,11 +645,11 @@ export default function EmployeeHistory() {
               <div className="flex-1 overflow-hidden flex">
                 <InterventionPreview intervention={selected} />
               </div>
-              <div className="p-4 bg-slate-50 border-t border-slate-100 shrink-0">
+              <div className="p-4 bg-slate-50 border-t border-line shrink-0">
                 <button
                   type="button"
                   onClick={handleCloseDetails}
-                  className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-transform"
+                  className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-bold text-xs uppercase tracking-wider active:scale-95 transition-transform"
                 >
                   Fermer l'aperçu
                 </button>

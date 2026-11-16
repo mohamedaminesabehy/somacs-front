@@ -1,38 +1,41 @@
 import { forwardRef, useImperativeHandle, useState, useEffect, useRef } from 'react'
-import { AlertCircle, ClipboardList, Users, Eye, Edit, Trash2, MapPin, Building2, Phone, Calendar, Wrench, Paperclip, FileText, Clock, UserCheck, Hourglass, Link2, Download, Truck } from 'lucide-react'
+import { AlertCircle, ClipboardList, Users, Eye, Edit, Trash2, MapPin, Building2, Phone, Calendar, Wrench, Paperclip, FileText, Clock, UserCheck, Hourglass, Link2, Download, Truck, ChevronLeft, ChevronRight, CheckCircle2, UploadCloud } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 import { getAvatarFromName } from '../../utils/format'
-import { getStatusColorKey } from '../../utils/status'
 import { useMissionTableData } from './useMissionTableData'
 import {
-  priorityColors,
-  statusColors,
   interventionStatusColors,
   getGroupedEmployeeStatuses,
   truncateText,
-  getPriorityColor,
-  getStatusIcon,
-  getPriorityPrefix,
   getMissionDisplayData,
-  getViewStatusColor,
   validateMissionForm,
-  submitGroupMission,
-  submitSingleMission,
+  updateMission,
+  submitMissionEdit,
 } from './missionTable.helpers'
-import technicien from '../../assets/technicien.avif'
+import Modal from '../ui/Modal'
+import { Link } from 'react-router-dom'
+import { Toast } from '../ui/DataKit'
+import { InlineAlert, SkeletonLines } from '../ui/Feedback'
+import StatusBadge from '../ui/StatusBadge'
+import MissionViewBadge from './MissionViewBadge'
+import { EmptyState as UiEmptyState } from '../ui/Feedback'
 
-function EmptyState() {
+function MissionEmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center text-center">
-      <div className="w-12 h-12 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center mb-3">
-        <AlertCircle size={22} className="text-gray-400" />
-      </div>
-      <p className="text-xs text-gray-500 mt-1">
-        Il n&apos;y a pas de mission correspondant à vos filtres.
-      </p>
-    </div>
+    <UiEmptyState
+      icon={AlertCircle}
+      title="Aucune mission"
+      description="Aucune mission ne correspond à vos filtres. Modifiez la recherche ou réinitialisez les filtres."
+    />
   )
 }
+
+const PRIORITY_OPTIONS = [
+  { value: 'Critique', dot: 'bg-red-500' },
+  { value: 'Haute', dot: 'bg-amber-500' },
+  { value: 'Moyenne', dot: 'bg-brand-600' },
+  { value: 'Basse', dot: 'bg-slate-400' },
+]
 
 function MissionTableInner(props, ref) {
   const {
@@ -41,8 +44,20 @@ function MissionTableInner(props, ref) {
     onRequestDelete,
     highlightMissionId,
     highlightAssignmentGroupId,
+    panelsOnly = false,
+    currentUser,
   } = props || {}
-  const { missions, fetchMissions, interventionsList, employeeUsers, fetchInterventions } = useMissionTableData(missionsProp)
+  const canEdit = Boolean(currentUser?.role) && String(currentUser.role).toLowerCase() !== 'technicien'
+  const [panelLoading, setPanelLoading] = useState(false)
+  const [panelError, setPanelError] = useState('')
+  const [saveToast, setSaveToast] = useState(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [formVehicleId, setFormVehicleId] = useState('')
+  const [formDriverId, setFormDriverId] = useState('')
+  const [vehicles, setVehicles] = useState([])
+  const [originalMission, setOriginalMission] = useState(null)
+  const requestId = useRef(0)
+  const { missions, fetchMissions, interventionsList, employeeUsers, dataError } = useMissionTableData(missionsProp, canEdit)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState('create')
   const [formMissionId, setFormMissionId] = useState(null)
@@ -64,6 +79,7 @@ function MissionTableInner(props, ref) {
   const [existingAttachments, setExistingAttachments] = useState([])
   const [newAttachments, setNewAttachments] = useState([])
 
+  const [formError, setFormError] = useState('')
   const [isViewOpen, setIsViewOpen] = useState(false)
   const [viewMission, setViewMission] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -76,7 +92,7 @@ function MissionTableInner(props, ref) {
   const hasHighlight = Boolean(activeHighlightMissionId || activeHighlightGroupId)
 
   // Only show PENDING and ASSIGNED interventions in the "Lier à une intervention" dropdown
-  const linkableInterventions = interventionsList.filter(i => i.status === 'PENDING' || i.status === 'ASSIGNED')
+  const linkableInterventions = interventionsList.filter(i => i.status === 'PENDING' || i.status === 'ASSIGNED' || i.id === selectedInterventionId)
 
   const employeeOptions = employeeUsers
   const selectedIntervention = linkableInterventions.find(i => i.id === selectedInterventionId)
@@ -112,32 +128,37 @@ function MissionTableInner(props, ref) {
     return () => window.clearTimeout(t)
   }, [hasHighlight, paginatedMissions.length, safeCurrentPage])
 
-  const handleOpenCreateModal = () => {
-    setModalMode('create')
-    setFormMissionId(null)
-    setFormTitle('')
-    setFormDescription('')
-    setFormEmployee('') // Vider pour forcer nouvelle sélection
-    setFormEmployeeIds([]) // NOUVEAU: array vide
-    setFormPriority('Moyenne')
-    setFormDueDate('')
-    setFormDueTime('')
-    setFormNotes('')
-    setFormStatus('À faire')
-    setMissionType('Normal')
-    setSelectedInterventionId('')
-    setFormSite('')
-    setFormAddress('')
-    setExistingAttachments([])
-    setNewAttachments([])
+  const handleOpenEditModal = async (source) => {
+    if (!canEdit) return
+    const id = ++requestId.current
+    setIsViewOpen(false)
     setIsModalOpen(true)
-  }
-
-  const handleOpenEditModal = (mission) => {
+    setPanelLoading(true)
+    setOriginalMission(null)
+    setFormError('')
+    let mission
+    try {
+      const response = await apiFetch(`/missions/${source.id}`, { auth: true, noCache: true })
+      if (!response.ok) throw new Error('Impossible de charger la mission pour modification.')
+      mission = await response.json()
+      const vehicleResponse = await apiFetch('/vehicles', { auth: true, noCache: true })
+      if (!vehicleResponse.ok) throw new Error('Impossible de vérifier la disponibilité des véhicules.')
+      const vehicleData = await vehicleResponse.json()
+      if (id !== requestId.current) return
+      setVehicles(Array.isArray(vehicleData) ? vehicleData : [])
+    } catch (error) {
+      if (id === requestId.current) { setFormError(error.message); setPanelLoading(false) }
+      return
+    }
+    setPanelLoading(false)
+    setOriginalMission(mission)
+    setFormEmployeeIds((mission.team?.length ? mission.team.map(t => t.userId) : mission.employeeUserId ? [mission.employeeUserId] : []).map(Number))
+    setFormVehicleId(mission.vehicleId ? String(mission.vehicleId) : '')
+    setFormDriverId(mission.driverUserId ? String(mission.driverUserId) : '')
     setModalMode('edit')
     setFormMissionId(mission.id)
-    setFormTitle(mission.title)
-    setFormDescription(mission.description)
+    setFormTitle(mission.title || '')
+    setFormDescription(mission.description || '')
     setFormEmployee(
       mission.employeeUserId
         ? String(mission.employeeUserId)
@@ -146,7 +167,7 @@ function MissionTableInner(props, ref) {
           : '',
     )
     setFormPriority(mission.priority)
-    setFormDueDate(mission.dueDate)
+    setFormDueDate(mission.dueDate || '')
     setFormDueTime(mission.dueTime || '')
     setFormNotes(mission.notes || '')
     setFormStatus(mission.status || 'À faire')
@@ -160,6 +181,9 @@ function MissionTableInner(props, ref) {
   }
 
   const handleCloseModal = () => {
+    if (isSaving) return
+    requestId.current += 1
+    setFormError('')
     setIsModalOpen(false)
   }
 
@@ -170,7 +194,7 @@ function MissionTableInner(props, ref) {
     const maxBytes = 10 * 1024 * 1024
     const allowed = files.filter((f) => f.size <= maxBytes)
     if (allowed.length !== files.length) {
-      alert('Certains fichiers dépassent 10MB et ont été ignorés.')
+      setFormError('Certains fichiers dépassent 10 Mo et ont été ignorés.')
     }
 
     setNewAttachments((prev) => {
@@ -205,45 +229,74 @@ function MissionTableInner(props, ref) {
       formTitle, formDescription, formEmployeeIds, formEmployee, missionType, selectedInterventionId,
     })
     if (validationError) {
-      alert(validationError)
+      setFormError(validationError)
+      document.getElementById('mission-form-error')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       return
     }
+    setFormError('')
 
     const refreshAfterSave = () => {
-      if (typeof onMissionsChanged === 'function') onMissionsChanged()
-      else fetchMissions()
+      if (typeof onMissionsChanged === 'function') return onMissionsChanged()
+      return fetchMissions()
     }
 
-    const hasMultipleEmployees = Array.isArray(formEmployeeIds) && formEmployeeIds.length > 0
-    if (hasMultipleEmployees) {
-      await submitGroupMission({
-        formTitle, formDescription, formPriority, formDueDate, formDueTime, formNotes,
-        missionType, formSite, formAddress, selectedIntervention, selectedInterventionId, formEmployeeIds,
-        refreshAfterSave, setIsModalOpen,
-      })
+    if (isSaving || panelLoading || !canEdit || !originalMission) return
+    const teamIds = formEmployeeIds.length ? formEmployeeIds : formEmployee ? [Number(formEmployee)] : []
+    const driver = formVehicleId ? (teamIds.length === 1 ? teamIds[0] : Number(formDriverId)) : null
+    if (formVehicleId && !teamIds.includes(driver)) {
+      setFormError('Désignez le chauffeur parmi les techniciens sélectionnés.')
       return
     }
-
-    await submitSingleMission({
-      formTitle, formDescription, formPriority, formStatus, formDueDate, formDueTime, formNotes,
-      missionType, formSite, formAddress, selectedIntervention, selectedInterventionId,
-      modalMode, formMissionId, formEmployee, employeeUsers,
-      existingAttachments, newAttachments, refreshAfterSave, fetchInterventions, setIsModalOpen,
-    })
+    setIsSaving(true)
+    try {
+      await submitMissionEdit({
+        save: () => updateMission({
+          formMissionId: originalMission.id, formTitle, formDescription, formPriority, formStatus, formDueDate, formDueTime, formNotes,
+          missionType, formSite, formAddress, selectedIntervention, selectedInterventionId,
+          formEmployeeIds: teamIds, formVehicleId, formDriverId: driver,
+          expectedStatus: originalMission.status,
+          existingAttachments, newAttachments,
+        }),
+        closeDrawer: () => setIsModalOpen(false),
+        refresh: refreshAfterSave,
+      })
+      setSaveToast({ type: 'success', message: 'Mission modifiée avec succès.' })
+      window.dispatchEvent(new CustomEvent('mission:saved', { detail: { missionId: formMissionId } }))
+    } catch (error) {
+      setFormError(error.message || 'Impossible d’enregistrer la mission.')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
-  useImperativeHandle(ref, () => ({
-    openCreateModal: handleOpenCreateModal,
-  }))
+  useImperativeHandle(ref, () => ({ openDetails: handleOpenViewModal }))
 
-  const handleOpenViewModal = (mission) => {
-    const priorityColor = getPriorityColor(mission.priority)
-    const statusColor = getViewStatusColor(mission.status)
-    setViewMission({ ...mission, priorityColor, statusColor })
+  async function handleOpenViewModal(mission) {
+    const id = ++requestId.current
+    setIsModalOpen(false)
+    setViewMission(mission)
     setIsViewOpen(true)
+    setPanelLoading(true)
+    setPanelError('')
+    try {
+      const res = await apiFetch(`/missions/${mission.id}`, { auth: true, noCache: true })
+      if (!res.ok) throw new Error(`Impossible de charger cette mission (HTTP ${res.status}).`)
+      const detail = await res.json()
+      let intervention = null
+      if (detail.interventionId) {
+        const linked = await apiFetch(`/interventions/${detail.interventionId}`, { auth: true, noCache: true })
+        if (linked.ok) intervention = await linked.json()
+      }
+      if (requestId.current === id) setViewMission({ ...detail, intervention })
+    } catch (error) {
+      if (requestId.current === id) setPanelError(error.message)
+    } finally {
+      if (requestId.current === id) setPanelLoading(false)
+    }
   }
 
   const handleCloseViewModal = () => {
+    requestId.current += 1
     setIsViewOpen(false)
     setViewMission(null)
   }
@@ -268,1005 +321,607 @@ function MissionTableInner(props, ref) {
     }
   }
 
+  const renderStatus = (mission, compact = false) => {
+    const { groupedStatuses, isGroupedMission } = getMissionDisplayData(mission)
+    if (!isGroupedMission) return <StatusBadge status={mission.status} />
+    return (
+      <ul className={`flex flex-col gap-1.5 ${compact ? '' : 'min-w-[190px]'}`}>
+        {groupedStatuses.map((entry) => (
+          <li key={`${mission.id}_${entry.name}`} className="flex items-center justify-between gap-2">
+            <span className="truncate text-xs font-medium text-ink-soft">{entry.name}</span>
+            <StatusBadge status={entry.status} />
+          </li>
+        ))}
+      </ul>
+    )
+  }
+
+  const renderTypeBadge = (mission) => (
+    mission.type === 'Intervention' ? (
+      <span className="ui-badge bg-brand-50 text-brand-700 ring-brand-200">
+        <Wrench size={11} aria-hidden="true" /> Intervention S.A.V
+      </span>
+    ) : (
+      <span className="ui-badge bg-slate-100 text-slate-700 ring-slate-200">
+        <ClipboardList size={11} aria-hidden="true" /> Normal
+      </span>
+    )
+  )
+
+  const isRowHighlighted = (mission) =>
+    (activeHighlightMissionId && String(mission?.id) === activeHighlightMissionId) ||
+    (activeHighlightGroupId && String(mission?.assignmentGroupId || '').trim() === activeHighlightGroupId)
+
+  const sectionTitle = (Icon, label) => (
+    <h3 className="ui-eyebrow mb-3 flex items-center gap-2 text-brand-700">
+      <Icon size={13} aria-hidden="true" /> {label}
+    </h3>
+  )
+
   return (
-    <div className="relative bg-slate-50 lg:bg-white lg:rounded-lg lg:border lg:border-gray-200 lg:overflow-hidden">
-      {/* Mobile / tablet cards */}
-      <div className="lg:hidden px-4 py-4 sm:px-6 sm:py-5">
+    <div className="relative">
+      <Toast toast={saveToast} onClose={() => setSaveToast(null)} />
+      {!panelsOnly && <>
+      {/* Cartes mobile / tablette */}
+      <div className="p-3 sm:p-4 lg:hidden">
         {paginatedMissions.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-6 py-12">
-            <EmptyState />
-          </div>
+          <MissionEmptyState />
         ) : (
-          <div className="space-y-4 sm:space-y-5">
+          <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {paginatedMissions.map((mission) => {
-              const {
-                IconComponent,
-                priorityColor,
-                statusColor,
-                employeeDisplay,
-                groupedStatuses,
-                isGroupedMission,
-                avatar
-              } = getMissionDisplayData(mission)
-              const isHighlighted =
-                (activeHighlightMissionId && String(mission?.id) === activeHighlightMissionId) ||
-                (activeHighlightGroupId && String(mission?.assignmentGroupId || '').trim() === activeHighlightGroupId)
+              const { IconComponent, employeeDisplay, avatar } = getMissionDisplayData(mission)
+              const highlighted = isRowHighlighted(mission)
               return (
-                <div
+                <li
                   key={mission.id}
-                  ref={isHighlighted ? highlightRowRef : null}
-                  className={`bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-4 sm:p-5 transition active:scale-[0.99] sm:hover:shadow-md ${isHighlighted ? 'ring-2 ring-emerald-200 animate-pulse' : ''}`}
+                  ref={highlighted ? highlightRowRef : null}
+                  className={`flex flex-col overflow-hidden rounded-2xl border bg-white shadow-card transition ${highlighted ? 'border-teal-300 ring-2 ring-teal-200' : 'border-line'}`}
                 >
-                  <div className="flex items-start gap-3">
-                    <div className={`mt-0.5 w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${mission.type === 'Intervention' ? 'bg-blue-50' : 'bg-gray-100'}`}>
-                      <IconComponent size={18} className={`${mission.type === 'Intervention' ? 'text-brand-600' : 'text-gray-500'}`} />
-                    </div>
+                  <div className="flex items-start gap-3 p-4">
+                    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset ${mission.type === 'Intervention' ? 'bg-brand-50 text-brand-700 ring-brand-100' : 'bg-slate-100 text-slate-600 ring-slate-200'}`}>
+                      <IconComponent size={18} aria-hidden="true" />
+                    </span>
                     <div className="min-w-0 flex-1">
-                      <p className="font-bold text-gray-900 text-sm">{mission.title}</p>
-                      <p className="text-xs text-gray-500 mt-0.5" title={mission.description || ''}>{truncateText(mission.description, 60)}</p>
+                      <button type="button" onClick={() => handleOpenViewModal(mission)} className="break-words text-left font-display text-sm font-bold leading-snug text-ink hover:text-brand-700">{mission.title}</button>
+                      <p className="mt-0.5 text-xs leading-relaxed text-ink-muted" title={mission.description || ''}>{truncateText(mission.description, 80)}</p>
                     </div>
-                    <span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-medium shrink-0 ${priorityColors[priorityColor]}`}>
-                      {mission.priority}
-                    </span>
+                    <StatusBadge status={mission.priority} />
                   </div>
-
-                  <div className="mt-3 flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-brand-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
-                      {avatar}
+                  <div className="flex flex-wrap items-center gap-2 px-4">
+                    {renderTypeBadge(mission)}
+                    <span className="ui-badge bg-white text-ink-soft ring-line">
+                      <Calendar size={11} aria-hidden="true" /> {mission.dueDate}{mission.dueTime ? ` · ${mission.dueTime}` : ''}
+                    </span>
+                    {mission.interventionId && <span className="ui-ref">{mission.interventionId}</span>}
+                    <MissionViewBadge viewStatus={mission.viewStatus} />
+                  </div>
+                  <div className="mt-3 flex items-start justify-between gap-3 border-t border-slate-100 px-4 py-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-navy text-[10px] font-bold text-white">{avatar}</span>
+                      <span className="truncate text-xs font-semibold text-ink-soft">{employeeDisplay}</span>
                     </div>
-                    <span className="text-xs font-medium text-gray-800 truncate">{employeeDisplay}</span>
+                    <div className="min-w-0 max-w-[55%]">{renderStatus(mission, true)}</div>
                   </div>
-
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {mission.type === 'Intervention' ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold text-brand-600 bg-blue-50 border border-blue-100">
-                        <Wrench size={11} /> Intervention S.A.V
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-600 bg-slate-100 border border-slate-200">
-                        <ClipboardList size={11} /> Normal
-                      </span>
-                    )}
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium text-gray-600 bg-gray-50 border border-gray-100">
-                      <Calendar size={11} /> {mission.dueDate}{mission.dueTime ? ` · ${mission.dueTime}` : ''}
-                    </span>
-                  </div>
-
-                  <div className="mt-3">
-                    {isGroupedMission ? (
-                      <div className="space-y-1.5">
-                        {groupedStatuses.map((entry) => {
-                          const entryStatusColor = getStatusColorKey(entry.status)
-                          return (
-                            <div key={`${mission.id}_${entry.name}`} className="flex items-center justify-between gap-2">
-                              <span className="text-xs text-gray-700 font-medium truncate">{entry.name}</span>
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${statusColors[entryStatusColor]}`}>
-                                {entry.status}
-                              </span>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    ) : (
-                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${statusColors[statusColor]}`}>
-                        {mission.status}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-gray-50 text-gray-700 text-xs font-semibold hover:bg-gray-100 transition-colors"
-                      onClick={() => handleOpenViewModal(mission)}
-                    >
-                      <Eye size={14} /> Voir
+                  <div className="mt-auto grid grid-cols-3 divide-x divide-line border-t border-line bg-slate-50/60">
+                    <button type="button" onClick={() => handleOpenViewModal(mission)} className="flex h-11 items-center justify-center gap-1.5 text-xs font-semibold text-ink-soft hover:bg-white">
+                      <Eye size={14} aria-hidden="true" /> Voir
                     </button>
-                    <button
-                      type="button"
-                      className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition-colors"
-                      onClick={() => handleOpenEditModal(mission)}
-                    >
-                      <Edit size={14} /> Modifier
+                    <button type="button" disabled={!canEdit} onClick={() => handleOpenEditModal(mission)} className="flex h-11 items-center justify-center gap-1.5 text-xs font-semibold text-brand-700 hover:bg-white">
+                      <Edit size={14} aria-hidden="true" /> Modifier
                     </button>
-                    <button
-                      type="button"
-                      className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-red-50 text-red-600 text-xs font-semibold hover:bg-red-100 transition-colors"
-                      onClick={() => handleDeleteMission(mission)}
-                    >
-                      <Trash2 size={14} /> Suppr.
+                    <button type="button" onClick={() => handleDeleteMission(mission)} className="flex h-11 items-center justify-center gap-1.5 text-xs font-semibold text-red-600 hover:bg-white">
+                      <Trash2 size={14} aria-hidden="true" /> Supprimer
                     </button>
                   </div>
-                </div>
+                </li>
               )
             })}
-          </div>
+          </ul>
         )}
       </div>
 
-      <div className="overflow-x-auto hidden lg:block">
-        <table className="w-full min-w-[720px]">
-          <thead className="bg-gray-50 border-b border-gray-200">
+      {/* Tableau desktop */}
+      <div className="hidden min-w-0 lg:block">
+        <table className="ui-table table-fixed [&_td]:break-words [&_td]:px-3 [&_th]:px-3">
+          <thead>
             <tr>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Mission</th>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Employé</th>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Priorité</th>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Statut</th>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Type de mission</th>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Date mission</th>
-              <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
+              <th scope="col" className="w-[30%]">Mission</th>
+              <th scope="col" className="w-[20%]">Équipe</th>
+              <th scope="col" className="w-[18%]">Statut · Priorité</th>
+              <th scope="col" className="w-[17%]">Échéance</th>
+              <th scope="col" className="w-[15%] text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
-          {paginatedMissions.length === 0 ? (
-            <tr>
-              <td colSpan={7} className="px-6 py-12">
-                <EmptyState />
-              </td>
-            </tr>
-          ) : null}
-          {paginatedMissions.map((mission) => {
-            const {
-              IconComponent,
-              priorityColor,
-              statusColor,
-              employeeDisplay,
-              groupedStatuses,
-              isGroupedMission,
-              avatar
-            } = getMissionDisplayData(mission)
-            const isHighlighted =
-              (activeHighlightMissionId && String(mission?.id) === activeHighlightMissionId) ||
-              (activeHighlightGroupId && String(mission?.assignmentGroupId || '').trim() === activeHighlightGroupId)
-
-            return (
-              <tr
-                key={mission.id}
-                ref={isHighlighted ? highlightRowRef : null}
-                className={`transition-colors ${
-                  isHighlighted ? 'bg-emerald-50 ring-2 ring-emerald-200 animate-pulse' : 'hover:bg-gray-50'
-                }`}
-              >
-                <td className="px-4 sm:px-6 py-4">
-                  <div className="flex items-start gap-3">
-                    <div className={`mt-1 w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${mission.type === 'Intervention' ? 'bg-blue-50' : 'bg-gray-100'}`}>
-                      <IconComponent size={18} className={`${mission.type === 'Intervention' ? 'text-brand-600' : 'text-gray-500'}`} />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{mission.title}</p>
-                      <p className="text-sm text-gray-500" title={mission.description || ''}>{truncateText(mission.description)}</p>
-                      {mission.type === 'Intervention' && (
-                        <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-brand-600 bg-blue-50 px-2 py-0.5 rounded-md">
-                          <Link2 size={10} /> Intervention
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 sm:px-6 py-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-brand-600 text-white flex items-center justify-center text-xs font-bold">
-                      {avatar}
-                    </div>
-                    <span className="text-sm text-gray-900">{employeeDisplay}</span>
-                  </div>
-                </td>
-                <td className="px-4 sm:px-6 py-4">
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${priorityColors[priorityColor]}`}>
-                    {getPriorityPrefix(mission.priority)}{mission.priority}
-                  </span>
-                </td>
-                <td className="px-4 sm:px-6 py-4">
-                  {isGroupedMission ? (
-                    <div className="space-y-1.5 min-w-[180px]">
-                      {groupedStatuses.map((entry) => {
-                        const entryStatusColor = getStatusColorKey(entry.status)
-                        return (
-                        <div key={`${mission.id}_${entry.name}`} className="flex items-center justify-between gap-2">
-                          <span className="text-xs text-gray-700 font-medium truncate">{entry.name}</span>
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap ${statusColors[entryStatusColor]}`}>
-                            {getStatusIcon(entry.status)}{entry.status}
-                          </span>
-                        </div>
-                      )})}
-                    </div>
-                  ) : (
-                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${statusColors[statusColor]}`}>
-                      {getStatusIcon(mission.status)}{mission.status}
-                    </span>
-                  )}
-                </td>
-                <td className="px-4 sm:px-6 py-4">
-                  {mission.type === 'Intervention' ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold text-brand-600 bg-blue-50 border border-blue-100">
-                      <Wrench size={12} />
-                      Intervention S.A.V
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold text-slate-600 bg-slate-100 border border-slate-200">
-                      <ClipboardList size={12} />
-                      Normal
-                    </span>
-                  )}
-                </td>
-                <td className="px-4 sm:px-6 py-4">
-                  <p className="text-sm font-medium text-gray-900">{mission.dueDate}</p>
-                  {mission.dueTime && <p className="text-sm text-red-600">{mission.dueTime}</p>}
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
-                      onClick={() => handleOpenViewModal(mission)}
-                    >
-                      <Eye size={18} />
-                    </button>
-                    <button
-                      type="button"
-                      className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
-                      onClick={() => handleOpenEditModal(mission)}
-                    >
-                      <Edit size={18} />
-                    </button>
-                    <button
-                      type="button"
-                      className="p-1 text-gray-500 hover:text-red-700 hover:bg-red-50 rounded"
-                      onClick={() => handleDeleteMission(mission)}
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </td>
+          <tbody>
+            {paginatedMissions.length === 0 && (
+              <tr>
+                <td colSpan={5}><MissionEmptyState /></td>
               </tr>
-            )
-          })}
+            )}
+            {paginatedMissions.map((mission) => {
+              const { IconComponent, employeeDisplay, avatar, isGroupedMission, groupedStatuses } = getMissionDisplayData(mission)
+              const highlighted = isRowHighlighted(mission)
+              return (
+                <tr key={mission.id} ref={highlighted ? highlightRowRef : null} onClick={(e) => { if (!e.target.closest('button, a')) handleOpenViewModal(mission) }} className={`cursor-pointer ${highlighted ? 'bg-teal-50/70' : ''}`}>
+                  <td className="max-w-[340px]">
+                    <div className="flex items-start gap-3">
+                      <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset ${mission.type === 'Intervention' ? 'bg-brand-50 text-brand-700 ring-brand-100' : 'bg-slate-100 text-slate-600 ring-slate-200'}`}>
+                        <IconComponent size={17} aria-hidden="true" />
+                      </span>
+                      <div className="min-w-0">
+                        <button type="button" onClick={() => handleOpenViewModal(mission)} className="text-left font-semibold text-ink hover:text-brand-700">
+                          {mission.title}
+                        </button>
+                        <p className="mt-1 text-xs text-ink-muted">#{mission.id} · {mission.type === 'Intervention' ? 'Intervention SAV' : 'Mission normale'}</p>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          {mission.interventionId && (
+                            <span className="ui-ref gap-1"><Link2 size={10} aria-hidden="true" />{mission.interventionId}</span>
+                          )}
+                          <MissionViewBadge viewStatus={mission.viewStatus} />
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div className="flex items-center gap-2.5">
+                      {isGroupedMission ? (
+                        <span className="flex -space-x-2">
+                          {groupedStatuses.slice(0, 3).map((entry) => (
+                            <span key={entry.name} title={entry.name} className="flex h-8 w-8 items-center justify-center rounded-full bg-navy text-[10px] font-bold text-white ring-2 ring-white">
+                              {getAvatarFromName(entry.name)}
+                            </span>
+                          ))}
+                          {groupedStatuses.length > 3 && (
+                            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-ink-muted ring-2 ring-white">+{groupedStatuses.length - 3}</span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-navy text-[11px] font-bold text-white">{avatar}</span>
+                      )}
+                      <span className="min-w-0 break-words text-xs font-medium text-ink-soft">{employeeDisplay || 'Non renseigné'}</span>
+                    </div>
+                  </td>
+                  <td><div className="flex flex-col items-start gap-1.5"><StatusBadge status={mission.status} /><span className="text-xs text-ink-muted">{mission.priority || 'Non renseigné'}</span></div></td>
+                  <td className="whitespace-nowrap">
+                    <p className="text-sm font-semibold tabular-nums text-ink">{mission.dueDate}</p>
+                    {mission.dueTime && <p className="flex items-center gap-1 text-xs tabular-nums text-ink-muted"><Clock size={11} aria-hidden="true" />{mission.dueTime}</p>}
+                  </td>
+                  <td>
+                    <div className="flex flex-wrap items-center justify-end gap-1">
+                      <button type="button" onClick={() => handleOpenViewModal(mission)} className="ui-icon-btn h-9 w-9" aria-label={`Voir ${mission.title}`}>
+                        <Eye size={16} />
+                      </button>
+                      <button type="button" disabled={!canEdit} onClick={() => handleOpenEditModal(mission)} className="ui-icon-btn h-9 w-9 hover:bg-brand-50 hover:text-brand-700" aria-label={`Modifier ${mission.title}`}>
+                        <Edit size={16} />
+                      </button>
+                      <button type="button" onClick={() => handleDeleteMission(mission)} className="ui-icon-btn h-9 w-9 hover:bg-red-50 hover:text-red-600" aria-label={`Supprimer ${mission.title}`}>
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
+
       {totalMissions > 0 && (
-        <div className="mx-4 mb-4 mt-4 sm:mx-6 sm:mb-5 lg:mx-0 lg:mb-0 lg:mt-0 bg-white rounded-2xl border border-slate-200 shadow-sm lg:rounded-none lg:border-0 lg:border-t lg:border-gray-200 lg:shadow-none lg:bg-gray-50 flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-6 py-3">
-          <p className="text-xs sm:text-sm text-gray-600">
-            Affichage de{' '}
-            <span className="font-medium">
-              {startIndex + 1}–{Math.min(endIndex, totalMissions)}
-            </span>{' '}
-            sur <span className="font-medium">{totalMissions}</span> missions
+        <nav aria-label="Pagination des missions" className="flex flex-col items-center justify-between gap-3 border-t border-line bg-slate-50/60 px-4 py-3 sm:flex-row sm:px-5">
+          <p className="text-xs text-ink-muted">
+            <span className="font-semibold tabular-nums text-ink">{startIndex + 1}–{Math.min(endIndex, totalMissions)}</span> sur{' '}
+            <span className="font-semibold tabular-nums text-ink">{totalMissions}</span> missions
           </p>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-              disabled={safeCurrentPage === 1}
-              className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium border ${
-                safeCurrentPage === 1
-                  ? 'text-gray-400 border-gray-200 bg-white cursor-not-allowed'
-                  : 'text-gray-700 border-gray-300 bg-white hover:bg-gray-50'
-              }`}
-            >
-              Précédent
+          <div className="flex items-center gap-1.5">
+            <button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={safeCurrentPage === 1} className="ui-btn-secondary ui-btn-sm" aria-label="Page précédente">
+              <ChevronLeft size={14} aria-hidden="true" /> Précédent
             </button>
-            <span className="text-xs sm:text-sm text-gray-600">
-              Page <span className="font-medium">{safeCurrentPage}</span> sur{' '}
-              <span className="font-medium">{totalPages}</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-              disabled={safeCurrentPage === totalPages}
-              className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium border ${
-                safeCurrentPage === totalPages
-                  ? 'text-gray-400 border-gray-200 bg-white cursor-not-allowed'
-                  : 'text-gray-700 border-gray-300 bg-white hover:bg-gray-50'
-              }`}
-            >
-              Suivant
+            <span className="px-2 text-xs font-semibold tabular-nums text-ink-soft">{safeCurrentPage} / {totalPages}</span>
+            <button type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={safeCurrentPage === totalPages} className="ui-btn-secondary ui-btn-sm" aria-label="Page suivante">
+              Suivant <ChevronRight size={14} aria-hidden="true" />
             </button>
           </div>
-        </div>
+        </nav>
       )}
 
-      {/* ═══ CREATE/EDIT MODAL ═══ */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-          <div className="w-full max-w-2xl bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                  <ClipboardList size={22} className="text-brand-600" />
+      </>}
+      {/* ═══ MODALE CRÉATION / MODIFICATION ═══ */}
+      <Modal
+        side
+        dismissible={!isSaving}
+        open={isModalOpen}
+        onClose={handleCloseModal}
+        size="xl"
+        icon={ClipboardList}
+        title={modalMode === 'create' ? 'Ajouter une mission' : 'Modifier la mission'}
+        description={modalMode === 'create'
+          ? 'Renseignez les détails pour assigner une nouvelle mission.'
+          : 'Mettez à jour les informations de la mission existante.'}
+        footer={
+          <>
+            <button type="button" onClick={handleCloseModal} className="ui-btn-secondary">Annuler</button>
+            <button form="mission-form" type="submit" disabled={isSaving || panelLoading || !originalMission} className="ui-btn-primary disabled:opacity-50">
+              <CheckCircle2 size={16} aria-hidden="true" />
+              {modalMode === 'create' ? 'Créer la mission' : 'Enregistrer les modifications'}
+            </button>
+          </>
+        }
+      >
+        {dataError && <InlineAlert tone="error">{dataError}</InlineAlert>}
+        {panelLoading && <SkeletonLines count={6} />}
+        <form id="mission-form" onSubmit={handleSubmitModal} noValidate className={panelLoading ? 'hidden' : 'flex flex-col gap-7'}>
+          {formError && (
+            <div id="mission-form-error" role="alert" className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              <AlertCircle size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+              <div className="flex flex-col gap-0.5">
+                <p className="font-semibold">Enregistrement impossible</p>
+                <p className="leading-relaxed">{formError}</p>
+              </div>
+            </div>
+          )}
+          <section>
+            {sectionTitle(Wrench, 'Configuration')}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <fieldset>
+                <legend className="ui-label">Type de mission</legend>
+                <div className="grid grid-cols-2 gap-1 rounded-xl border border-line bg-slate-50 p-1">
+                  {[{ value: 'Normal', label: 'Mission normale', icon: ClipboardList }, { value: 'Intervention', label: 'Intervention SAV', icon: Wrench }].map((option) => {
+                    const Icon = option.icon
+                    const active = missionType === option.value
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => { setMissionType(option.value); setSelectedInterventionId('') }}
+                        className={`flex h-9 items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-colors ${active ? 'bg-white text-brand-700 shadow-sm ring-1 ring-line' : 'text-ink-muted hover:text-ink'}`}
+                      >
+                        <Icon size={14} aria-hidden="true" /> {option.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </fieldset>
+              {missionType === 'Intervention' && (
+                <div>
+                  <label htmlFor="mt-intervention" className="ui-label">Lier à une intervention <span className="text-red-500" aria-hidden="true">*</span></label>
+                  <select id="mt-intervention" value={selectedInterventionId} onChange={(e) => setSelectedInterventionId(e.target.value)} className="ui-select" required>
+                    <option value="">Sélectionner une intervention</option>
+                    <optgroup label="En attente (non assignées)">
+                      {linkableInterventions.filter(i => i.status === 'PENDING').map((inv) => (
+                        <option key={inv.id} value={inv.id}>{inv.id} — {inv.client} — {inv.machine}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Affectées (déjà assignées)">
+                      {linkableInterventions.filter(i => i.status === 'ASSIGNED').map((inv) => (
+                        <option key={inv.id} value={inv.id}>{inv.id} — {inv.client} — {inv.machine} ({inv.assignedTo})</option>
+                      ))}
+                    </optgroup>
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {missionType === 'Intervention' && selectedIntervention && (
+              <div className="mt-4 overflow-hidden rounded-2xl border border-brand-100 bg-brand-50/50">
+                <div className="flex items-center justify-between gap-3 border-b border-brand-100 px-4 py-3">
+                  <span className="flex items-center gap-2 text-xs font-bold text-brand-800">
+                    <AlertCircle size={14} aria-hidden="true" /> Détails de l’intervention
+                    <span className="ui-ref">{selectedIntervention.id}</span>
+                  </span>
+                  <span className={`ui-badge ring-transparent ${interventionStatusColors[selectedIntervention.status] || 'bg-slate-100 text-slate-600'}`}>
+                    {selectedIntervention.status === 'PENDING' && <Hourglass size={10} aria-hidden="true" />}
+                    {selectedIntervention.status === 'ASSIGNED' && <UserCheck size={10} aria-hidden="true" />}
+                    {selectedIntervention.statusLabel}
+                  </span>
+                </div>
+                <dl className="grid grid-cols-1 gap-4 px-4 py-4 sm:grid-cols-2">
+                  <div><dt className="text-[11px] font-medium text-ink-muted">Client</dt><dd className="mt-0.5 text-sm font-semibold text-ink">{selectedIntervention.client}</dd><dd className="text-[11px] text-ink-faint">{selectedIntervention.clientCode}</dd></div>
+                  <div><dt className="text-[11px] font-medium text-ink-muted">Équipement</dt><dd className="mt-0.5 text-sm font-semibold text-ink">{selectedIntervention.machine}</dd><dd className="text-[11px] text-ink-faint">{selectedIntervention.type}</dd></div>
+                  <div><dt className="text-[11px] font-medium text-ink-muted">Téléphone</dt><dd className="mt-0.5 flex items-center gap-1.5 text-sm font-medium text-ink"><Phone size={13} className="text-brand-400" aria-hidden="true" />{selectedIntervention.phone}</dd></div>
+                  <div><dt className="text-[11px] font-medium text-ink-muted">Date création</dt><dd className="mt-0.5 flex items-center gap-1.5 text-sm font-medium text-ink"><Calendar size={13} className="text-brand-400" aria-hidden="true" />{selectedIntervention.date}</dd></div>
+                  <div className="sm:col-span-2"><dt className="text-[11px] font-medium text-ink-muted">Demande / problème</dt><dd className="mt-1 rounded-xl bg-white px-3 py-2 text-sm leading-relaxed text-ink-soft ring-1 ring-inset ring-brand-100">{selectedIntervention.request}</dd></div>
+                  {selectedIntervention.assignedTo && (
+                    <div className="sm:col-span-2"><dt className="text-[11px] font-medium text-ink-muted">Déjà assignée à</dt>
+                      <dd className="mt-1 flex items-center gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-navy text-[10px] font-bold text-white">{getAvatarFromName(selectedIntervention.assignedTo)}</span><span className="text-sm font-semibold text-ink">{selectedIntervention.assignedTo}</span></dd>
+                    </div>
+                  )}
+                </dl>
+              </div>
+            )}
+          </section>
+
+          <section className="flex flex-col gap-4">
+            {sectionTitle(FileText, 'Détails de la mission')}
+            <div>
+              <label htmlFor="mt-title" className="ui-label">{missionType === 'Normal' ? 'Titre de la mission' : 'Titre de la sous-mission'} <span className="text-red-500" aria-hidden="true">*</span></label>
+              <input id="mt-title" type="text" value={formTitle} onChange={(event) => setFormTitle(event.target.value)} className="ui-input" placeholder={missionType === 'Normal' ? 'Ex : Maintenance préventive…' : 'Ex : Vérification câblage…'} required />
+            </div>
+            <div>
+              <label htmlFor="mt-desc" className="ui-label">{missionType === 'Normal' ? 'Description détaillée' : 'Description technique'} <span className="text-red-500" aria-hidden="true">*</span></label>
+              <textarea id="mt-desc" rows={3} value={formDescription} onChange={(event) => setFormDescription(event.target.value)} className="ui-textarea resize-none" placeholder="Décrivez précisément les actions à réaliser…" required />
+            </div>
+            {missionType === 'Normal' && (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label htmlFor="mt-site" className="ui-label">Site</label>
+                  <div className="relative">
+                    <Building2 size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint" aria-hidden="true" />
+                    <input id="mt-site" type="text" value={formSite} onChange={(e) => setFormSite(e.target.value)} className="ui-input pl-10" placeholder="Nom du site" />
+                  </div>
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">
-                    {modalMode === 'create' ? 'Ajouter une mission' : 'Modifier la mission'}
-                  </h2>
-                  <p className="text-xs text-gray-500">
-                    {modalMode === 'create'
-                      ? 'Remplissez les détails pour assigner une nouvelle mission.'
-                      : 'Mettez à jour les informations de la mission existante.'}
-                  </p>
+                  <label htmlFor="mt-address" className="ui-label">Adresse</label>
+                  <div className="relative">
+                    <MapPin size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint" aria-hidden="true" />
+                    <input id="mt-address" type="text" value={formAddress} onChange={(e) => setFormAddress(e.target.value)} className="ui-input pl-10" placeholder="Adresse complète" />
+                  </div>
                 </div>
               </div>
-              <button
-                onClick={handleCloseModal}
-                className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <Trash2 size={20} className="rotate-45" />
-              </button>
+            )}
+            <div>
+              <label htmlFor="mt-notes" className="ui-label">Notes supplémentaires <span className="font-normal text-ink-faint">(optionnel)</span></label>
+              <textarea id="mt-notes" rows={2} value={formNotes} onChange={(e) => setFormNotes(e.target.value)} className="ui-textarea min-h-[72px] resize-none" placeholder="Consignes particulières, précautions, contacts sur place…" />
             </div>
+          </section>
 
-            {/* Modal Body (Scrollable) */}
-            <div className="flex-1 overflow-y-auto p-6">
-              <form id="mission-form" onSubmit={handleSubmitModal} className="space-y-8">
-                {/* Configuration Section */}
-                <section>
-                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <Wrench size={14} />
-                    Configuration
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="block text-sm font-medium text-gray-700">Type de mission</label>
-                      <select
-                        value={missionType}
-                        onChange={(e) => { setMissionType(e.target.value); setSelectedInterventionId('') }}
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 bg-white transition-all hover:border-gray-300"
-                      >
-                        <option value="Normal">Normal</option>
-                        <option value="Intervention">Intervention SAV</option>
-                      </select>
-                    </div>
-                    {missionType === 'Intervention' && (
-                      <div className="space-y-1.5">
-                        <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
-                          <Link2 size={14} className="text-brand-600" />
-                          Lier à une intervention
-                        </label>
-                        <select
-                          value={selectedInterventionId}
-                          onChange={(e) => setSelectedInterventionId(e.target.value)}
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 bg-white transition-all hover:border-gray-300"
-                          required
-                        >
-                          <option value="">Sélectionner une intervention</option>
-                          <optgroup label="🕒 En attente (non assignées)">
-                            {linkableInterventions.filter(i => i.status === 'PENDING').map((inv) => (
-                              <option key={inv.id} value={inv.id}>
-                                {inv.id} — {inv.client} — {inv.machine}
-                              </option>
-                            ))}
-                          </optgroup>
-                          <optgroup label="✅ Affectées (déjà assignées)">
-                            {linkableInterventions.filter(i => i.status === 'ASSIGNED').map((inv) => (
-                              <option key={inv.id} value={inv.id}>
-                                {inv.id} — {inv.client} — {inv.machine} ({inv.assignedTo})
-                              </option>
-                            ))}
-                          </optgroup>
-                        </select>
-                      </div>
-                    )}
-                  </div>
-
-                  {missionType === 'Intervention' && selectedIntervention && (
-                    <div className="mt-4 p-5 bg-gradient-to-br from-blue-50/80 to-indigo-50/50 rounded-xl border border-blue-100 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-brand-600 font-bold text-xs uppercase tracking-wider">
-                          <AlertCircle size={14} />
-                          Détails de l’intervention
-                        </div>
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${interventionStatusColors[selectedIntervention.status] || 'bg-gray-100 text-gray-600'}`}>
-                          {selectedIntervention.status === 'PENDING' && <Hourglass size={10} />}
-                          {selectedIntervention.status === 'ASSIGNED' && <UserCheck size={10} />}
-                          {selectedIntervention.statusLabel}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-                        <div>
-                          <label className="block text-[10px] font-bold text-blue-400 uppercase mb-1">Client</label>
-                          <p className="text-sm font-semibold text-gray-800">{selectedIntervention.client}</p>
-                          <p className="text-[10px] text-gray-400 font-semibold">{selectedIntervention.clientCode}</p>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-blue-400 uppercase mb-1">Équipement</label>
-                          <p className="text-sm font-semibold text-gray-800">{selectedIntervention.machine}</p>
-                          <p className="text-[10px] text-gray-400 font-semibold">{selectedIntervention.type}</p>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-blue-400 uppercase mb-1">Téléphone</label>
-                          <div className="flex items-center gap-1.5 text-sm font-medium text-gray-800">
-                            <Phone size={14} className="text-blue-300" />
-                            {selectedIntervention.phone}
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-blue-400 uppercase mb-1">Date création</label>
-                          <div className="flex items-center gap-1.5 text-sm font-medium text-gray-800">
-                            <Calendar size={14} className="text-blue-300" />
-                            {selectedIntervention.date}
-                          </div>
-                        </div>
-                        <div className="col-span-2">
-                          <label className="block text-[10px] font-bold text-blue-400 uppercase mb-1">Demande / problème</label>
-                          <p className="text-sm text-gray-700 bg-white/60 p-2.5 rounded-lg border border-blue-50 italic">{selectedIntervention.request}</p>
-                        </div>
-                        {selectedIntervention.assignedTo && (
-                          <div className="col-span-2">
-                            <label className="block text-[10px] font-bold text-blue-400 uppercase mb-1">Déjà assignée à</label>
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-[10px] font-bold">
-                                {getAvatarFromName(selectedIntervention.assignedTo)}
-                              </div>
-                              <span className="text-sm font-semibold text-gray-800">{selectedIntervention.assignedTo}</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+          <section>
+            {sectionTitle(Users, 'Assignation & délai')}
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="ui-label mb-0">{formEmployeeIds.length > 0 ? `Employés sélectionnés (${formEmployeeIds.length})` : 'Employé assigné (mode simple)'}</span>
+                  {formEmployeeIds.length > 0 && (
+                    <button type="button" onClick={() => setFormEmployeeIds([])} className="text-xs font-semibold text-red-600 hover:text-red-700">Annuler la sélection</button>
                   )}
-                </section>
-
-                {/* Details Section */}
-                <section className="space-y-4">
-                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <FileText size={14} />
-                    Détails de la mission
-                  </h3>
-                  <div className="space-y-1.5">
-                    <label className="block text-sm font-medium text-gray-700">
-                      {missionType === 'Normal' ? 'Titre de la mission' : 'Titre de la sous-mission'}
-                    </label>
-                    <input
-                      type="text"
-                      value={formTitle}
-                      onChange={(event) => setFormTitle(event.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 transition-all hover:border-gray-300"
-                      placeholder={missionType === 'Normal' ? "Ex: Maintenance préventive..." : "Ex: Vérification câblage..."}
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="block text-sm font-medium text-gray-700">
-                      {missionType === 'Normal' ? 'Description détaillée' : 'Description technique'}
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={formDescription}
-                      onChange={(event) => setFormDescription(event.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 resize-none transition-all hover:border-gray-300"
-                      placeholder="Décrivez précisément les actions à réaliser..."
-                      required
-                    />
-                  </div>
-
-                  {missionType === 'Normal' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
-                          <Building2 size={16} className="text-gray-400" />
-                          Site
-                        </label>
-                        <input
-                          type="text"
-                          value={formSite}
-                          onChange={(e) => setFormSite(e.target.value)}
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 transition-all hover:border-gray-300"
-                          placeholder="Nom du site"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
-                          <MapPin size={16} className="text-gray-400" />
-                          Adresse
-                        </label>
-                        <input
-                          type="text"
-                          value={formAddress}
-                          onChange={(e) => setFormAddress(e.target.value)}
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 transition-all hover:border-gray-300"
-                          placeholder="Adresse complète"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-1.5">
-                    <label className="block text-sm font-medium text-gray-700">Notes supplémentaires (optionnel)</label>
-                    <textarea
-                      rows={2}
-                      value={formNotes}
-                      onChange={(e) => setFormNotes(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 resize-none transition-all hover:border-gray-300"
-                      placeholder="Consignes particulières, précautions, contacts sur place..."
-                    />
-                  </div>
-                </section>
-
-                {/* Assignment & Timing Section */}
-                <section>
-                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <Users size={14} />
-                    Assignation & Délai
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <label className="block text-sm font-medium text-gray-700">
-                            {formEmployeeIds.length > 0 ? 'Employés sélectionnés' : 'Employé assigné (mode simple)'}
-                          </label>
-                          {formEmployeeIds.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => setFormEmployeeIds([])}
-                              className="text-xs font-bold text-red-600 hover:text-red-700"
-                            >
-                              Annuler sélection multiple
-                            </button>
-                          )}
-                        </div>
-                        
-                        {/* Mode SIMPLE: Un seul employé */}
-                        {formEmployeeIds.length === 0 && (
-                          <select
-                            value={formEmployee}
-                            onChange={(event) => setFormEmployee(event.target.value)}
-                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 bg-white transition-all hover:border-gray-300"
-                          >
-                            <option value="">Sélectionner un employé OU utiliser la sélection multiple ci-dessous</option>
-                            {employeeOptions.map((employee) => (
-                              <option key={employee.id} value={employee.id}>
-                                {employee.name}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                        
-                        {/* Mode MULTIPLE: Checkboxes */}
-                        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50/50 space-y-2 max-h-64 overflow-y-auto">
-                          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-3">
-                            Sélectionner PLUSIEURS employés pour créer une mission groupée:
-                          </p>
-                          {employeeOptions.length === 0 ? (
-                            <p className="text-sm text-gray-500">Aucun employé disponible</p>
-                          ) : (
-                            employeeOptions.map((employee) => (
-                              <label key={employee.id} className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded transition-colors">
-                                <input
-                                  type="checkbox"
-                                  checked={formEmployeeIds.includes(employee.id)}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setFormEmployeeIds((prev) => [...prev, employee.id])
-                                    } else {
-                                      setFormEmployeeIds((prev) => prev.filter((id) => id !== employee.id))
-                                    }
-                                  }}
-                                  className="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-2 focus:ring-brand-600 cursor-pointer"
-                                />
-                                <span className="text-sm text-gray-700 font-medium">{employee.name}</span>
-                                {formEmployeeIds.includes(employee.id) && (
-                                  <span className="ml-auto text-xs font-bold text-brand-600 bg-blue-50 px-2 py-1 rounded">✓ Sélectionné</span>
-                                )}
-                              </label>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                      {modalMode === 'edit' && (
-                        <div className="space-y-1.5">
-                          <label className="block text-sm font-medium text-gray-700">Statut</label>
-                          <select
-                            value={formStatus}
-                            onChange={(e) => setFormStatus(e.target.value)}
-                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 bg-white transition-all hover:border-gray-300"
-                          >
-                            <option value="À faire">À faire</option>
-                            <option value="En cours">En cours</option>
-                            <option value="Terminée">Terminée</option>
-                            <option value="Bloquée">Bloquée</option>
-                          </select>
-                        </div>
-                      )}
-                      <div className="space-y-1.5">
-                        <label className="block text-sm font-medium text-gray-700">Priorité</label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {['Critique', 'Haute', 'Moyenne', 'Basse'].map((p) => (
-                            <button
-                              key={p}
-                              type="button"
-                              onClick={() => setFormPriority(p)}
-                              className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
-                                formPriority === p
-                                  ? 'bg-brand-600 text-white border-brand-600 shadow-sm'
-                                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-                              }`}
-                            >
-                              {p}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="space-y-1.5">
-                        <label className="block text-sm font-medium text-gray-700">Date de mission</label>
-                        <div className="relative">
+                </div>
+                {formEmployeeIds.length === 0 && (
+                  <select aria-label="Employé assigné" value={formEmployee} onChange={(event) => setFormEmployee(event.target.value)} className="ui-select">
+                    <option value="">Sélectionner un employé</option>
+                    {employeeOptions.map((employee) => (
+                      <option key={employee.id} value={employee.id}>{employee.name}</option>
+                    ))}
+                  </select>
+                )}
+                <fieldset className="overflow-hidden rounded-xl border border-line">
+                  <legend className="sr-only">Sélection multiple d’employés</legend>
+                  <p className="border-b border-line bg-slate-50 px-3 py-2 text-[11px] font-semibold text-ink-muted">Équipe de la mission · 3 techniciens maximum</p>
+                  <div className="scrollbar-gray flex max-h-56 flex-col overflow-y-auto p-1.5">
+                    {employeeOptions.length === 0 ? (
+                      <p className="px-2 py-3 text-sm text-ink-muted">Aucun employé disponible</p>
+                    ) : employeeOptions.map((employee) => {
+                      const checked = formEmployeeIds.includes(employee.id)
+                      return (
+                        <label key={employee.id} className={`flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 transition-colors ${checked ? 'bg-brand-50' : 'hover:bg-slate-50'}`}>
                           <input
-                            type="date"
-                            value={formDueDate}
-                            onChange={(event) => setFormDueDate(event.target.value)}
-                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 transition-all hover:border-gray-300"
+                            type="checkbox"
+                            checked={checked}
+                            disabled={!checked && formEmployeeIds.length >= 3}
+                            onChange={(e) => {
+                              if (e.target.checked) setFormEmployeeIds((prev) => prev.length < 3 ? [...prev, employee.id] : prev)
+                              else setFormEmployeeIds((prev) => prev.filter((id) => id !== employee.id))
+                            }}
+                            className="h-4 w-4 cursor-pointer rounded border-slate-300 text-brand-600 focus:ring-brand-600"
                           />
-                        </div>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="block text-sm font-medium text-gray-700 flex items-center gap-1.5">
-                          <Clock size={14} className="text-gray-400" />
-                          Heure de début
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-navy text-[10px] font-bold text-white">{getAvatarFromName(employee.name)}</span>
+                          <span className="flex-1 truncate text-sm font-medium text-ink-soft">{employee.name}</span>
+                          {checked && <CheckCircle2 size={16} className="text-brand-600" aria-hidden="true" />}
                         </label>
-                        <div className="relative">
-                          <input
-                            type="time"
-                            value={formDueTime}
-                            onChange={(event) => setFormDueTime(event.target.value)}
-                            className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 transition-all hover:border-gray-300"
-                          />
-                        </div>
-                      </div>
-                    </div>
+                      )
+                    })}
                   </div>
-                </section>
+                </fieldset>
+              </div>
 
-                {/* Attachments Section */}
-                <section>
-                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <Paperclip size={14} />
-                    Pièces jointes
-                  </h3>
-                  <input
-                    type="file"
-                    multiple
-                    accept=".pdf,.png,.jpg,.jpeg,image/png,image/jpeg,application/pdf"
-                    className="hidden"
-                    id="mission-table-attachments"
-                    onChange={handlePickAttachments}
-                  />
-                  <label
-                    htmlFor="mission-table-attachments"
-                    className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center hover:border-brand-600 hover:bg-blue-50/50 transition-all cursor-pointer group bg-gray-50/50 block"
-                  >
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center text-gray-400 group-hover:text-brand-600 transition-colors">
-                        <FileText size={24} />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-700 group-hover:text-brand-600 transition-colors">
-                          Cliquez pour ajouter des fichiers
-                        </p>
-                        <p className="text-xs text-gray-500">PDF, JPG, PNG (Max 10MB)</p>
-                      </div>
-                    </div>
-                  </label>
-
-                  {modalMode === 'edit' && existingAttachments.length > 0 && (
-                    <div className="mt-4 space-y-2">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Documents existants</p>
-                      {existingAttachments.map((a) => (
-                        <div
-                          key={a.publicId}
-                          className="flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-lg px-4 py-2 shadow-sm"
-                          onClick={(e) => e.stopPropagation()}
+              <div className="flex flex-col gap-4">
+                {modalMode === 'edit' && (
+                  <div>
+                    <label htmlFor="mt-status" className="ui-label">Statut</label>
+                    <select id="mt-status" value={formStatus} onChange={(e) => setFormStatus(e.target.value)} className="ui-select">
+                      <option value="À faire">À faire</option>
+                      <option value="En cours">En cours</option>
+                      <option value="Terminée">Terminée</option>
+                      <option value="Bloquée">Bloquée</option>
+                      <option value="Annulée">Annulée</option>
+                    </select>
+                  </div>
+                )}
+                <fieldset>
+                  <legend className="ui-label">Priorité</legend>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(PRIORITY_OPTIONS.some(p => p.value === formPriority) ? PRIORITY_OPTIONS : [...PRIORITY_OPTIONS, { value: formPriority, dot: 'bg-brand-600' }]).map((p) => {
+                      const active = formPriority === p.value
+                      return (
+                        <button
+                          key={p.value}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => setFormPriority(p.value)}
+                          className={`flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-all ${active ? 'border-brand-600 bg-brand-600 text-white shadow-sm' : 'border-line bg-white text-ink-soft hover:border-brand-200'}`}
                         >
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-gray-800 truncate">
-                              {a.originalFilename || a.publicId}
-                            </p>
-                            <p className="text-[10px] text-gray-500 truncate">{a.url}</p>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <a
-                              href={a.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-[10px] font-bold text-brand-600 hover:underline"
-                            >
-                              Ouvrir
-                            </a>
-                            <button
-                              type="button"
-                              onClick={() => removeExistingAttachment(a.publicId)}
-                              className="text-[10px] font-bold text-red-600 hover:text-red-700"
-                            >
-                              Retirer
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {newAttachments.length > 0 && (
-                    <div className="mt-4 space-y-2">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Nouveaux fichiers</p>
-                      {newAttachments.map((file) => (
-                        <div
-                          key={`${file.name}_${file.size}_${file.lastModified}`}
-                          className="flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-lg px-4 py-2 shadow-sm"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-gray-800 truncate">{file.name}</p>
-                            <p className="text-[10px] text-gray-500">{Math.ceil(file.size / 1024)} KB</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => removeNewAttachment(file)}
-                            className="text-[10px] font-bold text-red-600 hover:text-red-700"
-                          >
-                            Retirer
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
-              </form>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3 bg-gray-50/50 sticky bottom-0">
-              <button
-                type="button"
-                onClick={handleCloseModal}
-                className="px-6 py-2.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-white hover:shadow-sm transition-all active:scale-95"
-              >
-                Annuler
-              </button>
-              <button
-                form="mission-form"
-                type="submit"
-                className="px-8 py-2.5 bg-brand-600 text-white rounded-lg text-sm font-semibold hover:bg-brand-700 hover:shadow-lg hover:shadow-blue-200 transition-all active:scale-95"
-              >
-                {modalMode === 'create' ? 'Créer la mission' : 'Sauvegarder'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ═══ VIEW MODAL ═══ */}
-      {isViewOpen && viewMission && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-          <div className="w-full max-w-lg bg-white rounded-xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-            {/* View Header */}
-            <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
-              <div className="flex items-center gap-3">
-                <img
-                  src={technicien}
-                  alt=""
-                  aria-hidden="true"
-                  className="w-12 h-12 rounded-full object-cover shadow-inner"
-                />
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">{viewMission.employeeDisplay || viewMission.employee}</h2>
-                  <p className="text-xs text-gray-500 font-medium">Employé(s) assigné(s)</p>
+                          <span className={`h-2 w-2 rounded-full ${active ? 'bg-white' : p.dot}`} aria-hidden="true" />
+                          {p.value}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </fieldset>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="mt-date" className="ui-label">Date de mission</label>
+                    <input id="mt-date" type="date" value={formDueDate} onChange={(event) => setFormDueDate(event.target.value)} className="ui-input" />
+                  </div>
+                  <div>
+                    <label htmlFor="mt-time" className="ui-label">Heure de début</label>
+                    <input id="mt-time" type="time" value={formDueTime} onChange={(event) => setFormDueTime(event.target.value)} className="ui-input" />
+                  </div>
                 </div>
               </div>
-              <button
-                onClick={handleCloseViewModal}
-                className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <Trash2 size={20} className="rotate-45" />
-              </button>
             </div>
+          </section>
 
-            {/* View Body */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
-              <div className="grid grid-cols-1 gap-6">
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Titre de la mission</p>
-                  <p className="text-base font-semibold text-gray-900 leading-tight">{viewMission.title}</p>
-                </div>
+          <section>
+            {sectionTitle(Truck, 'Véhicule & chauffeur')}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <label className="min-w-0"><span className="ui-label">Véhicule affecté</span><select className="ui-select" value={formVehicleId} onChange={e => setFormVehicleId(e.target.value)}><option value="">Aucun véhicule</option>{vehicles.map(v => <option key={v.id} value={v.id} disabled={String(v.id) !== String(originalMission?.vehicleId) && (v.disponibilite === false || (v.statut && v.statut !== 'Disponible'))}>{[v.marque, v.modele, v.matricule].filter(Boolean).join(' · ')}{v.disponibilite === false ? ' — Affecté / indisponible' : ''}</option>)}</select></label>
+              <label className="min-w-0"><span className="ui-label">Chauffeur</span><select className="ui-select" disabled={!formVehicleId} value={formEmployeeIds.length === 1 ? String(formEmployeeIds[0]) : formDriverId} onChange={e => setFormDriverId(e.target.value)}><option value="">Sélectionner un technicien</option>{employeeOptions.filter(e => formEmployeeIds.includes(e.id) || (!formEmployeeIds.length && String(e.id) === formEmployee)).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select></label>
+            </div>
+            <p className="mt-2 text-xs text-ink-muted">La disponibilité et les conflits sont vérifiés par le serveur lors de l’enregistrement.</p>
+          </section>
+          <section>
+            {sectionTitle(Paperclip, 'Pièces jointes')}
+            <input type="file" multiple accept=".pdf,.png,.jpg,.jpeg,image/png,image/jpeg,application/pdf" className="sr-only" id="mission-table-attachments" onChange={handlePickAttachments} />
+            <label htmlFor="mission-table-attachments" className="group flex cursor-pointer items-center gap-4 rounded-2xl border-2 border-dashed border-line bg-slate-50/60 px-5 py-5 transition-colors hover:border-brand-300 hover:bg-brand-50/40">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-ink-faint shadow-card group-hover:text-brand-600">
+                <UploadCloud size={20} aria-hidden="true" />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold text-ink-soft group-hover:text-brand-700">Cliquez pour ajouter des fichiers</span>
+                <span className="block text-xs text-ink-muted">PDF, JPG, PNG — 10 Mo max, 10 fichiers</span>
+              </span>
+            </label>
 
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Description</p>
-                  <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg border border-gray-100 italic">
-                    "{viewMission.description}"
-                  </p>
-                </div>
-
-                {viewMission.interventionId && (
-                  <div className="bg-blue-50 p-3 rounded-xl border border-blue-100">
-                    <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-1.5">Intervention liée</p>
-                    <span className="font-mono text-sm font-bold text-brand-600">{viewMission.interventionId}</span>
-                  </div>
-                )}
-
-                {viewMission.vehicle && (
-                  <div className="flex items-center gap-3">
-                    <div className="mt-1 p-2 bg-slate-100 rounded-lg">
-                      <Truck size={16} className="text-slate-500" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Véhicule affecté</p>
-                      <p className="text-sm font-semibold text-gray-900">
-                        {viewMission.vehicle.marque} {viewMission.vehicle.modele} — {viewMission.vehicle.matricule}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Priorité</p>
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${priorityColors[viewMission.priorityColor]}`}
-                    >
-                      {getPriorityPrefix(viewMission.priority)}{viewMission.priority}
-                    </span>
-                  </div>
-                  <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Statut</p>
-                    {getGroupedEmployeeStatuses(viewMission).length > 1 ? (
-                      <div className="space-y-1.5">
-                        {getGroupedEmployeeStatuses(viewMission).map((entry) => {
-                          const entryStatusColor = getStatusColorKey(entry.status)
-                          return (
-                            <div key={`${viewMission.id}_${entry.name}`} className="flex items-center justify-between gap-2">
-                              <span className="text-xs text-gray-700 font-medium truncate">{entry.name}</span>
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap ${statusColors[entryStatusColor]}`}>
-                                {getStatusIcon(entry.status)}{entry.status}
-                              </span>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    ) : (
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${statusColors[viewMission.statusColor]}`}
-                      >
-                        {getStatusIcon(viewMission.status)}{viewMission.status}
+            {(modalMode === 'edit' && existingAttachments.length > 0) || newAttachments.length > 0 ? (
+              <ul className="mt-3 flex flex-col gap-2">
+                {modalMode === 'edit' && existingAttachments.map((a) => (
+                  <li key={a.publicId} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-white px-3 py-2.5">
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <FileText size={16} className="shrink-0 text-brand-600" aria-hidden="true" />
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-semibold text-ink">{a.originalFilename || a.publicId}</span>
+                        <span className="block text-[11px] text-ink-faint">Document existant</span>
                       </span>
-                    )}
-                  </div>
-                </div>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1">
+                      <a href={a.url} target="_blank" rel="noreferrer" className="ui-btn-ghost ui-btn-sm">Ouvrir</a>
+                      <button type="button" onClick={() => removeExistingAttachment(a.publicId)} className="ui-btn-ghost ui-btn-sm text-red-600 hover:bg-red-50 hover:text-red-700">Retirer</button>
+                    </span>
+                  </li>
+                ))}
+                {newAttachments.map((file) => (
+                  <li key={`${file.name}_${file.size}_${file.lastModified}`} className="flex items-center justify-between gap-3 rounded-xl border border-brand-100 bg-brand-50/40 px-3 py-2.5">
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <FileText size={16} className="shrink-0 text-brand-600" aria-hidden="true" />
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-semibold text-ink">{file.name}</span>
+                        <span className="block text-[11px] text-ink-faint">Nouveau · {Math.ceil(file.size / 1024)} Ko</span>
+                      </span>
+                    </span>
+                    <button type="button" onClick={() => removeNewAttachment(file)} className="ui-btn-ghost ui-btn-sm text-red-600 hover:bg-red-50 hover:text-red-700">Retirer</button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
+        </form>
+      </Modal>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="flex items-start gap-3">
-                    <div className="mt-1 p-2 bg-blue-50 rounded-lg">
-                      <Calendar size={16} className="text-brand-600" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Échéance</p>
-                      <p className="text-sm font-semibold text-gray-900">{viewMission.dueDate}</p>
-                      {viewMission.dueTime && <p className="text-xs text-red-500 font-medium">{viewMission.dueTime}</p>}
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="mt-1 p-2 bg-orange-50 rounded-lg">
-                      <FileText size={16} className="text-orange-500" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Note technicien</p>
-                      {getGroupedEmployeeStatuses(viewMission).length > 1 ? (
-                        <div className="mt-1 space-y-1.5">
-                          {getGroupedEmployeeStatuses(viewMission).map((entry) => (
-                            <div key={`${viewMission.id}_note_${entry.name}`} className="flex items-start justify-between gap-3">
-                              <span className="text-xs text-gray-700 font-semibold whitespace-nowrap">{entry.name}</span>
-                              <span className="text-xs text-gray-900 break-words text-right">{entry.notes || '—'}</span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-sm font-semibold text-gray-900 break-words">
-                          {viewMission.notes || '—'}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {Array.isArray(viewMission.attachments) && viewMission.attachments.length > 0 && (
-                  <div className="pt-4 border-t border-gray-100">
-                    <div className="flex items-center justify-between gap-3 mb-3">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Documents</p>
-                      <div className="text-[10px] font-bold text-gray-400 truncate">
-                        {(viewMission.employeeDisplay || viewMission.employee)} · {viewMission.dueDate}{viewMission.dueTime ? ` ${viewMission.dueTime}` : ''}
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      {viewMission.attachments.map((a) => (
-                        <div
-                          key={a.publicId}
-                          className="flex items-center justify-between gap-3 bg-white p-3 rounded-xl border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all"
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-11 h-11 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center shrink-0">
-                              {a.resourceType === 'image' ? (
-                                <img
-                                  src={a.url}
-                                  alt={a.originalFilename || ''}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <FileText size={18} className="text-gray-500" />
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold text-gray-900 truncate">
-                                {a.originalFilename || a.publicId}
-                              </p>
-                              <p className="text-[10px] text-gray-500 truncate">
-                                Mission: {viewMission.title}
-                              </p>
-                              <div className="flex items-center gap-2 text-[10px] text-gray-400 mt-0.5">
-                                <span className="truncate">{a.bytes ? `${Math.ceil(a.bytes / 1024)} KB` : '—'}</span>
-                                <span className="w-1 h-1 bg-gray-200 rounded-full" />
-                                <span className="truncate">{a.createdAt ? new Date(a.createdAt).toLocaleDateString('fr-FR') : '—'}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <a
-                              href={a.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="p-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-100 transition-all"
-                              title="Ouvrir"
-                            >
-                              <Eye size={16} />
-                            </a>
-                            <a
-                              href={a.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="p-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-100 transition-all"
-                              title="Télécharger"
-                            >
-                              <Download size={16} />
-                            </a>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {(viewMission.site || viewMission.address) && (
-                  <div className="pt-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-                    {viewMission.site && (
-                      <div className="flex items-center gap-2 text-xs text-gray-600">
-                        <Building2 size={14} className="text-gray-400" />
-                        <span className="font-medium">{viewMission.site}</span>
-                      </div>
-                    )}
-                    {viewMission.address && (
-                      <div className="flex items-center gap-2 text-xs text-gray-600">
-                        <MapPin size={14} className="text-gray-400" />
-                        <span className="font-medium break-words">{viewMission.address}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* View Footer */}
-            <div className="px-4 sm:px-6 py-4 bg-gray-50 flex justify-end">
-              <button
-                type="button"
-                onClick={handleCloseViewModal}
-                className="px-6 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-100 transition-all active:scale-95 shadow-sm"
-              >
-                Fermer
+      {/* ═══ MODALE CONSULTATION ═══ */}
+      <Modal
+        side
+        open={isViewOpen && Boolean(viewMission)}
+        onClose={handleCloseViewModal}
+        size="lg"
+        icon={viewMission?.type === 'Intervention' ? Wrench : ClipboardList}
+        title={viewMission ? `Mission #${viewMission.id} · ${viewMission.title}` : 'Mission'}
+        description={viewMission ? `${viewMission.type === 'Intervention' ? 'Intervention S.A.V' : 'Mission normale'} · Échéance ${viewMission.dueDate || 'Non renseigné'}${viewMission.dueTime ? ` à ${viewMission.dueTime}` : ''}` : undefined}
+        footer={
+          <>
+            <button type="button" onClick={handleCloseViewModal} className="ui-btn-secondary">Fermer</button>
+            {viewMission && <Link to={`/missions/${viewMission.id}`} className="ui-btn-secondary">Voir la mission</Link>}
+            {viewMission && canEdit && !panelLoading && !panelError && (
+              <button type="button" onClick={() => { const m = viewMission; handleCloseViewModal(); handleOpenEditModal(m) }} className="ui-btn-primary">
+                <Edit size={15} aria-hidden="true" /> Modifier
               </button>
+            )}
+          </>
+        }
+      >
+        {panelLoading && <SkeletonLines count={6} />}
+        {panelError && <InlineAlert tone="error">{panelError}<button onClick={() => handleOpenViewModal(viewMission)} className="ml-2 underline">Réessayer</button></InlineAlert>}
+        {viewMission && !panelLoading && !panelError && (
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge status={viewMission.priority}>Priorité {viewMission.priority}</StatusBadge>
+              {getGroupedEmployeeStatuses(viewMission).length <= 1 && <StatusBadge status={viewMission.status} />}
+              {viewMission.interventionId && <span className="ui-ref gap-1"><Link2 size={10} aria-hidden="true" />{viewMission.interventionId}</span>}
             </div>
+
+            <section><h3 className="ui-eyebrow mb-2">Description</h3><p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-relaxed text-ink-soft ring-1 ring-inset ring-line">{viewMission.description || 'Non renseigné'}</p></section>
+
+            <div className="overflow-hidden rounded-2xl border border-line">
+              <p className="flex items-center gap-2 border-b border-line bg-slate-50/60 px-4 py-2.5 text-xs font-semibold text-ink-muted">
+                <Users size={13} aria-hidden="true" /> Équipe et avancement
+              </p>
+              <ul className="divide-y divide-slate-100">
+                {!getGroupedEmployeeStatuses(viewMission).length && <li className="px-4 py-3 text-sm text-ink-muted">Non renseigné</li>}
+                {getGroupedEmployeeStatuses(viewMission).map((entry) => (
+                  <li key={`${viewMission.id}_${entry.name}`} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-navy text-[10px] font-bold text-white">{getAvatarFromName(entry.name)}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-ink">{entry.name}</span>
+                        <span className="block break-words text-xs text-ink-muted">{entry.notes ? `Note : ${entry.notes}` : 'Aucune note technicien'}</span>
+                      </span>
+                    </span>
+                    <StatusBadge status={entry.status} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {[
+                ['Référence', `#${viewMission.id}`],
+                ['Client', viewMission.intervention?.client],
+                ['Machine', viewMission.intervention?.machine],
+                ['Chauffeur', viewMission.driverName || viewMission.team?.find(t => Number(t.userId) === Number(viewMission.driverUserId))?.name],
+                ['Heure', viewMission.dueTime],
+                ['Notes', viewMission.notes],
+              ].map(([label, value]) => <div key={label} className="min-w-0 rounded-2xl border border-line px-4 py-3"><dt className="text-[11px] font-medium text-ink-muted">{label}</dt><dd className="mt-1 break-words text-sm font-semibold text-ink">{typeof value === 'string' && value.trim() ? value : 'Non renseigné'}</dd></div>)}
+              <div className="flex items-start gap-3 rounded-2xl border border-line px-4 py-3">
+                <Calendar size={16} className="mt-0.5 text-brand-600" aria-hidden="true" />
+                <div><dt className="text-[11px] font-medium text-ink-muted">Échéance</dt><dd className="text-sm font-semibold tabular-nums text-ink">{viewMission.dueDate || 'Non renseigné'}{viewMission.dueTime ? ` · ${viewMission.dueTime}` : ''}</dd></div>
+              </div>
+              <div className="flex items-start gap-3 rounded-2xl border border-line px-4 py-3">
+                <Truck size={16} className="mt-0.5 text-brand-600" aria-hidden="true" />
+                <div className="min-w-0"><dt className="text-[11px] font-medium text-ink-muted">Véhicule affecté</dt><dd className="truncate text-sm font-semibold text-ink">{viewMission.vehicle ? [viewMission.vehicle.marque, viewMission.vehicle.modele, viewMission.vehicle.matricule].filter(Boolean).join(' · ') : 'Non renseigné'}</dd></div>
+              </div>
+              {(viewMission.site || viewMission.address) && (
+                <div className="flex items-start gap-3 rounded-2xl border border-line px-4 py-3 sm:col-span-2">
+                  <MapPin size={16} className="mt-0.5 text-brand-600" aria-hidden="true" />
+                  <div className="min-w-0"><dt className="text-[11px] font-medium text-ink-muted">Site d’intervention</dt><dd className="break-words text-sm font-semibold text-ink">{[viewMission.site, viewMission.address].filter(Boolean).join(' — ')}</dd></div>
+                </div>
+              )}
+            </dl>
+
+            {Array.isArray(viewMission.attachments) && viewMission.attachments.length > 0 && (
+              <div>
+                <p className="ui-eyebrow mb-2">Documents ({viewMission.attachments.length})</p>
+                <ul className="flex flex-col gap-2">
+                  {viewMission.attachments.map((a) => (
+                    <li key={a.publicId} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-white p-2.5">
+                      <span className="flex min-w-0 items-center gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-50 ring-1 ring-inset ring-line">
+                          {a.resourceType === 'image' ? <img src={a.url} alt={a.originalFilename || ''} className="h-full w-full object-cover" /> : <FileText size={17} className="text-ink-muted" aria-hidden="true" />}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold text-ink">{a.originalFilename || a.publicId}</span>
+                          <span className="block text-[11px] text-ink-faint">{a.bytes ? `${Math.ceil(a.bytes / 1024)} Ko` : '—'} · {a.createdAt ? new Date(a.createdAt).toLocaleDateString('fr-FR') : '—'}</span>
+                        </span>
+                      </span>
+                      <span className="flex shrink-0 items-center gap-1">
+                        <a href={a.url} target="_blank" rel="noreferrer" className="ui-icon-btn h-9 w-9" aria-label={`Ouvrir ${a.originalFilename || 'le document'}`}><Eye size={16} /></a>
+                        <a href={a.url} target="_blank" rel="noreferrer" className="ui-icon-btn h-9 w-9" aria-label={`Télécharger ${a.originalFilename || 'le document'}`}><Download size={16} /></a>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   )
 }

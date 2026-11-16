@@ -1,38 +1,48 @@
-﻿import React, { useState, useMemo, useEffect, useRef } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../api/apiClient'
 import InterventionActions from './components/InterventionActions'
 import PageHeader from '../../components/ui/PageHeader'
+import Modal from '../../components/ui/Modal'
 import {
   Search, Plus, Eye, Edit2, Trash2, Wrench,
   CheckCircle2, Hourglass,
   Building2, Calendar,
   PlayCircle, LayoutGrid, LayoutList, X, AlertTriangle,
-  RefreshCw, UserCheck2, Filter, ChevronDown,
-  MoreHorizontal,
+  RefreshCw, UserCheck2,
+  MoreHorizontal, Cpu,
   FileSearch, Truck, GraduationCap,
   ShieldAlert, ChevronLeft, ChevronRight as ChevronRightIcon
 } from 'lucide-react'
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 const statusConfig = {
-  PENDING:     { label: "En attente d'affectation", color: 'bg-amber-50 text-amber-700 border-amber-100',    dot: 'bg-amber-500',  icon: Hourglass,    bar: 'bg-amber-400'  },
-  ASSIGNED:    { label: 'Affectée technicien',    color: 'bg-slate-100 text-slate-700 border-slate-200',       dot: 'bg-blue-500',   icon: UserCheck2,   bar: 'bg-blue-500'   },
-  IN_PROGRESS: { label: 'En cours',                color: 'bg-brand-50 text-brand-700 border-brand-100', dot: 'bg-orange-500', icon: PlayCircle,   bar: 'bg-orange-500' },
-  CLOSED:      { label: 'Intervention Clôturée',   color: 'bg-teal-50 text-teal-700 border-teal-100',   dot: 'bg-green-500',  icon: CheckCircle2, bar: 'bg-green-500'  },
+  PENDING:     { label: "En attente d'affectation", short: 'En attente', badge: 'bg-amber-50 text-amber-800 ring-amber-200', dot: 'bg-amber-500', icon: Hourglass,    bar: 'bg-amber-400' },
+  ASSIGNED:    { label: 'Affectée technicien',      short: 'Affectée',   badge: 'bg-brand-50 text-brand-700 ring-brand-200', dot: 'bg-brand-600', icon: UserCheck2,   bar: 'bg-brand-500' },
+  IN_PROGRESS: { label: 'En cours',                 short: 'En cours',   badge: 'bg-navy text-white ring-navy',               dot: 'bg-brand-300', icon: PlayCircle,   bar: 'bg-navy'      },
+  CLOSED:      { label: 'Intervention clôturée',    short: 'Clôturée',   badge: 'bg-teal-50 text-teal-800 ring-teal-200',    dot: 'bg-teal-600',  icon: CheckCircle2, bar: 'bg-teal-500'  },
 }
 
 const typeConfig = {
-  DEVIS:        { label: 'Devis',        color: 'bg-brand-800/5 text-brand-800 border-brand-800/10', icon: FileSearch     },
-  LIVRAISON:    { label: 'Livraison',    color: 'bg-brand-800/5 text-brand-800 border-brand-800/10', icon: Truck          },
-  FORMATION:    { label: 'Formation',    color: 'bg-brand-800/5 text-brand-800 border-brand-800/10', icon: GraduationCap },
-  INSTALLATION: { label: 'Installation',  color: 'bg-brand-800/5 text-brand-800 border-brand-800/10', icon: Plus           },
-  REPARATION:   { label: 'Réparation',    color: 'bg-brand-800/5 text-brand-800 border-brand-800/10', icon: Wrench         },
-  GARANTIE:     { label: 'Garantie',     color: 'bg-brand-800/5 text-brand-800 border-brand-800/10', icon: ShieldAlert    },
+  DEVIS:        { label: 'Devis',        icon: FileSearch    },
+  LIVRAISON:    { label: 'Livraison',    icon: Truck         },
+  FORMATION:    { label: 'Formation',    icon: GraduationCap },
+  INSTALLATION: { label: 'Installation', icon: Plus          },
+  REPARATION:   { label: 'Réparation',   icon: Wrench        },
+  GARANTIE:     { label: 'Garantie',     icon: ShieldAlert   },
 }
 
 const fallbackStatus = statusConfig.PENDING
 const fallbackType = typeConfig.REPARATION
+
+const MONTHS_SHORT = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.']
+
+function parseDisplayDate(value) {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return { day: String(date.getDate()).padStart(2, '0'), month: MONTHS_SHORT[date.getMonth()], year: date.getFullYear() }
+}
 
 function normalizeTypeKey(value) {
   const base = String(value || '').trim()
@@ -169,34 +179,129 @@ function normalizeInterventions(interventionsData, agentsByIntervention, linkedM
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function StatCard({ label, count, total, icon, active, onClick, colorClass }) {
-  const StatIcon = icon
-  const pct = total > 0 ? Math.round((count / total) * 100) : 0
+function StatusPill({ status, compact = false }) {
+  const st = statusConfig[status] || fallbackStatus
+  return (
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${st.badge}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} aria-hidden="true" />
+      {compact ? st.short : st.label}
+    </span>
+  )
+}
+
+function DateBlock({ value }) {
+  const parsed = parseDisplayDate(value)
+  if (!parsed) {
+    return <span className="text-xs font-medium text-ink-muted">{value || '—'}</span>
+  }
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-xl bg-slate-50 ring-1 ring-inset ring-line">
+        <span className="font-display text-sm font-bold leading-none text-ink tabular-nums">{parsed.day}</span>
+        <span className="mt-0.5 text-[9px] font-semibold uppercase leading-none text-ink-faint">{parsed.month}</span>
+      </div>
+      <span className="text-xs font-medium text-ink-muted tabular-nums">{parsed.year}</span>
+    </div>
+  )
+}
+
+function TechnicianChip({ name, compact = false }) {
+  if (!name) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">
+        <AlertTriangle size={12} aria-hidden="true" /> Non affecté
+      </span>
+    )
+  }
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-600 text-[11px] font-bold text-white ring-2 ring-white" aria-hidden="true">
+        {getInitials(name).slice(0, 2).toUpperCase()}
+      </span>
+      <span className={`truncate text-sm font-medium text-ink ${compact ? 'max-w-[8rem]' : ''}`}>{name}</span>
+    </div>
+  )
+}
+
+function PipelineOverview({ total, kpiData, statusFilter, onSelect }) {
+  return (
+    <section className="ui-card overflow-hidden p-0" aria-labelledby="pipeline-title">
+      <div className="flex flex-col gap-4 p-4 sm:p-5">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <p className="ui-eyebrow">Pipeline SAV</p>
+            <h2 id="pipeline-title" className="font-display text-lg font-bold text-ink">
+              <span className="tabular-nums">{total}</span> dossier{total > 1 ? 's' : ''} suivi{total > 1 ? 's' : ''}
+            </h2>
+          </div>
+          {statusFilter !== 'ALL' && (
+            <button type="button" onClick={() => onSelect('ALL')} className="ui-btn-ghost ui-btn-sm">
+              <X size={14} aria-hidden="true" /> Voir tous les statuts
+            </button>
+          )}
+        </div>
+        <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100" role="img" aria-label="Répartition des dossiers par statut">
+          {kpiData.map((k) => (
+            k.count > 0 && (
+              <div
+                key={k.key}
+                className={`h-full transition-all duration-700 ${k.bar} ${statusFilter !== 'ALL' && statusFilter !== k.key ? 'opacity-25' : ''}`}
+                style={{ width: `${(k.count / Math.max(total, 1)) * 100}%` }}
+              />
+            )
+          ))}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 border-t border-line lg:grid-cols-4">
+        {kpiData.map((k, index) => {
+          const active = statusFilter === k.key
+          const pct = total > 0 ? Math.round((k.count / total) * 100) : 0
+          const KIcon = k.icon
+          return (
+            <button
+              key={k.key}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onSelect(active ? 'ALL' : k.key)}
+              className={`group flex min-w-0 items-center gap-3 px-4 py-3.5 text-left transition-colors sm:px-5
+                ${index % 2 === 1 ? 'border-l border-line' : ''} ${index >= 2 ? 'border-t border-line lg:border-t-0' : ''} ${index === 2 ? 'lg:border-l' : ''}
+                ${active ? 'bg-brand-50/70' : 'hover:bg-slate-50'}`}
+            >
+              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${active ? 'bg-brand-600 text-white' : 'bg-slate-100 text-ink-muted group-hover:text-brand-700'}`}>
+                <KIcon size={16} aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-xs font-medium text-ink-muted">{k.short}</span>
+                <span className="flex items-baseline gap-1.5">
+                  <span className="font-display text-xl font-bold leading-tight text-ink tabular-nums">{k.count}</span>
+                  <span className="text-[11px] font-medium text-ink-faint tabular-nums">{pct}%</span>
+                </span>
+              </span>
+              <span className={`h-8 w-1 shrink-0 rounded-full ${k.bar}`} aria-hidden="true" />
+            </button>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+function RowIconAction({ label, icon, onClick, tone = 'default', disabled = false }) {
+  const Icon = icon
+  const tones = {
+    default: 'text-ink-muted hover:bg-brand-50 hover:text-brand-700',
+    danger: 'text-ink-muted hover:bg-red-50 hover:text-red-600',
+  }
   return (
     <button
-      onClick={onClick}
-      className={`w-full min-w-0 bg-white border rounded-2xl p-3 sm:p-5 text-left transition-all relative overflow-hidden group
-        ${active ? 'border-brand-500 shadow-raised ring-2 ring-brand-100' : 'border-line shadow-card hover:border-brand-200 hover:shadow-raised'}`}
+      type="button"
+      title={label}
+      aria-label={label}
+      disabled={disabled}
+      onClick={(e) => { e.stopPropagation(); onClick?.() }}
+      className={`flex h-9 w-9 items-center justify-center rounded-xl transition-colors disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent ${tones[tone]}`}
     >
-      <div className={`absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 rounded-full opacity-[0.05] transition-transform group-hover:scale-110 ${colorClass}`} />
-      <div className="flex items-center justify-between mb-2 sm:mb-4 relative z-10">
-        <div className={`p-2 sm:p-2.5 rounded-xl shadow-sm ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-blue-600 transition-colors'}`}>
-          <StatIcon size={18} className="sm:w-5 sm:h-5" />
-        </div>
-        <div className="flex flex-col items-end min-w-0">
-          <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider sm:tracking-widest text-slate-400 truncate">{label}</span>
-          <span className={`text-xl sm:text-2xl font-black leading-none mt-1 transition-colors ${active ? 'text-blue-600' : 'text-slate-900'}`}>{count}</span>
-        </div>
-      </div>
-      <div className="relative z-10">
-        <div className="flex items-center justify-between mb-1.5 sm:mb-2">
-          <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 tracking-tight">{pct}%</span>
-          <span className={`text-[9px] sm:text-[10px] font-black px-1.5 sm:px-2 py-0.5 rounded-md ${active ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-500'}`}>{count}/{total}</span>
-        </div>
-        <div className="w-full h-1.5 sm:h-2 bg-slate-100 rounded-full overflow-hidden shadow-inner">
-          <div className={`h-full rounded-full transition-all duration-1000 ease-out shadow-sm ${colorClass}`} style={{ width: `${pct}%` }} />
-        </div>
-      </div>
+      <Icon size={16} aria-hidden="true" />
     </button>
   )
 }
@@ -207,51 +312,54 @@ function ActionMenu({ item, onNavigate }) {
   const isAlreadyAssigned = isItemAssigned(item)
 
   useEffect(() => {
+    if (!open) return undefined
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false) }
     document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  const itemClass = 'flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm font-medium transition-colors'
 
   return (
     <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
       <button
+        type="button"
         onClick={() => setOpen(!open)}
-        className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Actions pour ${item.id}`}
+        className="ui-icon-btn h-8 w-8"
       >
-        <MoreHorizontal size={16} />
+        <MoreHorizontal size={16} aria-hidden="true" />
       </button>
       {open && (
-        <div className="absolute right-0 top-10 z-50 w-48 max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-          <div className="px-3 py-2 border-b border-slate-50">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Actions dossier</p>
-          </div>
-          <button onClick={() => { onNavigate('details', item); setOpen(false) }}
-            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-brand-600 transition-colors">
-            <Eye size={14} /> Consulter le dossier
+        <div role="menu" className="absolute right-0 top-9 z-50 w-52 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-line bg-white py-1 shadow-modal animate-scale-in">
+          <button role="menuitem" onClick={() => { onNavigate('details', item); setOpen(false) }} className={`${itemClass} text-ink hover:bg-brand-50`}>
+            <Eye size={15} aria-hidden="true" /> Consulter le dossier
           </button>
-          <button onClick={() => { onNavigate('edit', item); setOpen(false) }}
-            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-brand-600 transition-colors">
-            <Edit2 size={14} /> Modifier les infos
+          <button role="menuitem" onClick={() => { onNavigate('edit', item); setOpen(false) }} className={`${itemClass} text-ink hover:bg-brand-50`}>
+            <Edit2 size={15} aria-hidden="true" /> Modifier les infos
           </button>
           <button
+            role="menuitem"
             disabled={isAlreadyAssigned}
             onClick={() => {
               if (isAlreadyAssigned) return
               onNavigate('assign', item)
               setOpen(false)
             }}
-            className={`flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold transition-colors ${
-              isAlreadyAssigned
-                ? 'text-slate-300 cursor-not-allowed'
-                : 'text-slate-700 hover:bg-blue-50 hover:text-brand-600'
-            }`}
+            className={`${itemClass} ${isAlreadyAssigned ? 'cursor-not-allowed text-slate-300' : 'text-ink hover:bg-brand-50'}`}
           >
-            <UserCheck2 size={14} /> Affecter technicien
+            <UserCheck2 size={15} aria-hidden="true" /> Affecter technicien
           </button>
-          <div className="border-t border-slate-50" />
-          <button onClick={() => { onNavigate('delete', item); setOpen(false) }}
-            className="flex items-center gap-2.5 w-full px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 transition-colors">
-            <Trash2 size={14} /> Supprimer dossier
+          <div className="my-1 border-t border-line" />
+          <button role="menuitem" onClick={() => { onNavigate('delete', item); setOpen(false) }} className={`${itemClass} text-red-600 hover:bg-red-50`}>
+            <Trash2 size={15} aria-hidden="true" /> Supprimer le dossier
           </button>
         </div>
       )}
@@ -267,143 +375,95 @@ function DeleteConfirmationModal({
   onCancel,
   onConfirm,
 }) {
-  if (!open) return null
-
   const linkedMissionCount = Number(item?.linkedMissionCount || 0)
   const hasLinkedMission = linkedMissionCount > 0
 
   return (
-    <div
-      className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/55 backdrop-blur-sm px-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Confirmer la suppression"
-    >
-      <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Suppression</p>
-            <h2 className="mt-1 text-xl font-black text-slate-900">
-              {hasLinkedMission ? 'Supprimer cette intervention et sa mission ?' : 'Supprimer cette intervention ?'}
-            </h2>
-            <p className="mt-1.5 text-sm text-slate-500">
-              Cette action est définitive.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={isDeleting}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-50 text-slate-500 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label="Fermer"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="px-6 py-5">
-          {item && (
-            <div className="mb-4 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-semibold text-slate-700">
-                <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase tracking-widest text-slate-500 border border-slate-200">
-                  {item.id}
-                </span>
-                <span className="truncate">{item.client}</span>
-                <span className="hidden h-1 w-1 rounded-full bg-slate-300 sm:inline-block" />
-                <span className="truncate text-slate-500">{item.machine}</span>
-              </div>
-            </div>
-          )}
-
-          <div
-            className={`rounded-2xl border px-4 py-4 ${hasLinkedMission ? 'border-amber-200 bg-amber-50/80' : 'border-slate-200 bg-slate-50'}`}
-          >
-            <div className="flex items-start gap-3">
-              <div
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${hasLinkedMission ? 'bg-amber-100 text-amber-700' : 'bg-red-50 text-red-600'}`}
-              >
-                {hasLinkedMission ? <AlertTriangle size={18} /> : <Trash2 size={18} />}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-700 whitespace-pre-line">
-                  {hasLinkedMission
-                    ? 'Cette intervention est affectée à une mission. La mission liée sera également supprimée.'
-                    : 'Êtes-vous sûr de vouloir supprimer cette intervention ?'}
-                </p>
-                {hasLinkedMission && (
-                  <p className="mt-2 text-xs font-medium text-amber-700/90">
-                    {linkedMissionCount > 1
-                      ? `${linkedMissionCount} missions liées seront supprimées.`
-                      : 'La mission liée sera supprimée en même temps.'}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {error && (
-            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-              {error}
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={isDeleting}
-            className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-          >
+    <Modal
+      open={open}
+      onClose={onCancel}
+      dismissible={!isDeleting}
+      size="md"
+      icon={hasLinkedMission ? AlertTriangle : Trash2}
+      title={hasLinkedMission ? 'Supprimer cette intervention et sa mission ?' : 'Supprimer cette intervention ?'}
+      description="Cette action est définitive."
+      footer={
+        <>
+          <button type="button" onClick={onCancel} disabled={isDeleting} className="ui-btn-secondary">
             Annuler
           </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={isDeleting}
-            className={`inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-white transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-75 ${hasLinkedMission ? 'bg-amber-600 hover:bg-amber-700' : 'bg-red-600 hover:bg-red-700'}`}
-          >
-            {isDeleting ? <RefreshCw size={16} className="animate-spin" /> : <Trash2 size={16} />}
-            {isDeleting ? 'Suppression...' : 'Supprimer'}
+          <button type="button" onClick={onConfirm} disabled={isDeleting} className="ui-btn-danger">
+            {isDeleting ? <RefreshCw size={16} className="animate-spin" aria-hidden="true" /> : <Trash2 size={16} aria-hidden="true" />}
+            {isDeleting ? 'Suppression…' : 'Supprimer définitivement'}
           </button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        {item && (
+          <div className="flex flex-col gap-1 rounded-2xl border border-line bg-slate-50/70 px-4 py-3">
+            <span className="ui-ref w-fit">{item.id}</span>
+            <p className="truncate text-sm font-semibold text-ink">{item.client}</p>
+            <p className="truncate text-xs text-ink-muted">{item.machine}</p>
+          </div>
+        )}
+        <div className={`flex items-start gap-3 rounded-2xl px-4 py-3.5 ring-1 ring-inset ${hasLinkedMission ? 'bg-amber-50 ring-amber-200' : 'bg-red-50/60 ring-red-100'}`}>
+          {hasLinkedMission
+            ? <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-700" aria-hidden="true" />
+            : <Trash2 size={18} className="mt-0.5 shrink-0 text-red-600" aria-hidden="true" />}
+          <div className="min-w-0">
+            <p className="text-sm font-medium leading-relaxed text-ink">
+              {hasLinkedMission
+                ? 'Cette intervention est affectée à une mission. La mission liée sera également supprimée.'
+                : 'Êtes-vous sûr de vouloir supprimer cette intervention ?'}
+            </p>
+            {hasLinkedMission && (
+              <p className="mt-1 text-xs font-medium text-amber-800">
+                {linkedMissionCount > 1
+                  ? `${linkedMissionCount} missions liées seront supprimées.`
+                  : 'La mission liée sera supprimée en même temps.'}
+              </p>
+            )}
+          </div>
         </div>
+        {error && (
+          <p role="alert" className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700 ring-1 ring-inset ring-red-200">
+            {error}
+          </p>
+        )}
       </div>
-    </div>
+    </Modal>
   )
 }
 
 function SuccessModal({ open, message, onClose }) {
-  if (!open) return null
-
   return (
-    <div
-      className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-950/45 backdrop-blur-sm px-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Suppression réussie"
+    <Modal
+      open={open}
+      onClose={onClose}
+      size="sm"
+      icon={CheckCircle2}
+      title="Suppression effectuée"
+      footer={<button type="button" onClick={onClose} className="ui-btn-primary" data-autofocus>Fermer</button>}
     >
-      <div className="w-full max-w-md overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-2xl">
-        <div className="flex items-start gap-4 px-6 py-6">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50 text-emerald-600">
-            <CheckCircle2 size={22} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500">Succès</p>
-            <p className="mt-1 text-base font-semibold text-slate-800 whitespace-pre-line">
-              {message}
-            </p>
-          </div>
-        </div>
-        <div className="border-t border-emerald-100 bg-emerald-50/50 px-6 py-4 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white transition-colors hover:bg-emerald-700"
-          >
-            Fermer
-          </button>
-        </div>
+      <p className="whitespace-pre-line text-sm leading-relaxed text-ink">{message}</p>
+    </Modal>
+  )
+}
+
+function EmptyResults({ onReset }) {
+  return (
+    <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-50 text-ink-faint ring-1 ring-inset ring-line">
+        <Search size={24} aria-hidden="true" />
       </div>
+      <div>
+        <p className="font-display text-base font-bold text-ink">Aucune intervention trouvée</p>
+        <p className="mt-1 text-sm text-ink-muted">Modifiez vos filtres ou lancez une nouvelle recherche.</p>
+      </div>
+      <button type="button" onClick={onReset} className="ui-btn-secondary ui-btn-sm mt-1">
+        <RefreshCw size={14} aria-hidden="true" /> Effacer les filtres
+      </button>
     </div>
   )
 }
@@ -681,8 +741,12 @@ export default function InterventionList() {
     return filtered.slice(startIndex, startIndex + itemsPerPage)
   }, [filtered, currentPage])
 
+  const hasActiveFilters = Boolean(startDate || endDate || search || typeFilter !== 'ALL' || statusFilter !== 'ALL')
+  const rangeStart = filtered.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1
+  const rangeEnd = Math.min(currentPage * itemsPerPage, filtered.length)
+
   return (
-    <div className="min-h-screen bg-canvas flex flex-col">
+    <div className="flex min-h-screen flex-col bg-canvas">
       <DeleteConfirmationModal
         open={deleteDialog.open}
         item={deleteDialog.item}
@@ -697,20 +761,15 @@ export default function InterventionList() {
         onClose={() => setDeleteSuccess({ open: false, message: '' })}
       />
       {toast.open && (
-        <div className="fixed top-4 left-4 right-4 sm:top-6 sm:left-auto sm:right-6 z-[120] animate-in fade-in duration-200">
-          <div
-            role="status"
-            className="w-full sm:w-[380px] max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden"
-          >
-            <div className="flex items-start gap-3.5 px-4 py-3.5">
-              <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
-                <CheckCircle2 size={18} className="text-emerald-600" />
-              </div>
+        <div className="fixed left-4 right-4 top-4 z-[130] animate-fade-in sm:left-auto sm:right-6 sm:top-6">
+          <div role="status" className="w-full max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-line bg-white shadow-modal sm:w-[380px]">
+            <div className="flex items-start gap-3 px-4 py-3.5">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-200">
+                <CheckCircle2 size={18} aria-hidden="true" />
+              </span>
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Interventions</p>
-                <p className="text-sm font-semibold text-slate-800 whitespace-pre-line leading-snug mt-0.5 break-words">
-                  {toast.message}
-                </p>
+                <p className="ui-eyebrow">Interventions</p>
+                <p className="mt-0.5 whitespace-pre-line break-words text-sm font-medium leading-snug text-ink">{toast.message}</p>
               </div>
               <button
                 type="button"
@@ -721,451 +780,325 @@ export default function InterventionList() {
                   }
                   setToast({ open: false, message: '' })
                 }}
-                className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-colors"
-                aria-label="Fermer"
+                className="ui-icon-btn h-8 w-8"
+                aria-label="Fermer la notification"
               >
-                <span className="text-lg leading-none">×</span>
+                <X size={16} aria-hidden="true" />
               </button>
             </div>
-            <div className="h-1 bg-gradient-to-r from-emerald-500 via-green-500 to-lime-400" />
           </div>
         </div>
       )}
-      {/* ── Top Bar ── */}
-  <div className="ui-page pb-0 pt-5 sm:pt-7">
-  <PageHeader
-  eyebrow="Service après-vente"
-  title="Interventions"
-  description={`${total} dossier(s) · suivi des demandes, affectations et clôtures.`}
-  icon={Wrench}
-  actions={
-  <>
-  <button
-  type="button"
-  onClick={fetchInterventions}
-  className="ui-btn-secondary hidden sm:inline-flex"
-  disabled={loading}
-  >
-  <RefreshCw size={16} className={loading ? 'animate-spin' : ''} aria-hidden="true" /> Actualiser
-  </button>
-  <button
-  type="button"
-  onClick={() => navigate('/interventions/create')}
-  className="ui-btn-primary"
-  >
-  <Plus size={18} strokeWidth={2.25} aria-hidden="true" /> Nouvelle intervention
-  </button>
-  </>
-  }
-  />
-  </div>
 
-      {/* ── Main Content ── */}
-      <main className="ui-page flex-1 space-y-5 sm:space-y-6 pt-5 sm:pt-6">
-        
-        {/* KPI Stats Grid */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 sm:gap-4">
-          <StatCard
-            label="Tout"
-            count={total}
-            total={total}
-            icon={LayoutGrid}
-            colorClass="bg-slate-400"
-            active={statusFilter === 'ALL'}
-            onClick={() => setStatusFilter('ALL')}
-          />
-          {kpiData.map(k => (
-            <StatCard
-              key={k.key}
-              label={k.label}
-              count={k.count}
-              total={total}
-              icon={k.icon}
-              colorClass={k.bar}
-              active={statusFilter === k.key}
-              onClick={() => setStatusFilter(prev => prev === k.key ? 'ALL' : k.key)}
-            />
-          ))}
-        </div>
+      <div className="ui-page pb-0 pt-5 sm:pt-7">
+        <PageHeader
+          eyebrow="Service après-vente"
+          title="Interventions"
+          description="Suivi des demandes, des affectations techniciens et des clôtures."
+          icon={Wrench}
+          actions={
+            <>
+              <button type="button" onClick={fetchInterventions} className="ui-btn-secondary hidden sm:inline-flex" disabled={loading}>
+                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} aria-hidden="true" /> Actualiser
+              </button>
+              <button type="button" onClick={() => navigate('/interventions/create')} className="ui-btn-primary">
+                <Plus size={18} strokeWidth={2.25} aria-hidden="true" /> Nouvelle intervention
+              </button>
+            </>
+          }
+        />
+      </div>
 
-        {/* Filters & Actions Bar */}
-        <div className="ui-card p-4 sm:p-5">
-          <div className="flex flex-wrap items-center gap-4">
-            {/* Search */}
-            <div className="relative w-full lg:flex-1 min-w-0">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input 
-                type="text"
-                placeholder="Rechercher par ID, client ou machine..."
+      <main className="ui-page flex flex-1 flex-col gap-5 pt-5 sm:gap-6 sm:pt-6">
+        <PipelineOverview total={total} kpiData={kpiData} statusFilter={statusFilter} onSelect={setStatusFilter} />
+
+        {/* Filter rail */}
+        <section className="ui-card flex flex-col gap-4 p-4 sm:p-5" aria-label="Filtres">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="relative min-w-0 flex-1">
+              <label htmlFor="intervention-search" className="sr-only">Rechercher une intervention</label>
+              <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint" aria-hidden="true" />
+              <input
+                id="intervention-search"
+                type="search"
+                placeholder="Référence, client ou machine…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="ui-input w-full pl-11"
+                className="ui-input w-full pl-10"
               />
             </div>
-            
-            {/* Type filter with icons */}
-            <div className="relative group w-full sm:w-auto sm:min-w-[180px]">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-                {typeFilter !== 'ALL' ? (
-                  React.createElement(typeConfig[typeFilter].icon, { size: 14 })
-                ) : (
-                  <Filter size={14} />
-                )}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-slate-50 px-3 ring-1 ring-inset ring-line sm:flex-none">
+                <Calendar size={14} className="shrink-0 text-brand-600" aria-hidden="true" />
+                <label htmlFor="date-start" className="sr-only">Date de début</label>
+                <input id="date-start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-10 min-w-0 flex-1 bg-transparent text-sm text-ink outline-none sm:w-[8.5rem] sm:flex-none" />
+                <span className="text-xs text-ink-faint" aria-hidden="true">→</span>
+                <label htmlFor="date-end" className="sr-only">Date de fin</label>
+                <input id="date-end" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-10 min-w-0 flex-1 bg-transparent text-sm text-ink outline-none sm:w-[8.5rem] sm:flex-none" />
               </div>
-              <select 
-                value={typeFilter}
-                onChange={e => setTypeFilter(e.target.value)}
-                className="ui-input w-full appearance-none pl-9 pr-8 text-sm font-semibold"
-              >
-                <option value="ALL">Tous les types</option>
-                {Object.entries(typeConfig).map(([key, cfg]) => (
-                  <option key={key} value={key}>{cfg.label}</option>
-                ))}
-              </select>
-              <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            </div>
-
-            {/* Date Filters Row */}
-            <div className="flex flex-col sm:flex-row sm:items-end gap-2 w-full sm:w-auto">
-              <div className="flex flex-col gap-1 w-full sm:w-auto min-w-0">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date début</label>
-                <div className="relative w-full sm:w-40 min-w-0">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 pointer-events-none" size={12} />
-                  <input 
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="ui-input w-full min-w-0 pl-9 text-sm"
-                  />
-                  {!startDate && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium pointer-events-none sm:hidden">JJ/MM/AAAA</span>
-                  )}
-                </div>
-              </div>
-              <span className="text-slate-300 text-xs hidden sm:inline pb-2.5">à</span>
-              <div className="flex flex-col gap-1 w-full sm:w-auto min-w-0">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date fin</label>
-                <div className="relative w-full sm:w-40 min-w-0">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 pointer-events-none" size={12} />
-                  <input 
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="ui-input w-full min-w-0 pl-9 text-sm"
-                  />
-                  {!endDate && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium pointer-events-none sm:hidden">JJ/MM/AAAA</span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Actions / View Mode */}
-            <div className="flex items-center justify-end gap-2 w-full lg:w-auto lg:ml-auto">
-              {(startDate || endDate || search || typeFilter !== 'ALL' || statusFilter !== 'ALL') && (
-                <button 
-                  onClick={resetFilters}
-                  className="p-2.5 text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                  title="Réinitialiser"
+              <div className="flex items-center gap-1 rounded-xl bg-slate-100 p-1" role="group" aria-label="Mode d'affichage">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  aria-pressed={viewMode === 'list'}
+                  className={`flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-all ${viewMode === 'list' ? 'bg-white text-brand-700 shadow-card' : 'text-ink-muted hover:text-ink'}`}
                 >
-                  <RefreshCw size={18} />
+                  <LayoutList size={15} aria-hidden="true" /> Liste
                 </button>
-              )}
-              <div className="h-8 w-px bg-slate-100 mx-2" />
-              <button 
-                onClick={() => setViewMode('list')}
-                className={`flex h-10 w-10 items-center justify-center rounded-xl transition-all ${viewMode === 'list' ? 'bg-brand-600 text-white shadow-card' : 'text-ink-muted hover:bg-slate-100'}`}
-              >
-                <LayoutList size={18} />
-              </button>
-              <button 
-                onClick={() => setViewMode('kanban')}
-                className={`p-2.5 rounded-xl transition-all ${viewMode === 'kanban' ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'text-slate-400 hover:bg-slate-100'}`}
-              >
-                <LayoutGrid size={18} />
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('kanban')}
+                  aria-pressed={viewMode === 'kanban'}
+                  className={`flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-all ${viewMode === 'kanban' ? 'bg-white text-brand-700 shadow-card' : 'text-ink-muted hover:text-ink'}`}
+                >
+                  <LayoutGrid size={15} aria-hidden="true" /> Tableau
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+          <div className="flex items-center gap-3">
+            <div className="-mx-1 flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto px-1 pb-0.5 no-scrollbar" role="group" aria-label="Type d'intervention">
+              {[['ALL', { label: 'Tous les types', icon: Wrench }], ...Object.entries(typeConfig)].map(([key, cfg]) => {
+                const active = typeFilter === key
+                const TIcon = cfg.icon
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setTypeFilter(key)}
+                    className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-semibold ring-1 ring-inset transition-colors ${active ? 'bg-brand-600 text-white ring-brand-600' : 'bg-white text-ink-muted ring-line hover:text-brand-700 hover:ring-brand-200'}`}
+                  >
+                    <TIcon size={13} aria-hidden="true" /> {cfg.label}
+                  </button>
+                )
+              })}
+            </div>
+            {hasActiveFilters && (
+              <button type="button" onClick={resetFilters} className="ui-btn-ghost ui-btn-sm shrink-0 text-red-600 hover:bg-red-50">
+                <X size={14} aria-hidden="true" /> <span className="hidden sm:inline">Réinitialiser</span>
+              </button>
+            )}
+          </div>
+        </section>
 
-        {/* List View */}
         {viewMode === 'list' && (
-          <div className="ui-card overflow-hidden p-0">
-            {/* Mobile / tablet cards */}
-            <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:hidden">
+          <section className="ui-card overflow-hidden p-0" aria-label="Liste des interventions">
+            <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
+              <p className="text-sm text-ink-muted">
+                <span className="font-semibold text-ink tabular-nums">{filtered.length}</span> résultat{filtered.length > 1 ? 's' : ''}
+                {statusFilter !== 'ALL' && <> · <span className="font-medium text-ink">{(statusConfig[statusFilter] || fallbackStatus).short}</span></>}
+              </p>
+              {loading && <RefreshCw size={14} className="animate-spin text-brand-600" aria-label="Chargement" />}
+            </div>
+
+            {/* Mobile & tablet: ticket cards */}
+            <div className="grid grid-cols-1 gap-3 bg-slate-50/50 p-3 sm:grid-cols-2 sm:p-4 lg:hidden">
               {paginatedData.map((item) => {
                 const { st, ty, TyIcon, isHighlighted } = getItemDisplayData(item, highlightId)
                 const isAssigned = isItemAssigned(item)
                 return (
-                  <div
+                  <article
                     key={item.id}
                     ref={isHighlighted ? highlightRowRef : null}
-                    className={`ui-card flex flex-col overflow-hidden p-4 transition-shadow hover:shadow-raised ${isHighlighted ? 'ring-2 ring-teal-200' : ''}`}
+                    className={`relative flex flex-col overflow-hidden rounded-2xl border border-line bg-white shadow-card ${isHighlighted ? 'ring-2 ring-teal-300' : ''}`}
                   >
-                    <div className="flex items-start gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${ty.color}`}>
-                        <TyIcon size={18} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-black text-slate-900 truncate">{item.machine}</p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[10px] font-mono font-bold text-slate-400 uppercase truncate">{item.id}</span>
-                          <span className="w-1 h-1 bg-slate-200 rounded-full" />
-                          <span className="text-[9px] font-black uppercase text-brand-800 truncate">{ty.label}</span>
+                    <div className={`h-1 w-full ${st.bar}`} aria-hidden="true" />
+                    <div className="flex flex-col gap-3 p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="ui-ref">{item.id}</span>
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-700">
+                            <TyIcon size={12} aria-hidden="true" /> {ty.label}
+                          </span>
                         </div>
+                        <StatusPill status={item.status} compact />
                       </div>
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black border-2 uppercase tracking-wider shrink-0 ${st.color}`}>
-                        <span className={`w-2 h-2 rounded-full ${st.dot}`} />
-                        {st.label}
-                      </span>
+                      <div className="min-w-0">
+                        <h3 className="truncate font-display text-base font-bold text-ink">{item.client || '—'}</h3>
+                        <p className="mt-0.5 flex items-center gap-1.5 truncate text-sm text-ink-muted">
+                          <Cpu size={13} className="shrink-0 text-ink-faint" aria-hidden="true" />
+                          <span className="truncate">{item.machine || '—'}</span>
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 border-t border-dashed border-line pt-3">
+                        <TechnicianChip name={item.assignee} compact />
+                        <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-ink-muted tabular-nums">
+                          <Calendar size={13} className="text-brand-600" aria-hidden="true" /> {item.date || '—'}
+                        </span>
+                      </div>
+                      <span className="sr-only">Statut : {st.label}</span>
                     </div>
-
-                    <div className="mt-3 space-y-1.5">
-                      <div className="flex items-center gap-2 text-sm font-bold text-slate-700 min-w-0">
-                        <Building2 size={14} className="text-slate-300 shrink-0" />
-                        <span className="truncate">{item.client}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                        <Calendar size={14} className="text-blue-500 shrink-0" />
-                        <span className="truncate">{item.date}</span>
-                      </div>
-                      {item.assignee ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[10px] font-black shrink-0">
-                            {getInitials(item.assignee)}
-                          </div>
-                          <span className="text-xs font-bold text-slate-800 truncate">{item.assignee}</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 text-amber-500">
-                          <AlertTriangle size={12} />
-                          <span className="text-[10px] font-black uppercase tracking-wider italic">Non affecté</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-2 border-t border-line bg-slate-50/60 p-3">
                       <InterventionActions variant="card" item={item} isAssigned={isAssigned} onNavigate={handleNavigate} />
                     </div>
-                  </div>
+                  </article>
                 )
               })}
               {paginatedData.length === 0 && (
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-6 py-16 text-center">
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-200 border-2 border-dashed border-slate-100">
-                      <Search size={32} />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-base font-black text-slate-400">Aucune intervention trouvée</p>
-                      <p className="text-sm text-slate-300 font-bold">Modifiez vos filtres ou effectuez une nouvelle recherche</p>
-                    </div>
-                    <button onClick={resetFilters} className="mt-1 px-6 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all">EFFACER LES FILTRES</button>
-                  </div>
+                <div className="rounded-2xl border border-line bg-white sm:col-span-2">
+                  <EmptyResults onReset={resetFilters} />
                 </div>
               )}
             </div>
 
             {/* Desktop table */}
-            <div className="hidden lg:block overflow-x-auto no-scrollbar">
-              <table className="ui-table w-full min-w-[860px] text-left">
+            <div className="hidden overflow-x-auto lg:block">
+              <table className="w-full min-w-[920px] text-left">
                 <thead>
-                  <tr className="bg-slate-50 border-b-2 border-slate-100">
-                    <th className="px-6 py-5 text-[11px] font-black text-slate-500 uppercase tracking-widest border-r border-slate-100 last:border-0">ID / Machine</th>
-                    <th className="px-6 py-5 text-[11px] font-black text-slate-500 uppercase tracking-widest border-r border-slate-100 last:border-0">Client / Site</th>
-                    <th className="px-6 py-5 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center border-r border-slate-100 last:border-0">Statut</th>
-                    <th className="px-6 py-5 text-[11px] font-black text-slate-500 uppercase tracking-widest border-r border-slate-100 last:border-0">Date d'intervention</th>
-                    <th className="px-6 py-5 text-[11px] font-black text-slate-500 uppercase tracking-widest border-r border-slate-100 last:border-0">Technicien</th>
-                    <th className="px-4 py-5 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center w-[200px]">Actions</th>
+                  <tr className="border-b border-line bg-slate-50/70 text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+                    <th scope="col" className="py-3 pl-6 pr-4">Dossier</th>
+                    <th scope="col" className="px-4 py-3">Client &amp; machine</th>
+                    <th scope="col" className="px-4 py-3">Technicien</th>
+                    <th scope="col" className="px-4 py-3">Date</th>
+                    <th scope="col" className="px-4 py-3">Statut</th>
+                    <th scope="col" className="py-3 pl-4 pr-6 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {paginatedData.map((item, idx) => {
+                <tbody className="divide-y divide-line">
+                  {paginatedData.map((item) => {
                     const { st, ty, TyIcon, isHighlighted } = getItemDisplayData(item, highlightId)
+                    const isAssigned = isItemAssigned(item)
                     return (
                       <tr
                         key={item.id}
                         ref={isHighlighted ? highlightRowRef : null}
-                        className={`transition-colors group ${
-                          isHighlighted
-                            ? 'bg-emerald-50 ring-2 ring-emerald-200 animate-pulse'
-                            : `hover:bg-blue-50/50 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'}`
-                        }`}
+                        onClick={() => handleNavigate('details', item)}
+                        className={`group cursor-pointer transition-colors ${isHighlighted ? 'bg-teal-50' : 'hover:bg-brand-50/40'}`}
                       >
-                        <td className="px-6 py-4 border-r border-slate-50 last:border-0">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${ty.color}`}>
-                              <TyIcon size={18} />
-                            </div>
+                        <td className="relative py-3.5 pl-6 pr-4">
+                          <span className={`absolute bottom-3 left-0 top-3 w-1 rounded-r-full ${st.bar}`} aria-hidden="true" />
+                          <div className="flex items-center gap-3">
+                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-100">
+                              <TyIcon size={17} aria-hidden="true" />
+                            </span>
                             <div className="min-w-0">
-                              <p className="text-[13px] font-black text-slate-900 leading-none mb-1.5 group-hover:text-blue-600 transition-colors truncate">{item.machine}</p>
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-tight truncate">{item.id}</span>
-                                <span className="w-1 h-1 bg-slate-200 rounded-full" />
-                                <span className="text-[9px] font-black uppercase text-brand-800 truncate">{ty.label}</span>
-                              </div>
+                              <span className="ui-ref">{item.id}</span>
+                              <p className="mt-1 text-xs font-medium text-ink-muted">{ty.label}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 border-r border-slate-50 last:border-0">
-                          <div className="flex items-center gap-2 text-sm font-bold text-slate-700 min-w-0">
-                            <Building2 size={14} className="text-slate-300 shrink-0" />
-                            <span className="truncate">{item.client}</span>
-                          </div>
+                        <td className="max-w-[18rem] px-4 py-3.5">
+                          <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-ink group-hover:text-brand-700">
+                            <Building2 size={14} className="shrink-0 text-ink-faint" aria-hidden="true" />
+                            <span className="truncate">{item.client || '—'}</span>
+                          </p>
+                          <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-ink-muted">
+                            <Cpu size={13} className="shrink-0 text-ink-faint" aria-hidden="true" />
+                            <span className="truncate">{item.machine || '—'}</span>
+                          </p>
                         </td>
-                        <td className="px-6 py-4 text-center border-r border-slate-50 last:border-0">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black border-2 uppercase tracking-wider ${st.color}`}>
-                            <span className={`w-2 h-2 rounded-full shadow-sm ${st.dot}`} />
-                            {st.label}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 border-r border-slate-50 last:border-0">
-                          <div className="flex items-center gap-2 text-xs font-black text-slate-600 min-w-0">
-                            <Calendar size={16} className="text-blue-500 shrink-0" />
-                            <span className="truncate">{item.date}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 border-r border-slate-50 last:border-0">
-                          {item.assignee ? (
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[10px] font-black shadow-md shadow-blue-100">
-                                {getInitials(item.assignee)}
-                              </div>
-                              <span className="text-xs font-bold text-slate-800">{item.assignee}</span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2 text-amber-500">
-                              <AlertTriangle size={12} />
-                              <span className="text-[10px] font-black uppercase tracking-wider italic">Non affecté</span>
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-4 w-[200px]">
-                          <div className="grid grid-cols-2 gap-1.5 w-[184px] mx-auto">
-                            <InterventionActions variant="table" item={item} isAssigned={isItemAssigned(item)} onNavigate={handleNavigate} />
+                        <td className="px-4 py-3.5"><TechnicianChip name={item.assignee} /></td>
+                        <td className="px-4 py-3.5"><DateBlock value={item.date} /></td>
+                        <td className="px-4 py-3.5"><StatusPill status={item.status} /></td>
+                        <td className="py-3.5 pl-4 pr-6">
+                          <div className="flex items-center justify-end gap-0.5">
+                            <RowIconAction label="Consulter le dossier" icon={Eye} onClick={() => handleNavigate('details', item)} />
+                            <RowIconAction label="Modifier" icon={Edit2} onClick={() => handleNavigate('edit', item)} />
+                            <RowIconAction label={isAssigned ? 'Déjà affectée' : 'Affecter un technicien'} icon={UserCheck2} disabled={isAssigned} onClick={() => handleNavigate('assign', item)} />
+                            <RowIconAction label="Supprimer" icon={Trash2} tone="danger" onClick={() => handleNavigate('delete', item)} />
                           </div>
                         </td>
                       </tr>
                     )
                   })}
                   {paginatedData.length === 0 && (
-                    <tr>
-                      <td colSpan="6" className="px-6 py-20 text-center">
-                        <div className="flex flex-col items-center gap-4">
-                          <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-200 border-2 border-dashed border-slate-100">
-                            <Search size={40} />
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-lg font-black text-slate-400">Aucune intervention trouvée</p>
-                            <p className="text-sm text-slate-300 font-bold">Modifiez vos filtres ou effectuez une nouvelle recherche</p>
-                          </div>
-                          <button onClick={resetFilters} className="mt-2 px-6 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all">EFFACER LES FILTRES</button>
-                        </div>
-                      </td>
-                    </tr>
+                    <tr><td colSpan="6"><EmptyResults onReset={resetFilters} /></td></tr>
                   )}
                 </tbody>
               </table>
             </div>
-            
-            {/* Pagination Controls */}
+
             {totalPages > 1 && (
-              <div className="mt-4 lg:mt-0 bg-white rounded-2xl border border-slate-200 shadow-sm lg:rounded-none lg:border-0 lg:border-t lg:border-slate-100 lg:shadow-none lg:bg-slate-50/50 px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Page {currentPage} sur {totalPages}</span>
-                  <div className="h-4 w-px bg-slate-200 mx-2" />
-                  <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">{filtered.length} résultats au total</span>
-                </div>
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                  <button
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(prev => prev - 1)}
-                    className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-blue-200 hover:text-blue-600 disabled:opacity-30 disabled:pointer-events-none transition-all"
-                  >
-                    <ChevronLeft size={14} strokeWidth={3} /> Précédent
+              <nav className="flex flex-col gap-3 border-t border-line px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5" aria-label="Pagination">
+                <p className="text-sm text-ink-muted">
+                  <span className="font-semibold text-ink tabular-nums">{rangeStart}–{rangeEnd}</span> sur <span className="tabular-nums">{filtered.length}</span>
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <button type="button" disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)} className="ui-icon-btn h-9 w-9 disabled:opacity-30" aria-label="Page précédente">
+                    <ChevronLeft size={16} aria-hidden="true" />
                   </button>
-                  <button
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage(prev => prev + 1)}
-                    className="flex items-center gap-2 px-6 py-2 bg-brand-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-100 hover:bg-blue-700 disabled:opacity-30 disabled:pointer-events-none transition-all group"
-                  >
-                    Suivant <ChevronRightIcon size={14} strokeWidth={3} className="group-hover:translate-x-1 transition-transform" />
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                    .map((p, idx, arr) => (
+                      <React.Fragment key={p}>
+                        {idx > 0 && p - arr[idx - 1] > 1 && <span className="px-1 text-ink-faint" aria-hidden="true">…</span>}
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage(p)}
+                          aria-current={p === currentPage ? 'page' : undefined}
+                          className={`h-9 min-w-9 rounded-xl px-3 text-sm font-semibold tabular-nums transition-colors ${p === currentPage ? 'bg-brand-600 text-white' : 'text-ink-muted hover:bg-slate-100'}`}
+                        >
+                          {p}
+                        </button>
+                      </React.Fragment>
+                    ))}
+                  <button type="button" disabled={currentPage === totalPages} onClick={() => setCurrentPage(prev => prev + 1)} className="ui-icon-btn h-9 w-9 disabled:opacity-30" aria-label="Page suivante">
+                    <ChevronRightIcon size={16} aria-hidden="true" />
                   </button>
                 </div>
-              </div>
+              </nav>
             )}
-          </div>
+          </section>
         )}
 
-        {/* Kanban View */}
         {viewMode === 'kanban' && (
-          <div className="flex gap-6 overflow-x-auto pb-6 no-scrollbar min-h-[420px] sm:min-h-[500px]">
+          <section className="-mx-4 flex min-h-[420px] snap-x gap-4 overflow-x-auto px-4 pb-6 no-scrollbar sm:mx-0 sm:px-0" aria-label="Tableau par statut">
             {Object.entries(statusConfig).map(([statusKey, st]) => {
               const items = filtered.filter(i => i.status === statusKey)
               return (
-                <div key={statusKey} className="flex-shrink-0 w-[18rem] sm:w-80 flex flex-col gap-4">
-                  <div className="flex items-center justify-between px-2">
+                <div key={statusKey} className="flex w-[17.5rem] shrink-0 snap-start flex-col rounded-2xl bg-slate-100/70 p-2 sm:w-80">
+                  <div className="flex items-center justify-between px-2 py-2">
                     <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${st.dot}`} />
-                      <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">{st.label}</h3>
-                      <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">{items.length}</span>
+                      <span className={`h-2.5 w-2.5 rounded-full ${st.bar}`} aria-hidden="true" />
+                      <h3 className="text-sm font-semibold text-ink">{st.short}</h3>
                     </div>
+                    <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-ink-muted tabular-nums ring-1 ring-inset ring-line">{items.length}</span>
                   </div>
-                  
-                  <div className="flex-1 flex flex-col gap-3">
+                  <div className="flex flex-1 flex-col gap-2">
                     {items.map(item => {
-                      const ty = typeConfig[item.type]
+                      const ty = typeConfig[normalizeTypeKey(item.type)] || fallbackType
                       return (
-                        <div 
-                          key={item.id} 
-                          className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:border-blue-300 hover:shadow-md transition-all group relative overflow-hidden"
+                        <article
+                          key={item.id}
+                          onClick={() => handleNavigate('details', item)}
+                          className="group cursor-pointer rounded-xl border border-line bg-white p-3.5 shadow-card transition-all hover:border-brand-200 hover:shadow-raised"
                         >
-                          <div className={`absolute top-0 left-0 w-1 h-full ${st.bar}`} />
-                          <div className="flex items-start justify-between mb-3">
-                            <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-tighter">{item.id}</span>
-                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-lg border uppercase tracking-wider ${ty.color}`}>
-                              {ty.label}
-                            </span>
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <span className="ui-ref">{item.id}</span>
+                            <span className="text-[11px] font-semibold text-brand-700">{ty.label}</span>
                           </div>
-                          <h4 className="text-sm font-black text-slate-900 leading-tight mb-1.5 group-hover:text-blue-600 transition-colors">{item.machine}</h4>
-                          <div className="space-y-2 mb-4">
-                            <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500">
-                              <Building2 size={12} className="text-slate-300" />
-                              {item.client}
-                            </div>
-                            <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400">
-                              <Calendar size={12} className="text-slate-300" />
-                              {item.date}
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between pt-3 border-t border-slate-50">
+                          <h4 className="truncate text-sm font-semibold text-ink group-hover:text-brand-700">{item.client || '—'}</h4>
+                          <p className="mt-0.5 truncate text-xs text-ink-muted">{item.machine || '—'}</p>
+                          <div className="mt-3 flex items-center justify-between gap-2 border-t border-line pt-2.5">
                             {item.assignee ? (
-                              <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center text-[8px] font-black border border-blue-100">
-                                  {getInitials(item.assignee)}
-                                </div>
-                                <span className="text-[10px] font-bold text-slate-600">{item.assignee.split(' ')[0]}</span>
+                              <div className="flex min-w-0 items-center gap-1.5">
+                                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-[9px] font-bold text-white" aria-hidden="true">
+                                  {getInitials(item.assignee).slice(0, 2).toUpperCase()}
+                                </span>
+                                <span className="truncate text-xs font-medium text-ink">{item.assignee.split(' ')[0]}</span>
                               </div>
                             ) : (
-                              <span className="text-[10px] font-bold text-amber-500 bg-amber-50 px-2 py-0.5 rounded-md">À affecter</span>
+                              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">À affecter</span>
                             )}
                             <div className="flex items-center gap-1">
+                              <span className="text-[11px] text-ink-faint tabular-nums">{item.date}</span>
                               <ActionMenu item={item} onNavigate={handleNavigate} />
                             </div>
                           </div>
-                        </div>
+                        </article>
                       )
                     })}
                     {items.length === 0 && (
-                      <div className="h-24 border-2 border-dashed border-slate-100 rounded-2xl flex flex-col items-center justify-center bg-slate-50/30">
-                        <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Vide</p>
+                      <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-slate-300 text-xs font-medium text-ink-faint">
+                        Aucun dossier
                       </div>
                     )}
                   </div>
                 </div>
               )
             })}
-          </div>
+          </section>
         )}
       </main>
     </div>

@@ -37,10 +37,11 @@ function NavGroup({ item, onNavigate }) {
   const Icon = item.icon
   const isAnyChildActive = item.matchPaths.some((path) => location.pathname.startsWith(path))
   const [open, setOpen] = useState(isAnyChildActive)
-
-  useEffect(() => {
+  const [wasChildActive, setWasChildActive] = useState(isAnyChildActive)
+  if (wasChildActive !== isAnyChildActive) {
+    setWasChildActive(isAnyChildActive)
     if (isAnyChildActive) setOpen(true)
-  }, [isAnyChildActive])
+  }
 
   return (
     <div>

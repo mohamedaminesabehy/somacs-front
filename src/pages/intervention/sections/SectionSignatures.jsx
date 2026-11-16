@@ -1,4 +1,4 @@
-import { ClipboardCheck } from 'lucide-react'
+import { Lock } from 'lucide-react'
 import SignatureCaptureCard from './SignatureCaptureCard'
 
 export default function SectionSignatures({
@@ -11,21 +11,33 @@ export default function SectionSignatures({
 }) {
   const techSig = getSignatureByType('TECHNICIAN_SIGNATURE')
   const clientSig = getSignatureByType('CLIENT_SIGNATURE_STAMP')
+  const signedCount = [techSig, clientSig].filter((s) => s?.url).length
 
   return (
-    <div className="space-y-6 sm:space-y-10 animate-in fade-in zoom-in-95 duration-500">
-      <div className="pb-4 sm:pb-6 border-b-2 border-slate-100">
-        <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-1 sm:mb-2 flex items-center gap-2 sm:gap-3">
-          <ClipboardCheck className="text-green-600" size={24} />
-          Clôture &amp; Signatures
-        </h2>
-        <p className="text-xs sm:text-sm text-slate-500 font-medium">Validez l&apos;intervention avec les signatures du technicien et du client</p>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-3 rounded-2xl border border-line bg-slate-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-ink">Validation contradictoire</p>
+          <p className="text-xs text-ink-muted">Le technicien et le client signent pour attester de l’intervention.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex h-2 w-28 overflow-hidden rounded-full bg-slate-200" role="img" aria-label={`${signedCount} signature(s) sur 2`}>
+            <div className="h-full bg-teal-500 transition-all" style={{ width: `${signedCount * 50}%` }} />
+          </div>
+          <span className="text-sm font-bold text-ink tabular-nums">{signedCount}/2</span>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {!canManageSignatures && (
+        <p className="flex items-center gap-2 rounded-xl bg-slate-100 px-3.5 py-2.5 text-xs font-medium text-ink-muted">
+          <Lock size={13} aria-hidden="true" /> Signatures en lecture seule pour ce dossier.
+        </p>
+      )}
+
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
         <SignatureCaptureCard
-          title="Signature du Technicien"
-          placeholder="Le technicien signe ici pour valider l'intervention"
+          title="Signature du technicien"
+          placeholder="Photographiez ou importez la signature du technicien"
           type="TECHNICIAN_SIGNATURE"
           signature={techSig}
           isBusy={uploadingSignatureType === 'TECHNICIAN_SIGNATURE'}
@@ -35,8 +47,8 @@ export default function SectionSignatures({
           onDelete={handleDeleteSignature}
         />
         <SignatureCaptureCard
-          title="Signature & Cachet Client"
-          placeholder="Le client appose sa signature et son cachet"
+          title="Signature & cachet client"
+          placeholder="Photographiez ou importez la signature et le cachet du client"
           type="CLIENT_SIGNATURE_STAMP"
           signature={clientSig}
           isBusy={uploadingSignatureType === 'CLIENT_SIGNATURE_STAMP'}

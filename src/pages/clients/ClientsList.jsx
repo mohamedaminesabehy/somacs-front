@@ -22,12 +22,10 @@ import { EmptyState, InlineAlert, SkeletonTableRows } from '../../components/ui/
 import { StatStrip, SearchField, SegmentedFilter, Toolbar, Toast } from '../../components/ui/DataKit'
 
 const PAGE_SIZE = 10
-
-function normalize(value) {
-  return String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
+const EMPTY_META = {
+  total: 0,
+  totalPages: 1,
+  stats: { globalTotal: 0, complete: 0, incomplete: 0, withEmail: 0, types: [], zones: [] },
 }
 
 function getInitials(name) {
@@ -95,21 +93,54 @@ export default function ClientsList() {
   const role = readRole()
   const canDelete = ['administrateur', 'coordinateur', 'responsable technicien'].includes(role)
 
-  const loadClients = useCallback(() => {
-    let alive = true
+  const [serverSearch, setServerSearch] = useState('')
+  useEffect(() => {
+    const timer = setTimeout(() => setServerSearch(search.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  const [meta, setMeta] = useState(EMPTY_META)
+  const [reloadKey, setReloadKey] = useState(0)
+  const loadClients = useCallback(() => setReloadKey((k) => k + 1), [])
+
+  useEffect(() => {
+    setPage(1)
+  }, [serverSearch, completeness, typeFilter, zoneFilter])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) })
+    if (serverSearch) params.set('search', serverSearch)
+    if (completeness) params.set('completeness', completeness)
+    if (typeFilter !== 'all') params.set('type', typeFilter)
+    if (zoneFilter !== 'all') params.set('zone', zoneFilter)
     setLoading(true)
     setError(null)
-    apiFetch('/clients')
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then((data) => alive && setClients(Array.isArray(data) ? data : []))
-      .catch((err) => alive && setError(err))
-      .finally(() => alive && setLoading(false))
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  useEffect(() => loadClients(), [loadClients])
+    apiFetch(`/clients?${params}`, { signal: controller.signal })
+      .then(async (r) => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}))
+          throw new Error(body.message || `Erreur serveur (HTTP ${r.status})`)
+        }
+        return r.json()
+      })
+      .then((data) => {
+        setClients(Array.isArray(data?.items) ? data.items : [])
+        setMeta({
+          total: Number(data?.total) || 0,
+          totalPages: Math.max(1, Number(data?.totalPages) || 1),
+          stats: { ...EMPTY_META.stats, ...(data?.stats || {}) },
+        })
+        if (data?.totalPages && page > data.totalPages) setPage(data.totalPages)
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError') setError(err)
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false)
+      })
+    return () => controller.abort()
+  }, [page, serverSearch, completeness, typeFilter, zoneFilter, reloadKey])
 
   useEffect(() => {
     if (!toast) return undefined
@@ -117,38 +148,20 @@ export default function ClientsList() {
     return () => clearTimeout(timer)
   }, [toast])
 
-  const types = useMemo(() => [...new Set(clients.map((c) => c.type).filter(Boolean))].sort(), [clients])
-  const zones = useMemo(() => [...new Set(clients.map((c) => c.zone || c.city).filter(Boolean))].sort(), [clients])
-
-  const counts = useMemo(() => {
-    const incomplete = clients.filter(isIncomplete).length
-    return {
-      total: clients.length,
-      complete: clients.length - incomplete,
-      incomplete,
-      withEmail: clients.filter((c) => c.email).length,
-    }
-  }, [clients])
-
-  const filtered = useMemo(() => {
-    const q = normalize(search.trim())
-    return clients.filter((c) => {
-      if (completeness === 'complete' && isIncomplete(c)) return false
-      if (completeness === 'incomplete' && !isIncomplete(c)) return false
-      if (typeFilter !== 'all' && c.type !== typeFilter) return false
-      if (zoneFilter !== 'all' && (c.zone || c.city) !== zoneFilter) return false
-      if (!q) return true
-      return [c.code, c.name, c.phone, c.phone2, c.email, c.city, c.zone, c.address].map(normalize).join(' ').includes(q)
-    })
-  }, [clients, search, completeness, typeFilter, zoneFilter])
-
-  useEffect(() => {
-    setPage(1)
-  }, [search, completeness, typeFilter, zoneFilter])
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const { stats } = meta
+  const types = useMemo(() => stats.types.map((t) => t.value), [stats.types])
+  const zones = stats.zones
+  const counts = {
+    total: stats.globalTotal,
+    complete: stats.complete,
+    incomplete: stats.incomplete,
+    withEmail: stats.withEmail,
+  }
+  const filtered = clients
+  const filteredTotal = meta.total
+  const totalPages = meta.totalPages
   const safePage = Math.min(page, totalPages)
-  const visible = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const visible = clients
   const hasFilters = Boolean(search || completeness || typeFilter !== 'all' || zoneFilter !== 'all')
 
   const resetFilters = () => {
@@ -166,7 +179,7 @@ export default function ClientsList() {
     try {
       const response = await apiFetch(`/clients/${deleteTarget.id}`, { method: 'DELETE', auth: true })
       if (response.ok) {
-        setClients((prev) => prev.filter((c) => c.id !== deleteTarget.id))
+        loadClients()
         setToast({ type: 'success', message: `Le client « ${deleteTarget.name} » a été supprimé.` })
       } else {
         const data = await response.json().catch(() => ({}))
@@ -186,8 +199,8 @@ export default function ClientsList() {
   ]
 
   const typeOptions = [
-    { value: 'all', label: 'Tous', count: clients.length },
-    ...types.map((type) => ({ value: type, label: type, count: clients.filter((c) => c.type === type).length })),
+    { value: 'all', label: 'Tous', count: stats.globalTotal },
+    ...stats.types.map((t) => ({ value: t.value, label: t.value, count: t.count })),
   ]
 
   return (
@@ -226,7 +239,13 @@ export default function ClientsList() {
       </div>
 
       <Toolbar
-        summary={loading ? 'Chargement…' : `${filtered.length} client(s) affiché(s) sur ${clients.length}`}
+        summary={
+          loading
+            ? 'Chargement…'
+            : hasFilters
+              ? `${filteredTotal} résultat(s) sur ${counts.total} client(s)`
+              : `${counts.total} client(s)`
+        }
         onReset={hasFilters ? resetFilters : undefined}
       >
         <SearchField

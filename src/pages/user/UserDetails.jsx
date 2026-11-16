@@ -1,161 +1,142 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import {
-  ArrowLeft,
-  Download,
-  Shield,
-  Clock,
-  Calendar,
-  RotateCcw,
-  Zap,
-  Cog,
-  CheckCircle,
-  AlertCircle,
-  Activity,
-  Eye,
-  BarChart3,
-  RefreshCw,
-  Sparkles,
-} from 'lucide-react'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
+import { AlertCircle, ArrowLeft, Download, History, Loader2, RefreshCw, SearchX } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
 import logoImage from '../../assets/logo-removebg-preview.png'
+import {
+  BUSINESS_ACTIONS,
+  MODULE_SHORT_LABELS,
+  MODULES,
+  OPERATIONS,
+  TECHNICIEN_ACTIONS,
+  buildModuleInsights,
+  countsFromStats,
+  formatDateForDisplay,
+  formatDateTime,
+  formatDateToISO,
+  getDescriptionLabel,
+  getStartOfMonth,
+  isValidDate,
+  moduleFromLog,
+  operationFromAction,
+  operationTotals,
+  totalFromCounts,
+  ACTION_LABELS,
+} from './audit/auditConfig'
+import { buildTraceabilityPdf, loadImageAsDataUrl, traceabilityPdfFileName } from './audit/traceabilityPdf'
+import ActivityFilters from './audit/ActivityFilters'
+import {
+  ActivityStats,
+  ActivityTable,
+  ActivityTimeline,
+  EventDetailModal,
+  ModuleInsights,
+  PaginationBar,
+} from './audit/ActivityViews'
 
-const BUSINESS_ACTIONS = [
-  'CREATE_MACHINE',
-  'UPDATE_MACHINE',
-  'DELETE_MACHINE',
-  'CREATE_MISSION',
-  'UPDATE_MISSION',
-  'DELETE_MISSION',
-  'CREATE_INTERVENTION',
-  'UPDATE_INTERVENTION',
-  'ASSIGN_USER_INTERVENTION',
-  'USE_AI_ASSISTANT',
-]
+const PAGE_SIZE = 15
+const FETCH_LIMIT = 100
+const MAX_FETCH_PAGES = 30
 
-const TECHNICIEN_ACTIONS = [
-  'UPDATE_MISSION',
-  'UPDATE_INTERVENTION',
-  'ASSIGN_USER_INTERVENTION',
-  'USE_AI_ASSISTANT',
-]
-
-const actionBadgeColors = {
-  CREATE_MACHINE: 'bg-emerald-100 text-emerald-700',
-  UPDATE_MACHINE: 'bg-blue-100 text-blue-700',
-  DELETE_MACHINE: 'bg-red-100 text-red-700',
-  CREATE_MISSION: 'bg-cyan-100 text-cyan-700',
-  UPDATE_MISSION: 'bg-sky-100 text-sky-700',
-  DELETE_MISSION: 'bg-rose-100 text-rose-700',
-  CREATE_INTERVENTION: 'bg-violet-100 text-violet-700',
-  UPDATE_INTERVENTION: 'bg-indigo-100 text-indigo-700',
-  ASSIGN_USER_INTERVENTION: 'bg-amber-100 text-amber-700',
-  USE_AI_ASSISTANT: 'bg-teal-100 text-teal-700',
+function initials(name) {
+  return String(name || '?')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('')
 }
 
-const actionLabels = {
-  CREATE_MACHINE: 'Creation machine',
-  UPDATE_MACHINE: 'Modification machine',
-  DELETE_MACHINE: 'Suppression machine',
-  CREATE_MISSION: 'Creation mission',
-  UPDATE_MISSION: 'Modification mission',
-  DELETE_MISSION: 'Suppression mission',
-  CREATE_INTERVENTION: 'Creation intervention',
-  UPDATE_INTERVENTION: 'Modification intervention',
-  ASSIGN_USER_INTERVENTION: 'Affectation utilisateur',
-  USE_AI_ASSISTANT: 'Assistant IA',
+function buildPeriodParams(start, end) {
+  const params = new URLSearchParams()
+  if (start) params.set('dateStart', start)
+  if (end) params.set('dateEnd', end)
+  return params
 }
 
-const moduleMeta = {
-  'Parc Machine - Assistant IA': {
-    icon: Zap,
-    pill: 'bg-teal-50 text-teal-700 border-teal-200',
-  },
-  'Parc Machine': {
-    icon: Cog,
-    pill: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  },
-  Missions: {
-    icon: CheckCircle,
-    pill: 'bg-cyan-50 text-cyan-700 border-cyan-200',
-  },
-  Interventions: {
-    icon: AlertCircle,
-    pill: 'bg-violet-50 text-violet-700 border-violet-200',
-  },
-}
-
-function formatDateTime(value) {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
-  return date.toLocaleString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-function formatTime(value) {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
-  return date.toLocaleString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-}
-
-function formatDateForDisplay(dateString) {
-  if (!dateString) return '-'
-  try {
-    const date = new Date(dateString + 'T00:00:00')
-    return date.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-  } catch {
-    return '-'
+async function fetchAllLogs(userId, start, end) {
+  const items = []
+  let total = 0
+  for (let page = 1; page <= MAX_FETCH_PAGES; page += 1) {
+    const params = buildPeriodParams(start, end)
+    params.set('page', String(page))
+    params.set('limit', String(FETCH_LIMIT))
+    const response = await apiFetch(`/audit-logs/user/${userId}?${params}`, { auth: true })
+    if (!response.ok) throw new Error('logs')
+    const data = await response.json()
+    const batch = Array.isArray(data?.items) ? data.items : []
+    items.push(...batch)
+    total = Number(data?.total) || items.length
+    const totalPages = Number(data?.totalPages) || 1
+    if (page >= totalPages || batch.length === 0) break
   }
+  return { items, total, truncated: total > items.length }
 }
 
-function getStartOfMonth(date) {
-  const year = date.getFullYear()
-  const month = date.getMonth()
-  return new Date(year, month, 1)
+function UserSummary({ user }) {
+  const facts = [
+    { label: 'Rôle', value: user.role || '-' },
+    { label: 'Département', value: user.department || '-' },
+    { label: 'Identifiant', value: user.username || `#${user.id}` },
+    { label: 'Dernière connexion', value: user.lastLogin ? formatDateTime(user.lastLogin) : 'Jamais' },
+  ]
+  return (
+    <section aria-label="Utilisateur" className="ui-card flex flex-col gap-5 p-5 sm:flex-row sm:items-center">
+      <div className="flex items-center gap-4">
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand-600 font-display text-lg font-bold text-white" aria-hidden="true">
+          {initials(user.name)}
+        </span>
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="truncate font-display text-lg font-bold text-ink">{user.name}</h2>
+            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${user.isActive ? 'bg-teal-50 text-teal-800 ring-teal-200' : 'bg-slate-100 text-ink-muted ring-slate-300'}`}>
+              {user.isActive ? 'Compte actif' : 'Compte inactif'}
+            </span>
+          </div>
+          <p className="truncate text-sm text-ink-muted">{user.email}</p>
+        </div>
+      </div>
+      <dl className="grid flex-1 grid-cols-2 gap-x-6 gap-y-3 border-t border-line pt-4 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0 lg:grid-cols-4">
+        {facts.map((fact) => (
+          <div key={fact.label} className="flex min-w-0 flex-col gap-0.5">
+            <dt className="text-xs text-ink-muted">{fact.label}</dt>
+            <dd className="truncate text-sm font-semibold text-ink">{fact.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  )
 }
 
-/**
- * Returns a human-readable count message with plural support.
- * @param {number} count - The quantity
- * @param {string} zeroMsg - Message when count is 0
- * @param {string} oneMsg - Message when count is 1
- * @param {string} pluralTemplate - Template for count > 1, uses {n} as placeholder
- */
-function formatCountMessage(count, zeroMsg, oneMsg, pluralTemplate) {
-  if (count === 0) return zeroMsg
-  if (count === 1) return oneMsg
-  return pluralTemplate.replace('{n}', String(count))
+function LoadingState() {
+  return (
+    <div className="flex flex-col gap-3" aria-busy="true" aria-label="Chargement du journal">
+      {[0, 1, 2, 3].map((n) => (
+        <div key={n} className="ui-skeleton h-20 rounded-xl" />
+      ))}
+    </div>
+  )
 }
 
-function formatDateToISO(date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function moduleFromLog(log) {
-  if (log.action === 'USE_AI_ASSISTANT') return 'Parc Machine - Assistant IA'
-  if (log.entity === 'MACHINE') return 'Parc Machine'
-  if (log.entity === 'MISSION') return 'Missions'
-  if (log.entity === 'INTERVENTION') return 'Interventions'
-  return log.entity || '-'
-}
-
-function getDescriptionLabel(action, description) {
-  if (description && description.length > 0 && description !== '-') {
-    return description
-  }
-  return actionLabels[action] || action
+function EmptyState({ filtered, onClear }) {
+  return (
+    <div className="ui-card flex flex-col items-center gap-3 px-6 py-14 text-center">
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+        {filtered ? <SearchX size={22} aria-hidden="true" /> : <History size={22} aria-hidden="true" />}
+      </span>
+      <h3 className="font-display text-base font-semibold text-ink">
+        {filtered ? 'Aucun événement ne correspond' : 'Aucune activité sur cette période'}
+      </h3>
+      <p className="max-w-sm text-pretty text-sm leading-relaxed text-ink-muted">
+        {filtered
+          ? 'Modifiez la recherche ou les filtres pour afficher davantage de résultats.'
+          : "Cet utilisateur n'a enregistré aucune action métier entre les dates sélectionnées."}
+      </p>
+      {filtered && (
+        <button type="button" className="ui-btn ui-btn-secondary ui-btn-sm" onClick={onClear}>Effacer les filtres</button>
+      )}
+    </div>
+  )
 }
 
 export default function UserDetails() {
@@ -166,901 +147,311 @@ export default function UserDetails() {
   const [isLoadingUser, setIsLoadingUser] = useState(true)
   const [pageError, setPageError] = useState('')
 
-  const today = new Date()
-  const startOfMonth = getStartOfMonth(today)
-  const [dateStart, setDateStart] = useState(formatDateToISO(startOfMonth))
-  const [dateEnd, setDateEnd] = useState(formatDateToISO(today))
-  // Committed dates: only these are sent to the API
-  const [committedDateStart, setCommittedDateStart] = useState(formatDateToISO(startOfMonth))
-  const [committedDateEnd, setCommittedDateEnd] = useState(formatDateToISO(today))
+  const defaultStart = formatDateToISO(getStartOfMonth(new Date()))
+  const defaultEnd = formatDateToISO(new Date())
+  const [dateStart, setDateStart] = useState(defaultStart)
+  const [dateEnd, setDateEnd] = useState(defaultEnd)
+  const [period, setPeriod] = useState({ start: defaultStart, end: defaultEnd })
+  const [activePreset, setActivePreset] = useState('month')
+  const [dateError, setDateError] = useState('')
 
-  const [auditPage, setAuditPage] = useState(1)
-  const [auditLogs, setAuditLogs] = useState({ items: [], total: 0, page: 1, totalPages: 1 })
+  const [logs, setLogs] = useState([])
+  const [logsTruncated, setLogsTruncated] = useState(false)
   const [auditStats, setAuditStats] = useState(null)
   const [isLoadingAudit, setIsLoadingAudit] = useState(false)
   const [auditError, setAuditError] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
-  const [tablePage, setTablePage] = useState(1)
-  const [dateError, setDateError] = useState('')
-  const tableRowsPerPage = 6
+
+  const [search, setSearch] = useState('')
+  const [moduleFilter, setModuleFilter] = useState('')
+  const [operationFilter, setOperationFilter] = useState('')
+  const [view, setView] = useState('timeline')
+  const [page, setPage] = useState(1)
+  const [selectedLog, setSelectedLog] = useState(null)
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportError, setExportError] = useState('')
 
   useEffect(() => {
-    const fetchUser = async () => {
-      setIsLoadingUser(true)
-      setPageError('')
-      try {
-        const response = await apiFetch(`/users/${id}`, { auth: true })
-        if (!response.ok) {
-          setPageError("Impossible de charger les informations de l'utilisateur.")
-          return
-        }
+    if (!id) return
+    let cancelled = false
+    setIsLoadingUser(true)
+    setPageError('')
+    apiFetch(`/users/${id}`, { auth: true })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('user')
         const data = await response.json()
-        setUserDetails(data)
-      } catch {
-        setPageError("Erreur lors du chargement des informations de l'utilisateur.")
-      } finally {
-        setIsLoadingUser(false)
-      }
+        if (!cancelled) setUserDetails(data)
+      })
+      .catch(() => {
+        if (!cancelled) setPageError("Impossible de charger les informations de l'utilisateur.")
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingUser(false)
+      })
+    return () => {
+      cancelled = true
     }
-
-    if (id) fetchUser()
   }, [id])
 
   useEffect(() => {
-    const fetchAudit = async () => {
-      if (!id) return
-      setIsLoadingAudit(true)
-      setAuditError('')
-      setAuditPage(1)
-
-      try {
-        let baseParams = ''
-        if (committedDateStart) baseParams += `&dateStart=${committedDateStart}`
-        if (committedDateEnd) baseParams += `&dateEnd=${committedDateEnd}`
-
-        const [logsResponse, statsResponse] = await Promise.all([
-          apiFetch(`/audit-logs/user/${id}?page=1&limit=20${baseParams}`, { auth: true }),
-          apiFetch(`/audit-logs/user/${id}/stats?${baseParams.substring(1)}`, { auth: true }),
-        ])
-
-        if (!logsResponse.ok || !statsResponse.ok) {
-          setAuditError('Impossible de charger la tracabilite de cet utilisateur.')
-          return
-        }
-
-        const [logsData, statsData] = await Promise.all([
-          logsResponse.json(),
-          statsResponse.json(),
-        ])
-
-        setAuditLogs({
-          items: Array.isArray(logsData?.items) ? logsData.items : [],
-          total: Number(logsData?.total) || 0,
-          page: Number(logsData?.page) || 1,
-          totalPages: Number(logsData?.totalPages) || 1,
-        })
-        setAuditStats(statsData || null)
-      } catch {
-        setAuditError('Erreur lors du chargement de la tracabilite.')
-      } finally {
-        setIsLoadingAudit(false)
-      }
+    if (!id) return
+    let cancelled = false
+    setIsLoadingAudit(true)
+    setAuditError('')
+    Promise.all([
+      fetchAllLogs(id, period.start, period.end),
+      apiFetch(`/audit-logs/user/${id}/stats?${buildPeriodParams(period.start, period.end)}`, { auth: true }).then((response) => {
+        if (!response.ok) throw new Error('stats')
+        return response.json()
+      }),
+    ])
+      .then(([logsResult, stats]) => {
+        if (cancelled) return
+        setLogs(logsResult.items)
+        setLogsTruncated(logsResult.truncated)
+        setAuditStats(stats || null)
+        setPage(1)
+      })
+      .catch(() => {
+        if (!cancelled) setAuditError('Impossible de charger la traçabilité de cet utilisateur.')
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingAudit(false)
+      })
+    return () => {
+      cancelled = true
     }
+  }, [id, period, refreshKey])
 
-    fetchAudit()
-  }, [id, committedDateStart, committedDateEnd, refreshKey])
+  const isTechnicien = userDetails?.role === 'Technicien'
+  const allowedActions = isTechnicien ? TECHNICIEN_ACTIONS : BUSINESS_ACTIONS
+  const counts = useMemo(() => countsFromStats(auditStats), [auditStats])
+  const totalActions = totalFromCounts(counts, isTechnicien)
+  const totals = useMemo(() => operationTotals(counts, isTechnicien), [counts, isTechnicien])
+  const insights = useMemo(() => buildModuleInsights(counts, isTechnicien), [counts, isTechnicien])
 
-  useEffect(() => {
-    if (auditPage === 1) return
+  const visibleOperations = isTechnicien ? ['create', 'update', 'assign', 'ai'] : Object.keys(OPERATIONS)
+  const visibleModules = isTechnicien ? MODULES.filter((key) => key !== 'Parc Machine') : MODULES
 
-    const fetchNextPage = async () => {
-      if (!id) return
-      setIsLoadingAudit(true)
+  const businessLogs = useMemo(() => logs.filter((log) => allowedActions.includes(log.action)), [logs, allowedActions])
 
-      try {
-        let baseParams = ''
-        if (committedDateStart) baseParams += `&dateStart=${committedDateStart}`
-        if (committedDateEnd) baseParams += `&dateEnd=${committedDateEnd}`
-        const response = await apiFetch(`/audit-logs/user/${id}?page=${auditPage}&limit=20${baseParams}`, { auth: true })
+  const filteredLogs = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return businessLogs.filter((log) => {
+      if (moduleFilter && moduleFromLog(log) !== moduleFilter) return false
+      if (operationFilter && operationFromAction(log.action) !== operationFilter) return false
+      if (!query) return true
+      const haystack = [
+        getDescriptionLabel(log.action, log.description),
+        ACTION_LABELS[log.action],
+        MODULE_SHORT_LABELS[moduleFromLog(log)],
+        log.entityId != null ? `#${log.entityId}` : '',
+      ]
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [businessLogs, search, moduleFilter, operationFilter])
 
-        if (!response.ok) return
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const pageLogs = filteredLogs.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const hasActiveFilters = Boolean(search || moduleFilter || operationFilter)
 
-        const logsData = await response.json()
-        setAuditLogs({
-          items: Array.isArray(logsData?.items) ? logsData.items : [],
-          total: Number(logsData?.total) || 0,
-          page: Number(logsData?.page) || 1,
-          totalPages: Number(logsData?.totalPages) || 1,
-        })
-      } catch {
-        // Ignore
-      } finally {
-        setIsLoadingAudit(false)
-      }
-    }
-
-    fetchNextPage()
-  }, [auditPage, id, committedDateStart, committedDateEnd])
-
-  const counts = useMemo(() => {
-    const map = auditStats?.actionsByType || {}
-    return {
-      ai: Number(map.USE_AI_ASSISTANT || 0),
-      machineCreate: Number(map.CREATE_MACHINE || 0),
-      machineUpdate: Number(map.UPDATE_MACHINE || 0),
-      machineDelete: Number(map.DELETE_MACHINE || 0),
-      missionCreate: Number(map.CREATE_MISSION || 0),
-      missionUpdate: Number(map.UPDATE_MISSION || 0),
-      missionDelete: Number(map.DELETE_MISSION || 0),
-      interventionCreate: Number(map.CREATE_INTERVENTION || 0),
-      interventionUpdate: Number(map.UPDATE_INTERVENTION || 0),
-      interventionAssign: Number(map.ASSIGN_USER_INTERVENTION || 0),
-    }
-  }, [auditStats])
-
-  const userRole = userDetails?.role || ''
-  const isTechnicien = userRole === 'Technicien'
-  const isAdminLike = !isTechnicien
-
-  const totalActions = useMemo(() => {
-    if (isTechnicien) {
-      return counts.ai + counts.missionUpdate + counts.interventionUpdate + counts.interventionAssign
-    }
-    return (
-      counts.ai +
-      counts.machineCreate +
-      counts.machineUpdate +
-      counts.machineDelete +
-      counts.missionCreate +
-      counts.missionUpdate +
-      counts.missionDelete +
-      counts.interventionCreate +
-      counts.interventionUpdate +
-      counts.interventionAssign
-    )
-  }, [counts, isTechnicien])
-
-  const logsForTable = useMemo(() => {
-    const allowedActions = isTechnicien ? TECHNICIEN_ACTIONS : BUSINESS_ACTIONS
-    return (auditLogs.items || []).filter((item) => allowedActions.includes(item.action))
-  }, [auditLogs.items, isTechnicien])
-
-  const totalTablePages = useMemo(
-    () => Math.max(1, Math.ceil(logsForTable.length / tableRowsPerPage)),
-    [logsForTable.length],
-  )
-
-  const paginatedLogsForTable = useMemo(() => {
-    const startIndex = (tablePage - 1) * tableRowsPerPage
-    return logsForTable.slice(startIndex, startIndex + tableRowsPerPage)
-  }, [logsForTable, tablePage])
-
-  useEffect(() => {
-    setTablePage(1)
-  }, [logsForTable.length, committedDateStart, committedDateEnd, refreshKey])
-
-  useEffect(() => {
-    if (tablePage > totalTablePages) {
-      setTablePage(totalTablePages)
-    }
-  }, [tablePage, totalTablePages])
-
-  const handleDateStartChange = (e) => {
-    setDateStart(e.target.value)
-    setDateError('')
-  }
-  const handleDateEndChange = (e) => {
-    setDateEnd(e.target.value)
-    setDateError('')
+  const resetPageAnd = (setter) => (value) => {
+    setter(value)
+    setPage(1)
   }
 
-  /**
-   * Validates a date string: must be a complete YYYY-MM-DD with year in SQL Server range (1753-9999).
-   */
-  const isValidDate = (dateStr) => {
-    if (!dateStr || dateStr.trim() === '') return false
-    const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-    if (!match) return false
-    const year = parseInt(match[1], 10)
-    if (year < 1753 || year > 9999) return false
-    const d = new Date(dateStr + 'T00:00:00')
-    return !Number.isNaN(d.getTime())
+  const clearFilters = () => {
+    setSearch('')
+    setModuleFilter('')
+    setOperationFilter('')
+    setPage(1)
   }
 
-  const handleSearch = () => {
+  const applyPeriod = (start, end, presetKey = '') => {
     setDateError('')
-    // Allow both empty (no filter) or both valid
-    const startEmpty = !dateStart || dateStart.trim() === ''
-    const endEmpty = !dateEnd || dateEnd.trim() === ''
-
-    if (!startEmpty && !isValidDate(dateStart)) {
+    if (start && !isValidDate(start)) {
       setDateError('La date de début est invalide (format attendu : AAAA-MM-JJ, année entre 1753 et 9999).')
       return
     }
-    if (!endEmpty && !isValidDate(dateEnd)) {
+    if (end && !isValidDate(end)) {
       setDateError('La date de fin est invalide (format attendu : AAAA-MM-JJ, année entre 1753 et 9999).')
       return
     }
-    if (!startEmpty && !endEmpty && dateStart > dateEnd) {
+    if (start && end && start > end) {
       setDateError('La date de début doit être antérieure ou égale à la date de fin.')
       return
     }
-
-    setCommittedDateStart(startEmpty ? '' : dateStart)
-    setCommittedDateEnd(endEmpty ? '' : dateEnd)
-  }
-
-  const handleResetDates = () => {
-    const now = new Date()
-    const start = formatDateToISO(getStartOfMonth(now))
-    const end = formatDateToISO(now)
     setDateStart(start)
     setDateEnd(end)
-    setDateError('')
-    setCommittedDateStart(start)
-    setCommittedDateEnd(end)
+    setActivePreset(presetKey)
+    setPeriod({ start, end })
   }
 
-  const handleRefresh = () => setRefreshKey((v) => v + 1)
+  const handlePreset = (preset) => {
+    const [start, end] = preset.range(new Date())
+    applyPeriod(formatDateToISO(start), formatDateToISO(end), preset.key)
+  }
 
-  const handleExportPdf = () => {
+  const handleExportPdf = useCallback(async () => {
     if (!userDetails) return
-
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-    const pageWidth = doc.internal.pageSize.getWidth()
-    const pageHeight = doc.internal.pageSize.getHeight()
-    const periodStart = formatDateForDisplay(committedDateStart)
-    const periodEnd = formatDateForDisplay(committedDateEnd)
-
-    const primaryColor = [0, 82, 204]
-    const lightGrey = [248, 250, 252]
-    const darkText = [30, 41, 59]
-    const mediumText = [100, 116, 139]
-
-    // En-tete premium
-    doc.setFillColor(0, 70, 180)
-    doc.rect(0, 0, pageWidth, 40, 'F')
-    doc.setFillColor(...primaryColor)
-    doc.rect(0, 40, pageWidth, 4, 'F')
-
-    // Cartouche logo
-    doc.setFillColor(255, 255, 255)
-    doc.roundedRect(10, 6, 30, 30, 3, 3, 'F')
+    setIsExporting(true)
+    setExportError('')
     try {
-      doc.addImage(logoImage, 'PNG', 12, 8, 26, 26)
-    } catch (err) {
-      console.warn('Logo non disponible:', err)
-    }
-
-    // Titre et metadonnees
-    doc.setTextColor(255, 255, 255)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(17)
-    doc.text('Rapport de Tracabilite Metier', 46, 16)
-
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
-    doc.text(`Utilisateur: ${userDetails.name || '-'}`, 46, 23)
-    doc.text(`Periode: ${periodStart} au ${periodEnd}`, 46, 29)
-    doc.text(`Genere le ${new Date().toLocaleString('fr-FR')}`, 46, 35)
-
-    // Section Informations utilisateur
-    let yPos = 52
-    doc.setTextColor(...darkText)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(11)
-    doc.text('Informations Utilisateur', 14, yPos)
-
-    const infoStartY = yPos + 8
-    const lineHeight = 6
-    const leftLabelX = 14
-    const leftValueX = 32
-    const rightLabelX = 108
-    const rightValueX = 136
-
-    doc.setFontSize(9)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...mediumText)
-    doc.text('Nom:', leftLabelX, infoStartY)
-    doc.setTextColor(...darkText)
-    doc.setFont('helvetica', 'bold')
-    doc.text(`${userDetails.name || '-'}`, leftValueX, infoStartY)
-
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...mediumText)
-    doc.text('Email:', leftLabelX, infoStartY + lineHeight)
-    doc.setTextColor(...darkText)
-    doc.setFont('helvetica', 'bold')
-    doc.text(`${userDetails.email || '-'}`, leftValueX, infoStartY + lineHeight)
-
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...mediumText)
-    doc.text('Rôle:', rightLabelX, infoStartY)
-    doc.setTextColor(...darkText)
-    doc.setFont('helvetica', 'bold')
-    doc.text(`${userDetails.role || '-'}`, rightValueX, infoStartY)
-
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(...mediumText)
-    doc.text('Période analysée:', rightLabelX, infoStartY + lineHeight)
-    doc.setTextColor(...darkText)
-    doc.setFont('helvetica', 'bold')
-    doc.text(`${periodStart} au ${periodEnd}`, rightValueX, infoStartY + lineHeight)
-
-    yPos = infoStartY + lineHeight + 12
-
-    // Section Statistiques (format carte similaire a l'interface)
-    doc.setTextColor(...darkText)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(11)
-    doc.text('Résumé des Statistiques Métier', 14, yPos)
-
-    const statsCards = [
-      {
-        title: 'Assistant IA',
-        value: counts.ai,
-        lines: [
-          counts.ai === 0
-            ? "L'Assistant IA de diagnostic n'a pas ete utilise durant cette periode."
-            : counts.ai === 1
-              ? "Cet utilisateur a utilise l'Assistant IA de diagnostic 1 fois durant cette periode."
-              : `Cet utilisateur a utilise l'Assistant IA de diagnostic ${counts.ai} fois durant cette periode.`,
-        ],
-      },
-      {
-        title: 'Parc Machines',
-        value: counts.machineCreate + counts.machineUpdate + counts.machineDelete,
-        lines: [
-          formatCountMessage(counts.machineCreate,
-            "Aucune creation de machine n'a ete enregistree durant cette periode.",
-            'Une nouvelle machine a ete creee par cet utilisateur.',
-            '{n} creations de machines ont ete enregistrees durant cette periode.'),
-          formatCountMessage(counts.machineUpdate,
-            "Aucune modification de machine n'a ete enregistree durant cette periode.",
-            'Une machine a ete modifiee par cet utilisateur.',
-            '{n} modifications de machines ont ete enregistrees durant cette periode.'),
-          formatCountMessage(counts.machineDelete,
-            "Aucune suppression de machine n'a ete enregistree durant cette periode.",
-            'Une machine a ete supprimee par cet utilisateur.',
-            '{n} suppressions de machines ont ete enregistrees durant cette periode.'),
-        ],
-      },
-      {
-        title: 'Missions',
-        value: counts.missionCreate + counts.missionUpdate + counts.missionDelete,
-        lines: [
-          formatCountMessage(counts.missionCreate,
-            "Aucune creation de mission n'a ete enregistree durant cette periode.",
-            'Une nouvelle mission a ete creee par cet utilisateur.',
-            '{n} creations de missions ont ete enregistrees durant cette periode.'),
-          formatCountMessage(counts.missionUpdate,
-            "Aucune modification de mission n'a ete enregistree durant cette periode.",
-            'Une mission a ete modifiee par cet utilisateur.',
-            '{n} modifications de missions ont ete enregistrees durant cette periode.'),
-          formatCountMessage(counts.missionDelete,
-            "Aucune suppression de mission n'a ete enregistree durant cette periode.",
-            'Une mission a ete supprimee par cet utilisateur.',
-            '{n} suppressions de missions ont ete enregistrees durant cette periode.'),
-        ],
-      },
-      {
-        title: 'Interventions',
-        value: counts.interventionCreate + counts.interventionUpdate + counts.interventionAssign,
-        lines: [
-          formatCountMessage(counts.interventionCreate,
-            "Aucune creation d'intervention n'a ete enregistree durant cette periode.",
-            'Une nouvelle intervention a ete creee par cet utilisateur.',
-            "{n} creations d'interventions ont ete enregistrees durant cette periode."),
-          formatCountMessage(counts.interventionUpdate,
-            "Aucune modification d'intervention n'a ete detectee pour cette periode.",
-            'Une intervention a ete modifiee par cet utilisateur.',
-            "{n} modifications d'interventions ont ete detectees pour cette periode."),
-          formatCountMessage(counts.interventionAssign,
-            "Aucune affectation d'utilisateur n'a ete enregistree durant cette periode.",
-            'Un utilisateur a ete affecte a une intervention durant cette periode.',
-            "{n} affectations d'utilisateurs ont ete enregistrees durant cette periode."),
-        ],
-      },
-    ]
-
-    const cardPairs = [
-      [statsCards[0], statsCards[1]],
-      [statsCards[2], statsCards[3]],
-    ]
-    const cardStartY = yPos + 8
-    const cardGapX = 6
-    const cardGapY = 6
-    const cardXLeft = 12
-    const cardWidth = (pageWidth - 24 - cardGapX) / 2
-
-    const drawStatsCard = (card, x, y, width, height, fillColor, borderColor) => {
-      doc.setFillColor(...fillColor)
-      doc.setDrawColor(...borderColor)
-      doc.roundedRect(x, y, width, height, 2, 2, 'FD')
-
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(10)
-      doc.setTextColor(...darkText)
-      doc.text(card.title, x + 4, y + 7)
-
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(14)
-      doc.setTextColor(...primaryColor)
-      doc.text(String(card.value), x + 4, y + 14)
-
-      let lineY = y + 20
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(8)
-      doc.setTextColor(...mediumText)
-      card.lines.forEach((line) => {
-        const wrapped = doc.splitTextToSize(`- ${line}`, width - 8)
-        doc.text(wrapped, x + 4, lineY)
-        lineY += wrapped.length * 4.3
+      const logoDataUrl = await loadImageAsDataUrl(logoImage).catch(() => '')
+      const filterParts = []
+      if (moduleFilter) filterParts.push(`Module : ${MODULE_SHORT_LABELS[moduleFilter] || moduleFilter}`)
+      if (operationFilter) filterParts.push(`Opération : ${OPERATIONS[operationFilter].label}`)
+      if (search.trim()) filterParts.push(`Recherche : « ${search.trim()} »`)
+      const doc = buildTraceabilityPdf({
+        user: userDetails,
+        periodStart: period.start,
+        periodEnd: period.end,
+        counts,
+        totalActions,
+        isTechnicien,
+        logs: filteredLogs,
+        filtersLabel: filterParts.join(' · '),
+        logoDataUrl,
       })
+      doc.save(traceabilityPdfFileName(userDetails, period.start, period.end))
+    } catch {
+      setExportError("La génération du PDF a échoué. Réessayez dans un instant.")
+    } finally {
+      setIsExporting(false)
     }
+  }, [userDetails, moduleFilter, operationFilter, search, period, counts, totalActions, isTechnicien, filteredLogs])
 
-    yPos = cardStartY
-    cardPairs.forEach((pair, rowIndex) => {
-      const [leftCard, rightCard] = pair
-      const leftHeight = 24 + leftCard.lines.reduce((sum, line) => sum + doc.splitTextToSize(line, cardWidth - 8).length * 4.3, 0)
-      const rightHeight = 24 + rightCard.lines.reduce((sum, line) => sum + doc.splitTextToSize(line, cardWidth - 8).length * 4.3, 0)
-      const rowHeight = Math.max(leftHeight, rightHeight)
-
-      if (yPos + rowHeight > pageHeight - 30) {
-        doc.addPage()
-        yPos = 22
-      }
-
-      const leftPalette = rowIndex === 0 ? { fill: [240, 253, 250], border: [153, 246, 228] } : { fill: [236, 254, 255], border: [165, 243, 252] }
-      const rightPalette = rowIndex === 0 ? { fill: [236, 253, 245], border: [167, 243, 208] } : { fill: [245, 243, 255], border: [221, 214, 254] }
-
-      drawStatsCard(leftCard, cardXLeft, yPos, cardWidth, rowHeight, leftPalette.fill, leftPalette.border)
-      drawStatsCard(rightCard, cardXLeft + cardWidth + cardGapX, yPos, cardWidth, rowHeight, rightPalette.fill, rightPalette.border)
-
-      yPos += rowHeight + cardGapY
-    })
-
-    // Total actions
-    doc.setDrawColor(...primaryColor)
-    doc.setLineWidth(0.5)
-    doc.line(10, yPos, pageWidth - 10, yPos)
-
-    yPos += 6
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(10)
-    doc.setTextColor(...primaryColor)
-    doc.text(`Total des actions: ${totalActions}`, 14, yPos)
-
-    // Historique des actions
-    yPos += 10
-    const rows = logsForTable.map((item) => [
-      formatDateForDisplay(item.createdAt?.split('T')[0] || ''),
-      item.createdAt?.split('T')[1]?.slice(0, 5) || '',
-      moduleFromLog(item),
-      actionLabels[item.action] || item.action,
-    ])
-
-    if (rows.length > 0) {
-      autoTable(doc, {
-        startY: yPos,
-        head: [['Date', 'Heure', 'Module', 'Action']],
-        body: rows,
-        styles: {
-          fontSize: 8,
-          cellPadding: 2.5,
-          textColor: darkText,
-          lineColor: [226, 232, 240],
-        },
-        headStyles: {
-          fillColor: primaryColor,
-          textColor: [255, 255, 255],
-          fontStyle: 'bold',
-          halign: 'left',
-        },
-        alternateRowStyles: {
-          fillColor: lightGrey,
-        },
-        margin: { left: 10, right: 10, bottom: 15 },
-        didDrawPage: (data) => {
-          // Pied de page
-          const pageCount = doc.internal.pages.length
-          const currentPage = data.pageNumber
-
-          doc.setFontSize(8)
-          doc.setTextColor(...mediumText)
-          doc.text(
-            `Page ${currentPage} sur ${pageCount}`,
-            pageWidth / 2,
-            pageHeight - 10,
-            { align: 'center' }
-          )
-
-          doc.setFontSize(7)
-          doc.text(
-            `Généré le ${new Date().toLocaleString('fr-FR')}`,
-            pageWidth / 2,
-            pageHeight - 5,
-            { align: 'center' }
-          )
-        },
-      })
-    }
-
-    doc.save(`rapport-tracabilite-${userDetails.name || 'user'}-${committedDateStart}-to-${committedDateEnd}.pdf`)
+  if (isLoadingUser) {
+    return (
+      <div className="ui-page flex flex-col gap-6">
+        <div className="ui-skeleton h-10 w-72 rounded-lg" />
+        <div className="ui-skeleton h-28 rounded-2xl" />
+        <LoadingState />
+      </div>
+    )
   }
 
-  const noActivity = totalActions === 0
+  if (pageError || !userDetails) {
+    return (
+      <div className="ui-page flex flex-col items-start gap-4">
+        <button type="button" className="ui-btn ui-btn-secondary" onClick={() => navigate('/users')}>
+          <ArrowLeft size={16} aria-hidden="true" /> Retour aux utilisateurs
+        </button>
+        <p role="alert" className="flex items-center gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          <AlertCircle size={16} aria-hidden="true" /> {pageError || 'Utilisateur introuvable.'}
+        </p>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-full bg-gradient-to-br from-slate-50 to-slate-100/70 p-5 lg:p-8 space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate('/users')}
-            className="h-10 w-10 rounded-full border border-slate-300 bg-white text-slate-600 transition hover:bg-slate-50 hover:shadow-sm"
-            title="Retour"
-          >
-            <ArrowLeft size={18} className="mx-auto" />
+    <div className="ui-page flex flex-col gap-6">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex items-start gap-3">
+          <button type="button" onClick={() => navigate('/users')} className="ui-icon-btn mt-1" aria-label="Retour aux utilisateurs">
+            <ArrowLeft size={18} aria-hidden="true" />
           </button>
-          <div>
-            <h1 className="text-2xl font-black tracking-tight text-slate-900 lg:text-3xl">Historique des activités</h1>
-            <p className="text-sm font-medium text-slate-500">Traçabilite métier et historique des actions de l'utilisateur.</p>
+          <div className="flex flex-col gap-1">
+            <p className="ui-eyebrow">Utilisateurs · Traçabilité</p>
+            <h1 className="text-balance font-display text-2xl font-bold tracking-tight text-ink lg:text-3xl">Historique des activités</h1>
+            <p className="text-sm text-ink-muted">
+              {`Période du ${formatDateForDisplay(period.start)} au ${formatDateForDisplay(period.end)}`}
+            </p>
           </div>
         </div>
-
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={handleRefresh}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-            title="Actualiser la section traçabilité"
-          >
-            <RefreshCw size={15} />
-            Actualiser
+          <button type="button" className="ui-btn ui-btn-secondary" onClick={() => setRefreshKey((value) => value + 1)} disabled={isLoadingAudit}>
+            <RefreshCw size={16} className={isLoadingAudit ? 'animate-spin' : ''} aria-hidden="true" /> Actualiser
           </button>
-          <button
-            type="button"
-            onClick={handleExportPdf}
-            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-brand-600/25 transition hover:bg-brand-700"
-          >
-            <Download size={15} />
-            Exporter PDF
+          <button type="button" className="ui-btn ui-btn-primary" onClick={handleExportPdf} disabled={isExporting || isLoadingAudit}>
+            {isExporting ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Download size={16} aria-hidden="true" />}
+            Exporter le rapport PDF
           </button>
         </div>
+      </header>
+
+      {exportError && (
+        <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{exportError}</p>
+      )}
+
+      <UserSummary user={userDetails} />
+
+      <ActivityStats
+        totals={totals}
+        totalActions={totalActions}
+        activeOperation={operationFilter}
+        onSelectOperation={resetPageAnd(setOperationFilter)}
+        visibleKeys={visibleOperations}
+      />
+
+      <div className="grid gap-6 xl:grid-cols-[1fr_22rem]">
+        <div className="flex min-w-0 flex-col gap-4">
+          <ActivityFilters
+            dateStart={dateStart}
+            dateEnd={dateEnd}
+            onDateStartChange={(event) => {
+              setDateStart(event.target.value)
+              setDateError('')
+            }}
+            onDateEndChange={(event) => {
+              setDateEnd(event.target.value)
+              setDateError('')
+            }}
+            onApplyDates={() => applyPeriod(dateStart, dateEnd)}
+            onPreset={handlePreset}
+            activePreset={activePreset}
+            onReset={() => applyPeriod(defaultStart, defaultEnd, 'month')}
+            dateError={dateError}
+            search={search}
+            onSearchChange={resetPageAnd(setSearch)}
+            moduleFilter={moduleFilter}
+            onModuleChange={resetPageAnd(setModuleFilter)}
+            operationFilter={operationFilter}
+            onOperationChange={resetPageAnd(setOperationFilter)}
+            modules={visibleModules}
+            operations={visibleOperations}
+            view={view}
+            onViewChange={setView}
+            resultCount={filteredLogs.length}
+            hasActiveFilters={hasActiveFilters}
+            onClearFilters={clearFilters}
+          />
+
+          {logsTruncated && (
+            <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {`Seuls les ${logs.length} événements les plus récents sont chargés. Réduisez la période pour un journal complet.`}
+            </p>
+          )}
+
+          {auditError ? (
+            <p role="alert" className="flex items-center gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              <AlertCircle size={16} aria-hidden="true" /> {auditError}
+            </p>
+          ) : isLoadingAudit ? (
+            <LoadingState />
+          ) : pageLogs.length === 0 ? (
+            <EmptyState filtered={hasActiveFilters} onClear={clearFilters} />
+          ) : (
+            <>
+              {view === 'timeline' ? (
+                <ActivityTimeline logs={pageLogs} onOpen={setSelectedLog} />
+              ) : (
+                <ActivityTable logs={pageLogs} onOpen={setSelectedLog} />
+              )}
+              <PaginationBar page={currentPage} totalPages={totalPages} total={filteredLogs.length} onChange={setPage} disabled={isLoadingAudit} />
+            </>
+          )}
+        </div>
+
+        <aside className="flex flex-col gap-6">
+          <ModuleInsights insights={insights} />
+        </aside>
       </div>
 
-      {pageError && (
-        <div className="inline-flex items-start gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-          <AlertCircle size={16} className="mt-0.5 shrink-0" />
-          <span>{pageError}</span>
-        </div>
-      )}
-
-      {isLoadingUser ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-slate-500">Chargement utilisateur...</div>
-      ) : userDetails && (
-        <>
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-              <div className="md:col-span-2 flex items-center gap-4">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-600 to-blue-700 text-xl font-black text-white shadow-md">
-                  {String(userDetails.name || 'U').slice(0, 1).toUpperCase()}
-                </div>
-                <div>
-                  <p className="text-xl font-black text-slate-900">{userDetails.name || '-'}</p>
-                  <p className="truncate text-sm text-slate-500">{userDetails.email || '-'}</p>
-                </div>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Role</p>
-                <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-slate-800">
-                  <Shield size={14} className="text-brand-600" />
-                  {userDetails.role || '-'}
-                </p>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Derniere connexion</p>
-                <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-slate-800">
-                  <Clock size={14} className="text-brand-600" />
-                  {formatDateTime(userDetails.lastLogin)}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-              <div className="w-full flex-1">
-                <h3 className="mb-4 inline-flex items-center gap-2 text-sm font-black uppercase tracking-widest text-slate-700">
-                  <Calendar size={16} className="text-brand-600" />
-                  Selectionner la periode
-                </h3>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="flex flex-col">
-                    <label htmlFor="dateStart" className="mb-2 text-xs font-bold text-slate-700">Date de debut</label>
-                    <input
-                      id="dateStart"
-                      type="date"
-                      value={dateStart}
-                      onChange={handleDateStartChange}
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/25"
-                    />
-                  </div>
-                  <div className="flex flex-col">
-                    <label htmlFor="dateEnd" className="mb-2 text-xs font-bold text-slate-700">Date de fin</label>
-                    <input
-                      id="dateEnd"
-                      type="date"
-                      value={dateEnd}
-                      onChange={handleDateEndChange}
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/25"
-                    />
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleSearch}
-                  className="mt-4 mr-2 inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-sm transition hover:bg-brand-700"
-                >
-                  Rechercher
-                </button>
-                <button
-                  type="button"
-                  onClick={handleResetDates}
-                  className="mt-4 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700 transition hover:bg-slate-50"
-                >
-                  <RotateCcw size={14} />
-                  Reinitialiser
-                </button>
-                {dateError && (
-                  <p className="mt-2 text-xs font-medium text-red-600">{dateError}</p>
-                )}
-              </div>
-
-              <div className="rounded-xl border border-brand-600/25 bg-brand-600/8 p-4">
-                <p className="text-xs font-black uppercase tracking-widest text-brand-600">Periode analysee</p>
-                <p className="mt-1 text-sm font-bold text-slate-900">
-                  du {formatDateForDisplay(committedDateStart)} au {formatDateForDisplay(committedDateEnd)}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="inline-flex items-center gap-2 text-lg font-black uppercase tracking-widest text-slate-800">
-                <BarChart3 size={18} className="text-brand-600" />
-                Statistiques metier
-              </h2>
-              <div className="inline-flex items-center gap-2 rounded-lg border border-brand-600/20 bg-brand-600/5 px-3 py-1.5 text-xs font-semibold text-brand-600">
-                <Sparkles size={14} />
-                {totalActions} action(s) sur la periode
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {/* ─── ADMIN / COORDINATEUR / RESPONSABLE TECHNICIEN ─── */}
-              {isAdminLike && (<>
-              <div className="rounded-xl border border-teal-200 bg-teal-50 p-4 transition hover:shadow-sm">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-sm font-black uppercase tracking-widest text-slate-600">Assistant IA</p>
-                  <span className="rounded-md bg-teal-100 px-2 py-1 text-xs font-bold text-teal-700">{counts.ai}</span>
-                </div>
-                <p className="text-sm leading-relaxed text-slate-700">
-                  {counts.ai === 0
-                    ? "- L'Assistant IA de diagnostic n'a pas été utilisé durant cette période."
-                    : counts.ai === 1
-                      ? "- Cet utilisateur a utilisé l'Assistant IA de diagnostic 1 fois durant la période sélectionnée."
-                      : `- Cet utilisateur a utilisé l'Assistant IA de diagnostic ${counts.ai} fois durant la période sélectionnée.`}
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 transition hover:shadow-sm">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-sm font-black uppercase tracking-widest text-slate-600">Parc Machines</p>
-                  <span className="rounded-md bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">
-                    {counts.machineCreate + counts.machineUpdate + counts.machineDelete}
-                  </span>
-                </div>
-                <div className="space-y-1 text-sm leading-relaxed text-slate-700">
-                  <p>- {formatCountMessage(counts.machineCreate, "Aucune création de machine n'a été enregistrée durant cette période.", 'Une nouvelle machine a été créée par cet utilisateur.', '{n} créations de machines ont été enregistrées durant cette période.')}</p>
-                  <p>- {formatCountMessage(counts.machineUpdate, "Aucune modification de machine n'a été enregistrée durant cette période.", 'Une machine a été modifiée par cet utilisateur.', '{n} modifications de machines ont été enregistrées durant cette période.')}</p>
-                  <p>- {formatCountMessage(counts.machineDelete, "Aucune suppression de machine n'a été enregistrée durant cette période.", 'Une machine a été supprimée par cet utilisateur.', '{n} suppressions de machines ont été enregistrées durant cette période.')}</p>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4 transition hover:shadow-sm">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-sm font-black uppercase tracking-widest text-slate-600">Missions</p>
-                  <span className="rounded-md bg-cyan-100 px-2 py-1 text-xs font-bold text-cyan-700">
-                    {counts.missionCreate + counts.missionUpdate + counts.missionDelete}
-                  </span>
-                </div>
-                <div className="space-y-1 text-sm leading-relaxed text-slate-700">
-                  <p>- {formatCountMessage(counts.missionCreate, "Aucune création de mission n'a été enregistrée durant cette période.", 'Une nouvelle mission a été créée par cet utilisateur.', '{n} créations de missions ont été enregistrées durant cette période.')}</p>
-                  <p>- {formatCountMessage(counts.missionUpdate, "Aucune modification de mission n'a été enregistrée durant cette période.", 'Une mission a été modifiée par cet utilisateur.', '{n} modifications de missions ont été enregistrées durant cette période.')}</p>
-                  <p>- {formatCountMessage(counts.missionDelete, "Aucune suppression de mission n'a été enregistrée durant cette période.", 'Une mission a été supprimée par cet utilisateur.', '{n} suppressions de missions ont été enregistrées durant cette période.')}</p>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 transition hover:shadow-sm">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-sm font-black uppercase tracking-widest text-slate-600">Interventions</p>
-                  <span className="rounded-md bg-violet-100 px-2 py-1 text-xs font-bold text-violet-700">
-                    {counts.interventionCreate + counts.interventionUpdate + counts.interventionAssign}
-                  </span>
-                </div>
-                <div className="space-y-1 text-sm leading-relaxed text-slate-700">
-                  <p>- {formatCountMessage(counts.interventionCreate, "Aucune création d'intervention n'a été enregistrée durant cette période.", 'Une nouvelle intervention a été créée par cet utilisateur.', "{n} créations d'interventions ont été enregistrées durant cette période.")}</p>
-                  <p>- {formatCountMessage(counts.interventionUpdate, "Aucune modification d'intervention n'a été détectée pour cette période.", 'Une intervention a été modifiée par cet utilisateur.', "{n} modifications d'interventions ont été détectées pour cette période.")}</p>
-                  <p>- {formatCountMessage(counts.interventionAssign, "Aucune affectation d'utilisateur n'a été enregistrée durant cette période.", 'Un utilisateur a été affecté à une intervention durant cette période.', "{n} affectations d'utilisateurs ont été enregistrées durant cette période.")}</p>
-                </div>
-              </div>
-              </>)}
-
-              {/* ─── TECHNICIEN ─── */}
-              {isTechnicien && (<>
-              <div className="rounded-xl border border-teal-200 bg-teal-50 p-4 transition hover:shadow-sm">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-sm font-black uppercase tracking-widest text-slate-600">Assistant IA</p>
-                  <span className="rounded-md bg-teal-100 px-2 py-1 text-xs font-bold text-teal-700">{counts.ai}</span>
-                </div>
-                <p className="text-sm leading-relaxed text-slate-700">
-                  {counts.ai === 0
-                    ? "- L'Assistant IA de diagnostic n'a pas été utilisé durant cette période."
-                    : `- Nombre d'utilisations de l'Assistant IA diagnostic : ${counts.ai}`}
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4 transition hover:shadow-sm">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-sm font-black uppercase tracking-widest text-slate-600">Missions</p>
-                  <span className="rounded-md bg-cyan-100 px-2 py-1 text-xs font-bold text-cyan-700">
-                    {counts.missionUpdate + counts.interventionAssign}
-                  </span>
-                </div>
-                <div className="space-y-1 text-sm leading-relaxed text-slate-700">
-                  {counts.missionUpdate === 0 && counts.interventionAssign === 0 ? (
-                    <p>- Aucun changement d'état de mission n'a été enregistré durant cette période.</p>
-                  ) : (<>
-                    {counts.interventionAssign > 0 && (
-                      <p>- Missions affectées au technicien : {counts.interventionAssign}</p>
-                    )}
-                    {counts.missionUpdate > 0 && (
-                      <p>- Missions dont le statut a été changé par le technicien : {counts.missionUpdate}</p>
-                    )}
-                    <p className="text-xs text-slate-500 italic mt-1">Détail des changements d'état possibles : À faire → En cours, En cours → Terminée, En cours → Bloquée</p>
-                  </>)}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 transition hover:shadow-sm lg:col-span-2">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-sm font-black uppercase tracking-widest text-slate-600">Interventions</p>
-                  <span className="rounded-md bg-violet-100 px-2 py-1 text-xs font-bold text-violet-700">
-                    {counts.interventionUpdate + counts.interventionAssign}
-                  </span>
-                </div>
-                <div className="space-y-1 text-sm leading-relaxed text-slate-700">
-                  {counts.interventionUpdate === 0 && counts.interventionAssign === 0 ? (
-                    <p>- Aucune clôture ou modification d'intervention n'a été détectée durant cette période.</p>
-                  ) : (<>
-                    {counts.interventionAssign > 0 && (
-                      <p>- Interventions affectées au technicien : {counts.interventionAssign}</p>
-                    )}
-                    {counts.interventionUpdate > 0 && (
-                      <p>- Interventions modifiées par le technicien : {counts.interventionUpdate}</p>
-                    )}
-                  </>)}
-                </div>
-              </div>
-              </>)}
-            </div>
-
-            {noActivity && (
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-slate-500">
-                <p className="text-sm font-medium">Aucune activite n'a ete enregistree pour cet utilisateur durant la periode selectionnee.</p>
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 inline-flex items-center gap-2 text-lg font-black uppercase tracking-widest text-slate-800">
-              <Activity size={18} className="text-brand-600" />
-              Historique des actions
-            </h2>
-
-            {auditError && (
-              <div className="mb-4 inline-flex items-start gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-                <AlertCircle size={16} className="mt-0.5 shrink-0" />
-                <span>{auditError}</span>
-              </div>
-            )}
-
-            {isLoadingAudit ? (
-              <div className="py-8 text-center text-slate-500">Chargement de l'historique...</div>
-            ) : logsForTable.length === 0 ? (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center text-slate-500">
-                <Eye size={26} className="mx-auto mb-2 text-slate-400" />
-                <p className="font-medium">Aucune activite n'a ete enregistree pour la periode selectionnee.</p>
-              </div>
-            ) : (
-              <>
-                <div className="overflow-x-auto rounded-xl border border-slate-200">
-                  <table className="w-full min-w-[980px]">
-                    <thead className="bg-slate-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-[11px] font-black uppercase tracking-widest text-slate-400">Date</th>
-                        <th className="px-4 py-3 text-left text-[11px] font-black uppercase tracking-widest text-slate-400">Heure</th>
-                        <th className="px-4 py-3 text-left text-[11px] font-black uppercase tracking-widest text-slate-400">Module</th>
-                        <th className="px-4 py-3 text-left text-[11px] font-black uppercase tracking-widest text-slate-400">Action</th>
-                        <th className="px-4 py-3 text-left text-[11px] font-black uppercase tracking-widest text-slate-400">Description</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {paginatedLogsForTable.map((log) => {
-                        const moduleName = moduleFromLog(log)
-                        const meta = moduleMeta[moduleName]
-                        const ModuleIcon = meta?.icon
-                        return (
-                          <tr key={log.id} className="transition-colors hover:bg-slate-50">
-                            <td className="px-4 py-3 text-sm font-semibold text-slate-700">
-                              {formatDateForDisplay(log.createdAt?.split('T')[0] || '')}
-                            </td>
-                            <td className="px-4 py-3 text-sm font-medium text-slate-600">{formatTime(log.createdAt)}</td>
-                            <td className="px-4 py-3">
-                              <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold ${meta?.pill || 'bg-slate-50 text-slate-700 border-slate-200'}`}>
-                                {ModuleIcon ? <ModuleIcon size={13} /> : <Activity size={13} />}
-                                {moduleName}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span
-                                title={actionLabels[log.action] || log.action}
-                                className={`inline-flex whitespace-nowrap rounded-lg px-2.5 py-1 text-xs font-black ${actionBadgeColors[log.action] || 'bg-slate-100 text-slate-700'}`}
-                              >
-                                {actionLabels[log.action] || log.action}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-slate-600">{getDescriptionLabel(log.action, log.description)}</td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <span className="text-sm text-slate-500">
-                    {logsForTable.length === 0
-                      ? 'Aucun evenement'
-                      : `Page ${tablePage} sur ${totalTablePages} • ${logsForTable.length} evenement(s) affiché(s)`}
-                  </span>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setTablePage((prev) => Math.max(1, prev - 1))}
-                      disabled={tablePage <= 1}
-                      className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      ← Precedent
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTablePage((prev) => Math.min(totalTablePages, prev + 1))}
-                      disabled={tablePage >= totalTablePages}
-                      className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      Suivant →
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </>
-      )}
+      <EventDetailModal log={selectedLog} onClose={() => setSelectedLog(null)} />
     </div>
   )
 }

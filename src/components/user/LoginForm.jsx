@@ -1,4 +1,6 @@
 import { useState } from 'react'
+
+const IS_UI_DEMO = import.meta.env.DEV && import.meta.env.VITE_UI_DEMO === 'true'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Eye, EyeOff, AlertCircle, ArrowRight } from 'lucide-react'
 import logo from '../../assets/logo.jpg'
@@ -71,12 +73,16 @@ export default function LoginForm({ onLoginSuccess }) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault()
+    performLogin(username, password)
+  }
+
+  const performLogin = async (loginName, loginPassword) => {
     setError('')
     setIsLoading(true)
     try {
-      const result = await loginRequest(username, password)
+      const result = await loginRequest(loginName, loginPassword)
       if (result.error) {
         setError(result.error)
         return
@@ -207,6 +213,23 @@ export default function LoginForm({ onLoginSuccess }) {
               )}
             </button>
           </form>
+
+          {IS_UI_DEMO && (
+            <div className="mt-6 flex flex-col gap-2 rounded-xl bg-amber-50 p-4 ring-1 ring-inset ring-amber-200">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-800">Mode démonstration</p>
+              <p className="text-sm leading-relaxed text-amber-900">
+                Données fictives, aucune écriture backend. Identifiants : admin, coord, tech ou resp (mot de passe libre).
+              </p>
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={() => performLogin('admin', 'demo1234')}
+                className="mt-1 inline-flex h-10 w-full items-center justify-center rounded-xl bg-white text-sm font-semibold text-amber-900 ring-1 ring-inset ring-amber-300 transition hover:bg-amber-100 disabled:opacity-65"
+              >
+                Explorer la démonstration
+              </button>
+            </div>
+          )}
 
           <p className="mt-8 border-t border-slate-200 pt-6 text-xs leading-relaxed text-slate-500">
             Accès réservé aux membres de l&apos;organisation SOMACS. Contactez votre administrateur en cas de problème.

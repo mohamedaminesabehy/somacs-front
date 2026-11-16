@@ -19,12 +19,12 @@ const initialClientForm = {
 }
 
 function getClientModalTitle(view, editingClient) {
-  if (view === 'list') return 'SÃ©lectionner un Client'
+  if (view === 'list') return 'Sélectionner un Client'
   return editingClient ? 'Modifier le Client' : 'Ajouter un Nouveau Client'
 }
 
 function getClientModalSubtitle(view) {
-  return view === 'list' ? 'Gestion de la base de donnÃ©es clients' : 'Informations dÃ©taillÃ©es du client'
+  return view === 'list' ? 'Gestion de la base de données clients' : 'Informations détaillées du client'
 }
 
 function safeText(value) {
@@ -55,8 +55,8 @@ const clientColumns = [
     label: 'Contact',
     render: (client) => (
       <div className="space-y-1">
-        <p className="text-xs font-bold text-slate-600 flex items-center gap-1.5"><Phone size={12} />{client.phone || 'Non renseignÃ©'}</p>
-        <p className="text-xs font-bold text-slate-400 flex items-center gap-1.5"><Mail size={12} />{client.email || 'Non renseignÃ©'}</p>
+        <p className="text-xs font-bold text-slate-600 flex items-center gap-1.5"><Phone size={12} />{client.phone || 'Non renseigné'}</p>
+        <p className="text-xs font-bold text-slate-400 flex items-center gap-1.5"><Mail size={12} />{client.email || 'Non renseigné'}</p>
       </div>
     )
   }
@@ -64,26 +64,26 @@ const clientColumns = [
 
 const clientFormSections = [
   {
-    title: 'IdentitÃ© client',
+    title: 'Identité client',
     subtitle: 'Informations principales',
     icon: User,
     fields: [
       { name: 'code', label: 'Code client', icon: Hash, required: true },
       { name: 'name', label: 'Nom', icon: Building2, required: true },
-      { name: 'type', label: 'Type', type: 'select', options: ['Homme', 'Femme', 'SociÃ©tÃ©'] },
-      { name: 'priceCategory', label: 'CatÃ©gorie prix', type: 'select', options: ['A', 'B', 'C'] },
+      { name: 'type', label: 'Type', type: 'select', options: ['Homme', 'Femme', 'Société'] },
+      { name: 'priceCategory', label: 'Catégorie prix', type: 'select', options: ['A', 'B', 'C'] },
       { name: 'taxId', label: 'Matricule fiscal', icon: FileText },
       { name: 'city', label: 'Ville', icon: MapPin }
     ]
   },
   {
-    title: 'CoordonnÃ©es',
+    title: 'Coordonnées',
     subtitle: 'Contact et localisation',
     icon: Phone,
     fields: [
-      { name: 'phone', label: 'TÃ©lÃ©phone', icon: Phone },
-      { name: 'phone2', label: 'TÃ©lÃ©phone 2', icon: Phone },
-      { name: 'phone3', label: 'TÃ©lÃ©phone 3', icon: Phone },
+      { name: 'phone', label: 'Téléphone', icon: Phone },
+      { name: 'phone2', label: 'Téléphone 2', icon: Phone },
+      { name: 'phone3', label: 'Téléphone 3', icon: Phone },
       { name: 'fax', label: 'Fax', icon: Phone },
       { name: 'email', label: 'E-mail', type: 'email', icon: Mail },
       { name: 'web', label: 'Site web', icon: Globe },
@@ -105,7 +105,7 @@ export default function ClientSelectionModal({ isOpen, onClose, onSelect }) {
       listIcon={<Users size={20} className="sm:w-6 sm:h-6" />}
       formIcon={<User size={20} className="sm:w-6 sm:h-6" />}
       primaryColor="blue"
-      emptyMessage="Aucun client trouvÃ©"
+      emptyMessage="Aucun client trouvé"
       columns={clientColumns}
       initialForm={initialClientForm}
       resetForm={(count) => ({ ...initialClientForm, code: `CLT-2026-00${count + 1}` })}
@@ -119,7 +119,7 @@ export default function ClientSelectionModal({ isOpen, onClose, onSelect }) {
       actions={{
         addLabel: 'Ajouter Client',
         saveLabel: 'Enregistrer Client',
-        updateLabel: 'Mettre Ã  jour'
+        updateLabel: 'Mettre à jour'
       }}
     />
   )

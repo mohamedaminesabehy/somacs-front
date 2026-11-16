@@ -1,106 +1,90 @@
-
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useId } from "react"
 import {
-  Upload, FileText, Gauge, Settings2, ShieldCheck, CheckCircle2,
-  Eye, Truck, AlertCircle, X, Loader2, Save
+  Upload, FileText, Gauge, ShieldCheck, CheckCircle2, Circle,
+  Eye, Truck, AlertCircle, X, Loader2, Save, NotebookPen, RotateCcw,
 } from "lucide-react"
+import { FormSection } from "../ui/DataKit"
+import {
+  VEHICLE_TYPES, STATUS_OPTIONS, CARBURANT_OPTIONS, BOITE_OPTIONS, EMPTY_FORM, buildMatricule,
+} from "./vehicleFormOptions"
 
-export const VEHICLE_TYPES = ["Fourgon", "Camion", "Voiture", "Camionnette", "Utilitaire", "Autre"]
-export const STATUS_OPTIONS = ["Disponible", "Affecte", "En maintenance", "Hors service"]
-export const CARBURANT_OPTIONS = ["Essence", "Diesel", "Hybride", "Electrique", "GPL", "Autre"]
-export const BOITE_OPTIONS = ["Manuelle", "Automatique", "Semi-automatique"]
 
-export const EMPTY_FORM = {
-  marque: "", modele: "", type: "", annee: new Date().getFullYear(),
-  couleur: "", statut: "Disponible",
-  kilometrage: "", carburant: "", boite: "", puissance: "", nombrePlaces: "",
-  dateMiseEnCirculation: "", assuranceExpiration: "", visiteTechniqueExpiration: "",
-  notes: "",
+const STATUS_LABELS = {
+  "Disponible": "Disponible",
+  "Affecte": "Affecté",
+  "En maintenance": "En maintenance",
+  "Hors service": "Hors service",
 }
 
-export function parseMatricule(mat) {
-  if (!mat) return { left: "", right: "" }
-  const m = String(mat).match(/^(\d{1,4})\s*TU\s*(\d{1,3})$/)
-  return m ? { left: m[1], right: m[2] } : { left: "", right: "" }
-}
 
-export function buildMatricule(left, right) {
-  if (!left || !right) return ""
-  return left + " TU " + right
-}
-
-export function MatriculeInput({ left, right, onChange }) {
+export function MatriculeInput({ left, right, onChange, idPrefix = "matricule" }) {
   return (
-    <div className="flex items-center gap-2">
-      <input type="text" inputMode="numeric" value={left} maxLength={4}
+    <div className="flex items-stretch overflow-hidden rounded-xl border-2 border-ink bg-ink shadow-sm focus-within:ring-4 focus-within:ring-brand-100">
+      <label htmlFor={idPrefix + "-left"} className="sr-only">Numéro de série (4 chiffres)</label>
+      <input
+        id={idPrefix + "-left"} type="text" inputMode="numeric" value={left} maxLength={4}
         onChange={e => onChange({ left: e.target.value.replace(/\D/g, "").slice(0, 4), right })}
         placeholder="1234"
-        className="w-20 px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-center focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all" />
-      <span className="px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-xl text-sm font-black text-blue-700 select-none">TU</span>
-      <input type="text" inputMode="numeric" value={right} maxLength={3}
+        className="w-full min-w-0 bg-transparent px-3 py-3 text-center font-mono text-xl font-bold tracking-[0.2em] text-white placeholder:text-white/30 outline-none"
+      />
+      <span className="flex shrink-0 flex-col items-center justify-center border-x border-white/15 px-3 text-white select-none" aria-hidden="true">
+        <span className="text-base font-bold leading-none" lang="ar">تونس</span>
+        <span className="mt-1 text-[10px] font-semibold tracking-[0.2em] text-white/60">TU</span>
+      </span>
+      <label htmlFor={idPrefix + "-right"} className="sr-only">Numéro d&apos;ordre (3 chiffres)</label>
+      <input
+        id={idPrefix + "-right"} type="text" inputMode="numeric" value={right} maxLength={3}
         onChange={e => onChange({ left, right: e.target.value.replace(/\D/g, "").slice(0, 3) })}
         placeholder="123"
-        className="w-16 px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-center focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all" />
-    </div>
-  )
-}
-
-export function Field({ label, name, value, onChange, placeholder, type, required }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-        {label}{required && " *"}
-      </label>
-      <input
-        type={type || "text"} name={name}
-        value={value != null ? value : ""}
-        onChange={onChange} placeholder={placeholder}
-        className="px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all"
+        className="w-full min-w-0 bg-transparent px-3 py-3 text-center font-mono text-xl font-bold tracking-[0.2em] text-white placeholder:text-white/30 outline-none"
       />
     </div>
   )
 }
 
-export function SelectField({ label, name, value, onChange, options, required }) {
+export function Field({ label, name, value, onChange, placeholder, type, required, suffix, min, max }) {
+  const id = useId()
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-        {label}{required && " *"}
+    <div className="flex min-w-0 flex-col">
+      <label htmlFor={id} className="ui-label">
+        {label}{required && <span className="ml-0.5 text-red-500" aria-hidden="true">*</span>}
       </label>
-      <select
-        name={name} value={value != null ? value : ""} onChange={onChange}
-        className="px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-medium text-slate-800 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all appearance-none cursor-pointer"
-      >
-        <option value="">Selectionner...</option>
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      <div className="relative">
+        <input
+          id={id} type={type || "text"} name={name}
+          value={value != null ? value : ""}
+          onChange={onChange} placeholder={placeholder}
+          required={required} min={min} max={max}
+          className={"ui-input " + (suffix ? "pr-12" : "")}
+        />
+        {suffix && (
+          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-semibold text-ink-faint">{suffix}</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function SelectField({ label, name, value, onChange, options, required, labels }) {
+  const id = useId()
+  return (
+    <div className="flex min-w-0 flex-col">
+      <label htmlFor={id} className="ui-label">
+        {label}{required && <span className="ml-0.5 text-red-500" aria-hidden="true">*</span>}
+      </label>
+      <select id={id} name={name} value={value != null ? value : ""} onChange={onChange} required={required} className="ui-select">
+        <option value="">Sélectionner…</option>
+        {options.map(o => <option key={o} value={o}>{labels?.[o] || o}</option>)}
       </select>
     </div>
   )
 }
 
-export function Section({ icon, title, description, accent, children }) {
-  const SectionIcon = icon
-  const a = accent || "blue"
-  const map = {
-    blue:  ["from-blue-50/80 border-blue-200",   "bg-blue-100 text-blue-600",   "text-blue-800"],
-    teal:  ["from-cyan-50/80 border-cyan-200",   "bg-cyan-100 text-cyan-600",   "text-cyan-800"],
-    amber: ["from-amber-50/80 border-amber-200", "bg-amber-100 text-amber-600", "text-amber-800"],
-    slate: ["from-slate-50/80 border-slate-200", "bg-slate-100 text-slate-600", "text-slate-700"],
-  }
-  const [wrap, iconClass, titleCls] = map[a] || map.blue
+export function Section({ icon, title, description, children }) {
   return (
-    <div className={"bg-gradient-to-br " + wrap + " to-white border rounded-3xl p-5 sm:p-6 space-y-4"}>
-      <div className="flex items-start gap-3 pb-1">
-        <div className={"w-9 h-9 rounded-xl flex items-center justify-center shrink-0 " + iconClass}>
-          <SectionIcon size={17} />
-        </div>
-        <div>
-          <h2 className={"text-[11px] font-black uppercase tracking-[0.22em] " + titleCls}>{title}</h2>
-          {description && <p className="mt-0.5 text-[11px] text-slate-500">{description}</p>}
-        </div>
-      </div>
+    <FormSection icon={icon} title={title} description={description}>
       {children}
-    </div>
+    </FormSection>
   )
 }
 
@@ -111,67 +95,51 @@ export function CarteGrisePreview({ file, existingUrl, onRemove, onReplace }) {
   useEffect(() => {
     if (!file || isPdfFile) return
     const url = URL.createObjectURL(file)
+    // The object URL is an external resource that must be created and revoked in the same effect;
+    // deriving it during render (useMemo) would leak or revoke it under StrictMode remounts.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPreview(url)
     return () => URL.revokeObjectURL(url)
   }, [file, isPdfFile])
-  
+
   if (!file && !existingUrl) return null
-  
+
+  const showPdfTile = file ? isPdfFile : isPdfUrl
+
   return (
-    <div className="relative group rounded-2xl border border-slate-200 bg-white overflow-hidden">
-      {file ? (
-        isPdfFile ? (
-          <div className="flex items-center gap-3 p-4">
-            <div className="w-12 h-12 bg-red-50 border border-red-100 rounded-xl flex items-center justify-center shrink-0">
-              <FileText size={22} className="text-red-500" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-bold text-slate-800 truncate">{file.name}</p>
-              <p className="text-[11px] text-slate-400">{(file.size / 1024).toFixed(0)} Ko - PDF</p>
-            </div>
+    <div className="overflow-hidden rounded-xl border border-line bg-white">
+      {showPdfTile ? (
+        <div className="flex items-center gap-3 p-4">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600 ring-1 ring-inset ring-red-100">
+            <FileText size={20} aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-ink">{file ? file.name : "Carte grise (PDF)"}</p>
+            <p className="text-xs text-ink-muted">{file ? (file.size / 1024).toFixed(0) + " Ko · PDF" : "Fichier existant"}</p>
           </div>
-        ) : (
-          <div className="h-36 bg-slate-50">
-            {preview && <img src={preview} alt="Carte grise" className="w-full h-full object-contain p-2" />}
-          </div>
-        )
+        </div>
       ) : (
-        <div className="h-36 bg-slate-50 flex items-center justify-center">
-          {isPdfUrl ? (
-            <div className="flex items-center gap-3 p-4">
-              <div className="w-12 h-12 bg-red-50 border border-red-100 rounded-xl flex items-center justify-center">
-                <FileText size={22} className="text-red-500" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-slate-800">Carte grise (PDF)</p>
-                <p className="text-[11px] text-slate-400">Fichier existant</p>
-              </div>
-            </div>
-          ) : (
-            <img src={existingUrl} alt="Carte grise" className="w-full h-full object-contain p-2" />
+        <div className="flex h-40 items-center justify-center bg-canvas">
+          {(file ? preview : existingUrl) && (
+            <img src={file ? preview : existingUrl} alt="Aperçu de la carte grise" className="h-full w-full object-contain p-2" />
           )}
         </div>
       )}
-      <div className="px-4 py-2 border-t border-slate-100 flex items-center justify-between gap-2">
-        <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
-          <CheckCircle2 size={11} /> {file ? "Nouveau fichier" : "Fichier existant"}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-4 py-2.5">
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-700">
+          <CheckCircle2 size={13} aria-hidden="true" /> {file ? "Nouveau fichier" : "Fichier existant"}
         </span>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1">
           {existingUrl && !file && (
-            <a href={existingUrl} target="_blank" rel="noreferrer"
-              className="text-[10px] font-bold text-blue-500 hover:text-blue-700 flex items-center gap-1">
-              <Eye size={11} /> Voir
+            <a href={existingUrl} target="_blank" rel="noreferrer" className="ui-btn-ghost ui-btn-sm">
+              <Eye size={13} aria-hidden="true" /> Voir
             </a>
           )}
           {onReplace && (
-            <button type="button" onClick={onReplace} className="text-[10px] font-bold text-slate-500 hover:text-slate-700">
-              Remplacer
-            </button>
+            <button type="button" onClick={onReplace} className="ui-btn-ghost ui-btn-sm">Remplacer</button>
           )}
           {onRemove && (
-            <button type="button" onClick={onRemove} className="text-[10px] font-bold text-red-500 hover:text-red-700">
-              Supprimer
-            </button>
+            <button type="button" onClick={onRemove} className="ui-btn-ghost ui-btn-sm text-red-600 hover:bg-red-50">Retirer</button>
           )}
         </div>
       </div>
@@ -180,7 +148,7 @@ export function CarteGrisePreview({ file, existingUrl, onRemove, onReplace }) {
 }
 
 export default function VehicleForm({
-  mode = "create", // "create" or "edit"
+  mode = "create",
   initialForm = null,
   initialMatricule = { left: "", right: "" },
   onSubmit,
@@ -217,13 +185,13 @@ export default function VehicleForm({
     const file = e.target.files && e.target.files[0]
     if (!file) return
     const allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf"]
-    if (!allowed.includes(file.type)) { 
-      if (setError) setError("Format invalide. Acceptes : JPG, PNG, WEBP, PDF")
-      return 
+    if (!allowed.includes(file.type)) {
+      if (setError) setError("Format invalide. Acceptés : JPG, PNG, WEBP, PDF")
+      return
     }
-    if (file.size > 10 * 1024 * 1024) { 
+    if (file.size > 10 * 1024 * 1024) {
       if (setError) setError("Fichier trop volumineux (max 10 Mo)")
-      return 
+      return
     }
     setCarteGriseFile(file)
     setRemoveCarteGrise(false)
@@ -240,207 +208,181 @@ export default function VehicleForm({
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (onSubmit) {
-      await onSubmit({
-        form,
-        matricule,
-        carteGriseFile,
-        removeCarteGrise,
-      })
+      await onSubmit({ form, matricule, carteGriseFile, removeCarteGrise })
     }
   }
 
+  const openFilePicker = () => { if (fileInputRef.current) fileInputRef.current.click() }
+
   const mat = buildMatricule(matricule.left, matricule.right)
-  const showCarteGrise = mode === "create" 
-    ? carteGriseFile 
+  const showCarteGrise = mode === "create"
+    ? carteGriseFile
     : (carteGriseFile || (form.carteGriseUrl && !removeCarteGrise))
   const requiredFields = [
-    { label: "Matricule (TN)", ok: !!mat },
-    { label: "Marque", ok: !!form.marque.trim() },
-    { label: "Modele", ok: !!form.modele.trim() },
+    { label: "Matricule", ok: !!mat },
+    { label: "Marque", ok: !!String(form.marque || "").trim() },
+    { label: "Modèle", ok: !!String(form.modele || "").trim() },
     { label: "Type", ok: !!form.type },
-    { label: "Annee", ok: !!form.annee },
+    { label: "Année", ok: !!form.annee },
   ]
+  const completed = requiredFields.filter(f => f.ok).length
+  const progress = Math.round((completed / requiredFields.length) * 100)
+  const busy = loading || saving
 
-  let submitButtonLabel = "Enregistrer"
-  if (loading) submitButtonLabel = "Creation..."
-  else if (saving) submitButtonLabel = "Enregistrement..."
+  let submitButtonLabel = mode === "edit" ? "Enregistrer les modifications" : "Créer le véhicule"
+  if (loading) submitButtonLabel = "Création…"
+  else if (saving) submitButtonLabel = "Enregistrement…"
+
+  const vehicleTitle = [form.marque, form.modele].filter(Boolean).join(" ") || "Nouveau véhicule"
 
   return (
-    <div className="min-h-screen bg-canvas">
-      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
-        {error && (
-          <div className="mb-6 flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 font-semibold">
-            <AlertCircle size={16} className="shrink-0" />
-            <span className="flex-1">{error}</span>
-            {setError && (
-              <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 shrink-0">
-                <X size={14} />
-              </button>
-            )}
+    <form id={formId} onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
+      {error && (
+        <div role="alert" className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <AlertCircle size={18} className="mt-0.5 shrink-0 text-red-600" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">Impossible d&apos;enregistrer</p>
+            <p className="mt-0.5 text-red-700">{error}</p>
           </div>
-        )}
+          {setError && (
+            <button type="button" onClick={() => setError(null)} className="ui-icon-btn h-8 w-8 text-red-500 hover:bg-red-100" aria-label="Fermer le message d'erreur">
+              <X size={15} aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      )}
 
-        <form id={formId} onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 xl:grid-cols-[1fr_240px] gap-6 items-start">
-            <div className="space-y-5">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <Section icon={Truck} title="Identite" description="Informations d'identification" accent="blue">
-                  <div className="space-y-4">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                        Matricule tunisien *
-                      </label>
-                      <MatriculeInput left={matricule.left} right={matricule.right} onChange={setMatricule} />
-                      {mat ? (
-                        <p className="text-xs font-black text-blue-600 font-mono">{mat}</p>
-                      ) : (
-                        <p className="text-[10px] text-slate-400">Format : 1234 TU 123</p>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="Marque" name="marque" value={form.marque} onChange={handleChange} placeholder="Ex: Renault" required />
-                      <Field label="Modele" name="modele" value={form.modele} onChange={handleChange} placeholder="Ex: Kangoo" required />
-                      <SelectField label="Type" name="type" value={form.type} onChange={handleChange} options={VEHICLE_TYPES} required />
-                      <Field label="Annee" name="annee" type="number" value={form.annee} onChange={handleChange} required />
-                      <Field label="Couleur" name="couleur" value={form.couleur} onChange={handleChange} placeholder="Ex: Blanc" />
-                      <SelectField label="Statut" name="statut" value={form.statut} onChange={handleChange} options={STATUS_OPTIONS} />
-                    </div>
-                  </div>
-                </Section>
-
-                <Section icon={Gauge} title="Caracteristiques techniques" description="Donnees mecaniques" accent="teal">
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="Kilometrage (km)" name="kilometrage" type="number" value={form.kilometrage} onChange={handleChange} placeholder="0" />
-                    <SelectField label="Carburant" name="carburant" value={form.carburant} onChange={handleChange} options={CARBURANT_OPTIONS} />
-                    <SelectField label="Boite" name="boite" value={form.boite} onChange={handleChange} options={BOITE_OPTIONS} />
-                    <Field label="Puissance (CV)" name="puissance" type="number" value={form.puissance} onChange={handleChange} placeholder="Ex: 90" />
-                    <Field label="Nb. places" name="nombrePlaces" type="number" value={form.nombrePlaces} onChange={handleChange} placeholder="Ex: 5" />
-                  </div>
-                </Section>
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex min-w-0 flex-col gap-5">
+          <Section icon={Truck} title="Identité du véhicule" description="Immatriculation et informations principales.">
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col">
+                <span className="ui-label">Matricule tunisien<span className="ml-0.5 text-red-500" aria-hidden="true">*</span></span>
+                <div className="max-w-md">
+                  <MatriculeInput left={matricule.left} right={matricule.right} onChange={setMatricule} />
+                </div>
+                <p className="mt-1.5 text-xs text-ink-faint">Format : 4 chiffres · TU · 3 chiffres (ex. 1234 TU 123)</p>
               </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <Section icon={ShieldCheck} title="Administratif" description="Documents et dates reglementaires" accent="amber">
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="Mise en circulation" name="dateMiseEnCirculation" type="date" value={form.dateMiseEnCirculation} onChange={handleChange} />
-                      <div />
-                      <Field label="Assurance - expiration" name="assuranceExpiration" type="date" value={form.assuranceExpiration} onChange={handleChange} />
-                      <Field label="Visite technique - expiration" name="visiteTechniqueExpiration" type="date" value={form.visiteTechniqueExpiration} onChange={handleChange} />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Carte grise</label>
-                      {showCarteGrise ? (
-                        <CarteGrisePreview 
-                          file={carteGriseFile} 
-                          existingUrl={form.carteGriseUrl}
-                          onRemove={mode === "edit" ? handleRemoveCarteGrise : (() => setCarteGriseFile(null))}
-                          onReplace={mode === "edit" ? (() => { if (fileInputRef.current) fileInputRef.current.click() }) : undefined}
-                        />
-                      ) : (
-                        <div
-                          onClick={() => { if (fileInputRef.current) fileInputRef.current.click() }}
-                          className="border-2 border-dashed border-amber-200 rounded-2xl p-5 text-center hover:border-amber-400 hover:bg-amber-50/40 transition-all cursor-pointer group"
-                        >
-                          <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center mx-auto mb-2 text-slate-300 group-hover:text-amber-500 transition-colors border border-slate-200">
-                            <Upload size={18} />
-                          </div>
-                          <p className="text-xs font-bold text-slate-500 group-hover:text-amber-600 transition-colors">
-                            Ajouter la carte grise
-                          </p>
-                          <p className="text-[10px] text-slate-400 mt-0.5">JPG, PNG, WEBP ou PDF - Max 10 Mo</p>
-                        </div>
-                      )}
-                      <input
-                        ref={fileInputRef} 
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp,application/pdf"
-                        className="hidden" 
-                        onChange={handleFileChange}
-                      />
-                    </div>
-                  </div>
-                </Section>
-
-                <Section icon={Settings2} title="Remarques" description="Notes et observations" accent="slate">
-                  <textarea
-                    name="notes" 
-                    value={form.notes} 
-                    onChange={handleChange}
-                    placeholder="Notes, observations, informations complementaires..."
-                    rows={8}
-                    className="w-full px-4 py-3 bg-white border border-slate-300 rounded-2xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-100 focus:border-blue-400 outline-none transition-all resize-none"
-                  />
-                </Section>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Field label="Marque" name="marque" value={form.marque} onChange={handleChange} placeholder="Ex. Renault" required />
+                <Field label="Modèle" name="modele" value={form.modele} onChange={handleChange} placeholder="Ex. Kangoo" required />
+                <SelectField label="Type" name="type" value={form.type} onChange={handleChange} options={VEHICLE_TYPES} required />
+                <Field label="Année" name="annee" type="number" value={form.annee} onChange={handleChange} min={1900} max={new Date().getFullYear() + 1} required />
+                <Field label="Couleur" name="couleur" value={form.couleur} onChange={handleChange} placeholder="Ex. Blanc" />
+                <SelectField label="Statut" name="statut" value={form.statut} onChange={handleChange} options={STATUS_OPTIONS} labels={STATUS_LABELS} />
               </div>
             </div>
+          </Section>
 
-            <aside className="xl:sticky xl:top-24 space-y-4">
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400 mb-4">Champs requis</p>
-                <ul className="space-y-2.5">
-                  {requiredFields.map(function(f) {
-                    return (
-                      <li key={f.label} className="flex items-center gap-2.5">
-                        <span className={"w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors " + (f.ok ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-300")}>
-                          {f.ok ? <CheckCircle2 size={12} /> : <span className="w-2 h-2 rounded-full bg-slate-300 block" />}
-                        </span>
-                        <span className={"text-sm transition-colors " + (f.ok ? "text-slate-800 font-semibold" : "text-slate-400")}>{f.label}</span>
-                      </li>
-                    )
-                  })}
-                </ul>
+          <Section icon={Gauge} title="Caractéristiques techniques" description="Données mécaniques et capacité.">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Field label="Kilométrage" name="kilometrage" type="number" value={form.kilometrage} onChange={handleChange} placeholder="0" suffix="km" min={0} />
+              <SelectField label="Carburant" name="carburant" value={form.carburant} onChange={handleChange} options={CARBURANT_OPTIONS} />
+              <SelectField label="Boîte de vitesses" name="boite" value={form.boite} onChange={handleChange} options={BOITE_OPTIONS} />
+              <Field label="Puissance fiscale" name="puissance" type="number" value={form.puissance} onChange={handleChange} placeholder="Ex. 6" suffix="CV" min={0} />
+              <Field label="Nombre de places" name="nombrePlaces" type="number" value={form.nombrePlaces} onChange={handleChange} placeholder="Ex. 3" min={0} />
+            </div>
+          </Section>
+
+          <Section icon={ShieldCheck} title="Administratif & documents" description="Échéances réglementaires et carte grise.">
+            <div className="flex flex-col gap-5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <Field label="Mise en circulation" name="dateMiseEnCirculation" type="date" value={form.dateMiseEnCirculation} onChange={handleChange} />
+                <Field label="Fin d'assurance" name="assuranceExpiration" type="date" value={form.assuranceExpiration} onChange={handleChange} />
+                <Field label="Fin de visite technique" name="visiteTechniqueExpiration" type="date" value={form.visiteTechniqueExpiration} onChange={handleChange} />
               </div>
-
-              <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-blue-600 mb-2">Format matricule</p>
-                <p className="text-lg font-black text-blue-900 font-mono tracking-wider">1234 TU 123</p>
-                <p className="text-[11px] text-blue-500 mt-1">4 chiffres - TU - 3 chiffres</p>
+              <div className="flex flex-col">
+                <span className="ui-label">Carte grise</span>
+                {showCarteGrise ? (
+                  <CarteGrisePreview
+                    file={carteGriseFile}
+                    existingUrl={form.carteGriseUrl}
+                    onRemove={mode === "edit" ? handleRemoveCarteGrise : (() => setCarteGriseFile(null))}
+                    onReplace={mode === "edit" ? openFilePicker : undefined}
+                  />
+                ) : (
+                  <button
+                    type="button" onClick={openFilePicker}
+                    className="group flex w-full items-center gap-4 rounded-xl border-2 border-dashed border-line bg-canvas px-4 py-5 text-left transition-colors hover:border-brand-300 hover:bg-brand-50/40 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-100"
+                  >
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-ink-faint ring-1 ring-inset ring-line transition-colors group-hover:text-brand-600">
+                      <Upload size={18} aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-ink">Ajouter la carte grise</span>
+                      <span className="block text-xs text-ink-muted">JPG, PNG, WEBP ou PDF · 10 Mo maximum</span>
+                    </span>
+                  </button>
+                )}
+                <input
+                  ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,application/pdf"
+                  className="hidden" onChange={handleFileChange} aria-label="Fichier de carte grise"
+                />
               </div>
+            </div>
+          </Section>
 
-              <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5 text-white">
-                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400 mb-3">Flux conseille</p>
-                <ol className="space-y-2.5">
-                  {["Matricule + identite", "Caracteristiques techniques", "Dates + carte grise"].map(function(step, i) {
-                    return (
-                      <li key={i} className="flex items-start gap-2.5">
-                        <span className="w-5 h-5 rounded-full bg-slate-700 text-slate-300 flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">{i + 1}</span>
-                        <span className="text-xs text-slate-300 leading-5">{step}</span>
-                      </li>
-                    )
-                  })}
-                </ol>
+          <Section icon={NotebookPen} title="Remarques" description="Observations internes, équipements, consignes.">
+            <label htmlFor="vehicle-notes" className="sr-only">Remarques</label>
+            <textarea
+              id="vehicle-notes" name="notes" value={form.notes} onChange={handleChange}
+              placeholder="Ex. Galerie de toit, kit de secours, clé de rechange au bureau…"
+              rows={5} className="ui-textarea"
+            />
+          </Section>
+        </div>
+
+        <aside className="flex flex-col gap-4 xl:sticky xl:top-24" aria-label="Récapitulatif">
+          <div className="ui-card overflow-hidden">
+            <div className="bg-ink px-5 pb-5 pt-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/50">Aperçu</p>
+              <div className="mt-3 flex items-center justify-between rounded-lg border-2 border-white/80 px-3 py-2.5 font-mono text-lg font-bold tracking-[0.15em] text-white">
+                <span>{matricule.left || "····"}</span>
+                <span className="font-sans text-sm tracking-normal" lang="ar">تونس</span>
+                <span>{matricule.right || "···"}</span>
               </div>
-
-              {additionalSidebarContent}
-            </aside>
+              <p className="mt-3 truncate text-sm font-semibold text-white">{vehicleTitle}</p>
+              <p className="text-xs text-white/60">{[form.type, form.annee, form.carburant].filter(Boolean).join(" · ") || "Type · Année"}</p>
+            </div>
+            <div className="px-5 py-4">
+              <div className="flex items-center justify-between text-xs font-semibold">
+                <span className="text-ink-muted">Champs obligatoires</span>
+                <span className="text-ink">{completed}/{requiredFields.length}</span>
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-canvas" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label="Progression du formulaire">
+                <div className="h-full rounded-full bg-brand-600 transition-all duration-300" style={{ width: progress + "%" }} />
+              </div>
+              <ul className="mt-4 flex flex-col gap-2">
+                {requiredFields.map(f => (
+                  <li key={f.label} className="flex items-center gap-2.5 text-sm">
+                    {f.ok
+                      ? <CheckCircle2 size={16} className="shrink-0 text-teal-600" aria-hidden="true" />
+                      : <Circle size={16} className="shrink-0 text-line" aria-hidden="true" />}
+                    <span className={f.ok ? "font-medium text-ink" : "text-ink-muted"}>{f.label}</span>
+                    <span className="sr-only">{f.ok ? "renseigné" : "à renseigner"}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
+          {additionalSidebarContent}
+        </aside>
+      </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
-            {mode === "create" && onReset && (
-              <button type="button" onClick={handleReset}
-                className="px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-black uppercase tracking-wider hover:bg-slate-50 transition-colors">
-                Reinitialiser
-              </button>
-            )}
-            {onCancel && (
-              <button type="button" onClick={onCancel}
-                className="px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-black uppercase tracking-wider hover:bg-slate-50 transition-colors">
-                Annuler
-              </button>
-            )}
-            <button type="submit" disabled={loading || saving}
-              className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all disabled:opacity-60 shadow-lg shadow-blue-200">
-              {loading || saving ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Save size={14} />
-              )}
-              {submitButtonLabel}
-            </button>
-          </div>
-        </form>
-      </main>
-    </div>
+      <div className="sticky bottom-0 z-20 -mx-4 flex flex-col-reverse gap-2 border-t border-line bg-white/95 px-4 py-3 backdrop-blur sm:mx-0 sm:flex-row sm:items-center sm:justify-end sm:rounded-2xl sm:border sm:px-5">
+        {mode === "create" && onReset && (
+          <button type="button" onClick={handleReset} className="ui-btn-ghost sm:mr-auto">
+            <RotateCcw size={15} aria-hidden="true" /> Réinitialiser
+          </button>
+        )}
+        {onCancel && (
+          <button type="button" onClick={onCancel} className="ui-btn-secondary">Annuler</button>
+        )}
+        <button type="submit" disabled={busy} className="ui-btn-primary">
+          {busy ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
+          {submitButtonLabel}
+        </button>
+      </div>
+    </form>
   )
 }

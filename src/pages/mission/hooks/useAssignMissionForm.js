@@ -1,17 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { apiFetch } from '../../../api/apiClient'
 
-const createSafeRandomId = () => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID().replace(/-/g, '')
-  }
-  return String(Date.now())
-}
 
-function createAssignmentGroupId(count) {
-  if (count <= 1) return null
-  return `AG-${Date.now()}-${createSafeRandomId().slice(0, 8)}`
-}
+
 
 const STEPS_COUNT = 4
 
@@ -25,11 +16,12 @@ export function useAssignMissionForm({ interventionsList, employeeList, navigate
   const [dueDate, setDueDate] = useState('')
   const [dueTime, setDueTime] = useState('')
   const [vehicleId, setVehicleId] = useState('')
+  const [driverChoice, setDriverUserId] = useState('')
   const [attachments, setAttachments] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const siteManuallyEditedRef = useRef(false)
-  const prefillDoneRef = useRef(false)
+
   const fileInputRef = useRef(null)
   const isMountedRef = useRef(true)
 
@@ -43,10 +35,13 @@ export function useAssignMissionForm({ interventionsList, employeeList, navigate
     return () => clearTimeout(timer)
   }, [showMaxEmployeesPopup])
 
-  // Prefill from navigation state
+  // Prefill from navigation state, applied once on mount via a useEffect.
+  // Using setState synchronously inside the render body is a React anti-pattern
+  // (triggers a double-render on strict mode and can cause infinite loops).
+  const [prefillApplied, setPrefillApplied] = useState(false)
   useEffect(() => {
-    if (prefillDoneRef.current || !prefillInterventionId) return
-    prefillDoneRef.current = true
+    if (prefillApplied || !prefillInterventionId) return
+    setPrefillApplied(true)
     setMissionType('Intervention')
     setCurrentStep(2)
     setFormData((prev) => ({
@@ -55,6 +50,7 @@ export function useAssignMissionForm({ interventionsList, employeeList, navigate
       title: prev.title || `Intervention SAV — ${prefillInterventionId}`,
       description: '',
     }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefillInterventionId])
 
   // Reset site manual edit flag on type change
@@ -70,6 +66,7 @@ export function useAssignMissionForm({ interventionsList, employeeList, navigate
 
   const selectedIntervention = linkableInterventions.find((i) => i.id === formData.interventionId)
   const selectedEmployeeObjs = employeeList.filter((e) => selectedEmployees.includes(e.name))
+  const driverUserId = resolveDriver(selectedEmployeeObjs, vehicleId, driverChoice)
 
   // Sync site from selected intervention
   useEffect(() => {
@@ -111,6 +108,10 @@ export function useAssignMissionForm({ interventionsList, employeeList, navigate
 
   const nextStep = () => { if (canGoNext()) setCurrentStep((prev) => Math.min(prev + 1, STEPS_COUNT)) }
   const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 1))
+  /** Navigate directly to any step without looping through intermediate steps.
+   *  Replaces the previous loop-based goToStep in AssignMission.jsx which
+   *  relied on N batched setState calls that React 18 collapses into one. */
+  const goToStep = (target) => setCurrentStep(Math.max(1, Math.min(target, STEPS_COUNT)))
 
   const handlePickFiles = (e) => {
     const files = Array.from(e.target.files || [])
@@ -141,7 +142,7 @@ export function useAssignMissionForm({ interventionsList, employeeList, navigate
     const selectedNames = selectedEmployees
     try {
       setIsSubmitting(true)
-      const validationError = validateSubmission({ selectedEmployeeObjs, missionType, formData, vehicleId })
+      const validationError = validateSubmission({ selectedEmployeeObjs, missionType, formData, vehicleId, driverUserId })
       if (validationError) {
         alert(validationError)
         if (isMountedRef.current) setIsSubmitting(false)
@@ -151,44 +152,44 @@ export function useAssignMissionForm({ interventionsList, employeeList, navigate
       const cleanedTitle = String(formData.title || '').trim()
       const cleanedDescription = String(formData.description || '').trim()
       const createdMissions = []
-      const assignmentGroupId = createAssignmentGroupId(selectedEmployeeObjs.length)
+      const payloadDescription = cleanedDescription ||
+        buildFallbackDescription(missionType, selectedIntervention, formData.interventionId)
+      const selectedVehicleId = vehicleId ? Number(vehicleId) : null
+      const [leader] = selectedEmployeeObjs
 
-      for (const employee of selectedEmployeeObjs) {
-        const payloadDescription = cleanedDescription ||
-          buildFallbackDescription(missionType, selectedIntervention, formData.interventionId)
-
-        const selectedVehicleId = vehicleId ? Number(vehicleId) : null
-        const payload = {
-          title: cleanedTitle,
-          description: payloadDescription,
-          employee: employee.name,
-          employeeUserId: employee.id,
-          assignmentGroupId,
-          priority,
-          status: 'À faire',
-          dueDate: dueDate || "Aujourd'hui",
-          dueTime: dueTime || null,
-          type: missionType,
-          interventionId: missionType === 'Intervention' ? formData.interventionId : null,
-          site: formData.site,
-          address: formData.address,
-          ...(selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
-        }
-
-        const response = await apiFetch('/missions', { method: 'POST', body: payload, auth: true })
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          const message = Array.isArray(errorData?.message) ? errorData.message.join(', ') : (errorData?.message || 'Erreur lors de la création de la mission.')
-          console.error('[AssignMission] POST /missions failed:', response.status, errorData)
-          alert(message)
-          if (isMountedRef.current) setIsSubmitting(false)
-          return
-        }
-        const createdMission = await response.json().catch(() => null)
-        if (createdMission?.id) createdMissions.push(createdMission)
+      // Une seule mission partagée : l'équipe, le véhicule et le chauffeur
+      // sont validés et enregistrés côté Backend dans une même transaction.
+      const payload = {
+        title: cleanedTitle,
+        description: payloadDescription,
+        employee: leader.name,
+        employeeUserId: leader.id,
+        employeeUserIds: selectedEmployeeObjs.map((employee) => employee.id),
+        priority,
+        status: 'À faire',
+        dueDate: dueDate || "Aujourd'hui",
+        dueTime: dueTime || null,
+        type: missionType,
+        interventionId: missionType === 'Intervention' ? formData.interventionId : null,
+        site: formData.site,
+        address: formData.address,
+        ...(selectedVehicleId ? { vehicleId: selectedVehicleId } : {}),
+        ...(selectedVehicleId && driverUserId ? { driverUserId: Number(driverUserId) } : {}),
       }
 
-      navigateAfterSubmit(navigate, createdMissions, assignmentGroupId)
+      const response = await apiFetch('/missions', { method: 'POST', body: payload, auth: true })
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const message = Array.isArray(errorData?.message) ? errorData.message.join(', ') : (errorData?.message || 'Erreur lors de la création de la mission.')
+        console.error('[AssignMission] POST /missions failed:', response.status, errorData)
+        alert(message)
+        if (isMountedRef.current) setIsSubmitting(false)
+        return
+      }
+      const createdMission = await response.json().catch(() => null)
+      if (createdMission?.id) createdMissions.push(createdMission)
+
+      navigateAfterSubmit(navigate, createdMissions, null)
       finalizeAfterSubmit({ createdMissions, missionType, formData, selectedNames, attachments })
     } catch (error) {
       console.error('[AssignMission] erreur inattendue:', error)
@@ -205,10 +206,10 @@ export function useAssignMissionForm({ interventionsList, employeeList, navigate
     currentStep, missionType, setMissionType, formData, handleChange,
     selectedEmployees, toggleEmployeeSelection, showMaxEmployeesPopup,
     priority, setPriority, dueDate, setDueDate, dueTime, setDueTime,
-    vehicleId, setVehicleId, attachments, handlePickFiles, removeAttachment, openFilePicker,
+    vehicleId, setVehicleId, driverUserId, setDriverUserId, attachments, handlePickFiles, removeAttachment, openFilePicker,
     fileInputRef, isSubmitting, handleSubmit,
     linkableInterventions, selectedIntervention, selectedEmployeeObjs,
-    canGoNext, nextStep, prevStep,
+    canGoNext, nextStep, prevStep, goToStep,
   }
 }
 
@@ -222,13 +223,19 @@ function buildFallbackDescription(missionType, selectedIntervention, interventio
   return `Mission ${missionType}${suffix}`
 }
 
-function validateSubmission({ selectedEmployeeObjs, missionType, formData, vehicleId }) {
+function resolveDriver(selectedEmployeeObjs, vehicleId, driverChoice) {
+  if (!vehicleId || selectedEmployeeObjs.length === 0) return ''
+  if (selectedEmployeeObjs.length === 1) return String(selectedEmployeeObjs[0].id)
+  return selectedEmployeeObjs.some((e) => String(e.id) === String(driverChoice)) ? String(driverChoice) : ''
+}
+
+function validateSubmission({ selectedEmployeeObjs, missionType, formData, vehicleId, driverUserId }) {
   if (selectedEmployeeObjs.length === 0) return 'Veuillez sélectionner au moins un technicien valide.'
   const cleanedMissionType = String(missionType || '').trim()
   if (!cleanedMissionType) return 'Veuillez sélectionner un type de mission.'
   if (!String(formData.title || '').trim()) return 'Le titre de la mission est requis.'
   if (!String(formData.description || '').trim() && cleanedMissionType !== 'Intervention') return 'La description de la mission est requise.'
-  if (selectedEmployeeObjs.length > 1 && vehicleId) return 'Un véhicule ne peut pas être affecté à plusieurs missions actives en même temps. Retirez le véhicule ou affectez un seul technicien.'
+  if (selectedEmployeeObjs.length > 1 && vehicleId && !driverUserId) return 'Désignez le chauffeur du véhicule parmi les techniciens sélectionnés.'
   return null
 }
 

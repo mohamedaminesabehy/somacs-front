@@ -15,12 +15,12 @@ const initialMachineForm = {
 }
 
 function getMachineModalTitle(view, editingMachine) {
-  if (view === 'list') return 'SÃ©lectionner une Machine'
+  if (view === 'list') return 'Sélectionner une Machine'
   return editingMachine ? 'Modifier la Machine' : 'Ajouter une Nouvelle Machine'
 }
 
 function getMachineModalSubtitle(view) {
-  return view === 'list' ? 'Gestion du parc machines et fiches techniques' : 'Informations dÃ©taillÃ©es de l\'Ã©quipement'
+  return view === 'list' ? 'Gestion du parc machines et fiches techniques' : 'Informations détaillées de l\'équipement'
 }
 
 function safeText(value) {
@@ -34,7 +34,7 @@ const machineColumns = [
     render: (machine) => <span className="text-[10px] sm:text-xs font-black text-green-600 bg-green-50 px-2 py-1 rounded-lg">{machine.code}</span>
   },
   {
-    label: 'DÃ©signation',
+    label: 'Désignation',
     render: (machine) => (
       <div className="flex items-center gap-3">
         <div className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400">
@@ -51,8 +51,8 @@ const machineColumns = [
     label: 'Identification',
     render: (machine) => (
       <div className="space-y-1">
-        <p className="text-xs font-bold text-slate-600 flex items-center gap-1.5"><Hash size={12} />{machine.serialNumber || 'Non renseignÃ©'}</p>
-        <p className="text-xs font-bold text-slate-400 flex items-center gap-1.5"><MapPin size={12} />{machine.site || 'Non renseignÃ©'}</p>
+        <p className="text-xs font-bold text-slate-600 flex items-center gap-1.5"><Hash size={12} />{machine.serialNumber || 'Non renseigné'}</p>
+        <p className="text-xs font-bold text-slate-400 flex items-center gap-1.5"><MapPin size={12} />{machine.site || 'Non renseigné'}</p>
       </div>
     )
   }
@@ -65,10 +65,10 @@ const machineFormSections = [
     icon: Settings,
     fields: [
       { name: 'code', label: 'Code machine', icon: Hash, required: true },
-      { name: 'designation', label: 'DÃ©signation', icon: Cpu, required: true },
+      { name: 'designation', label: 'Désignation', icon: Cpu, required: true },
       { name: 'brand', label: 'Marque', icon: Tag },
-      { name: 'serialNumber', label: 'NÂ° de sÃ©rie', icon: Hash },
-      { name: 'year', label: 'AnnÃ©e', icon: Calendar },
+      { name: 'serialNumber', label: 'N° de série', icon: Hash },
+      { name: 'year', label: 'Année', icon: Calendar },
       { name: 'unitAmount', label: 'Montant unitaire', type: 'number', icon: DollarSign }
     ]
   },
@@ -97,7 +97,7 @@ export default function MachineSelectionModal({ isOpen, onClose, onSelect }) {
       listIcon={<Settings size={20} className="sm:w-6 sm:h-6" />}
       formIcon={<Cpu size={20} className="sm:w-6 sm:h-6" />}
       primaryColor="green"
-      emptyMessage="Aucune machine trouvÃ©e"
+      emptyMessage="Aucune machine trouvée"
       columns={machineColumns}
       initialForm={initialMachineForm}
       resetForm={(count) => ({
@@ -115,7 +115,7 @@ export default function MachineSelectionModal({ isOpen, onClose, onSelect }) {
       actions={{
         addLabel: 'Ajouter Machine',
         saveLabel: 'Enregistrer Machine',
-        updateLabel: 'Mettre Ã  jour'
+        updateLabel: 'Mettre à jour'
       }}
     />
   )

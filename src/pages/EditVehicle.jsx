@@ -1,14 +1,11 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import {
-  ChevronLeft, Save, Loader2, Truck, AlertCircle
-} from "lucide-react"
+import { ChevronLeft, Truck, AlertCircle } from "lucide-react"
 import { apiFetch } from "../api/apiClient"
-import VehicleForm, {
-  parseMatricule,
-  buildMatricule,
-} from "../components/vehicle/VehicleForm"
+import PageHeader from "../components/ui/PageHeader"
+import VehicleForm from "../components/vehicle/VehicleForm"
+import { parseMatricule, buildMatricule } from "../components/vehicle/vehicleFormOptions"
 
 export default function EditVehicle() {
   const { id } = useParams()
@@ -87,71 +84,76 @@ export default function EditVehicle() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-canvas flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      <div className="ui-page flex flex-col gap-5" aria-busy="true" aria-label="Chargement du véhicule">
+        <div className="ui-skeleton h-16 w-72 rounded-xl" />
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="flex flex-col gap-5">
+            <div className="ui-skeleton h-64 rounded-2xl" />
+            <div className="ui-skeleton h-48 rounded-2xl" />
+          </div>
+          <div className="ui-skeleton h-72 rounded-2xl" />
+        </div>
       </div>
     )
   }
 
   if (!initialForm) {
     return (
-      <div className="min-h-screen bg-canvas flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <AlertCircle size={40} className="text-red-400" />
-          <p className="text-slate-600 font-semibold">{error || "Vehicule introuvable."}</p>
-          <button onClick={() => navigate("/vehicles")} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold">Retour</button>
+      <div className="ui-page flex items-center justify-center">
+        <div className="ui-card flex max-w-sm flex-col items-center gap-3 px-6 py-10 text-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600">
+            <AlertCircle size={22} aria-hidden="true" />
+          </span>
+          <p className="font-display text-base font-bold text-ink">Véhicule introuvable</p>
+          <p className="text-sm text-ink-muted">{error || "Ce véhicule n'existe plus ou a été supprimé."}</p>
+          <button type="button" onClick={() => navigate("/vehicles")} className="ui-btn-primary mt-2">Retour aux véhicules</button>
         </div>
       </div>
     )
   }
 
-  const headerContent = (
-    <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200">
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate("/vehicles/" + id)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-all">
-            <ChevronLeft size={20} />
-          </button>
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm">
-            <Truck size={15} className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-sm font-black text-slate-900">Modifier le vehicule</h1>
-            <p className="text-[11px] text-slate-500">Renseignez le matricule</p>
-          </div>
-        </div>
-        <button form="vehicle-edit-form" type="submit" disabled={saving}
-          className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black transition-all active:scale-95 disabled:opacity-60 shadow-lg shadow-blue-200">
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-          {saving ? "Enregistrement..." : "Enregistrer"}
-        </button>
-      </div>
-    </header>
-  )
+  const formatDay = (value) => new Date(value).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
 
   const additionalSidebarContent = (initialForm.createdAt || initialForm.updatedAt) && (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400 mb-3">Informations</p>
-      <div className="space-y-2.5 text-sm">
+    <div className="ui-card px-5 py-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-faint">Historique de la fiche</p>
+      <dl className="mt-3 flex flex-col gap-3 text-sm">
         {initialForm.createdAt && (
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase">Cree le</p>
-            <p className="font-semibold text-slate-700">{new Date(initialForm.createdAt).toLocaleDateString("fr-FR")}</p>
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-ink-muted">Créée le</dt>
+            <dd className="font-semibold text-ink">{formatDay(initialForm.createdAt)}</dd>
           </div>
         )}
         {initialForm.updatedAt && (
-          <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase">Modifie le</p>
-            <p className="font-semibold text-slate-700">{new Date(initialForm.updatedAt).toLocaleDateString("fr-FR")}</p>
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-ink-muted">Modifiée le</dt>
+            <dd className="font-semibold text-ink">{formatDay(initialForm.updatedAt)}</dd>
           </div>
         )}
-      </div>
+      </dl>
     </div>
   )
 
+  const plate = buildMatricule(initialMatricule.left, initialMatricule.right)
+
   return (
-    <div className="min-h-screen bg-canvas">
-      {headerContent}
+    <div className="ui-page flex flex-col gap-5">
+      <PageHeader
+        eyebrow="Flotte"
+        title="Modifier le véhicule"
+        description={plate ? `Mise à jour de la fiche ${plate}.` : "Mise à jour de la fiche véhicule."}
+        icon={Truck}
+        breadcrumbs={[
+          { label: "Véhicules", to: "/vehicles" },
+          { label: plate || "Véhicule", to: "/vehicles/" + id },
+          { label: "Modifier" },
+        ]}
+        actions={
+          <button type="button" onClick={() => navigate("/vehicles/" + id)} className="ui-btn-secondary">
+            <ChevronLeft size={16} aria-hidden="true" /> Retour à la fiche
+          </button>
+        }
+      />
       <VehicleForm
         mode="edit"
         initialForm={initialForm}

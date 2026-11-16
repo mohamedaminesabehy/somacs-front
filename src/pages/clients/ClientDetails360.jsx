@@ -36,10 +36,9 @@ import {
   Save,
 } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
-import PageHeader from '../../components/ui/PageHeader'
 import StatusBadge from '../../components/ui/StatusBadge'
 import { EmptyState, InlineAlert, SkeletonLines } from '../../components/ui/Feedback'
-import { StatStrip, Toast } from '../../components/ui/DataKit'
+import { Toast } from '../../components/ui/DataKit'
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -212,7 +211,7 @@ const TONE_CLASSES = {
   brand: { cls: 'bg-brand-50 text-brand-700 border-brand-200', dot: 'bg-brand-600' },
   amber: { cls: 'bg-amber-50 text-amber-800 border-amber-200', dot: 'bg-amber-500' },
   red: { cls: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-500' },
-  slate: { cls: 'bg-slate-100 text-slate-700 border-slate-200', dot: 'bg-slate-400' },
+  slate: { cls: 'bg-slate-100 text-ink-muted border-line', dot: 'bg-slate-400' },
 }
 
 const preset = (label, tone, icon) => ({ label, tone, icon, ...TONE_CLASSES[tone] })
@@ -438,10 +437,10 @@ function InterventionCard({ intervention, onView }) {
   )
 }
 
-function SectionShell({ icon, title, description, count, actions, children }) {
+function SectionShell({ icon, title, description, count, actions, children, className = '' }) {
   const Icon = icon
   return (
-    <section className="ui-card overflow-hidden">
+    <section className={`ui-card overflow-hidden ${className}`}>
       <header className="flex items-start justify-between gap-3 border-b border-line px-5 py-4 sm:px-6">
         <div className="flex items-start gap-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-100">
@@ -666,46 +665,77 @@ export default function ClientDetails360() {
     <div className="ui-page">
       <Toast toast={toast ? { type: 'success', message: toast } : null} onClose={() => setToast('')} />
 
-      <PageHeader
-        breadcrumbs={[{ label: 'Clients', to: '/clients' }, { label: client.name }]}
-        eyebrow="Fiche client 360°"
-        title={client.name}
-        icon={Building2}
-        meta={
-          <>
-            <span className="ui-ref">{client.code || `#${client.id}`}</span>
-            {client.type && <StatusBadge tone="slate" dot={false}>{client.type}</StatusBadge>}
-            {client.zone && (
-              <span className="inline-flex items-center gap-1 text-xs text-ink-muted"><MapPin size={12} aria-hidden="true" /> Zone {client.zone}</span>
-            )}
-          </>
-        }
-        actions={
-          <>
-            <button type="button" onClick={() => navigate('/clients')} className="ui-btn-ghost">
-              <ArrowLeft size={16} aria-hidden="true" /> Liste
+      <nav aria-label="Fil d’Ariane" className="flex items-center justify-between gap-3">
+        <ol className="flex min-w-0 items-center gap-1.5 text-sm text-ink-muted">
+          <li>
+            <button type="button" onClick={() => navigate('/clients')} className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 font-medium hover:bg-white hover:text-ink">
+              <ArrowLeft size={15} aria-hidden="true" /> Clients
             </button>
-            <button type="button" onClick={load} className="ui-btn-secondary">
-              <RefreshCw size={16} aria-hidden="true" /> Actualiser
-            </button>
-          </>
-        }
-      />
+          </li>
+          <li aria-hidden="true">/</li>
+          <li className="truncate font-medium text-ink" aria-current="page">{client.name}</li>
+        </ol>
+        <button type="button" onClick={load} className="ui-btn-ghost ui-btn-sm shrink-0" aria-label="Actualiser la fiche">
+          <RefreshCw size={15} aria-hidden="true" /> <span className="hidden sm:inline">Actualiser</span>
+        </button>
+      </nav>
 
-      <StatStrip
-        items={[
-          { key: 'machines', label: 'Équipements', value: machines.length, icon: Cpu, tone: 'brand', showShare: false },
-          { key: 'alerts', label: 'Équipements en alerte', value: machinesInAlert, icon: AlertTriangle, tone: machinesInAlert ? 'red' : 'slate', showShare: false, hint: 'Panne ou maintenance' },
-          { key: 'interventions', label: 'Interventions', value: interventions.length, icon: Wrench, tone: 'teal', showShare: false },
-          { key: 'open', label: 'Dossiers ouverts', value: openInterventions, icon: Clock, tone: 'amber', showShare: false, hint: lastIntervention ? `Dernière le ${fmtDate(lastIntervention)}` : 'Aucune intervention' },
-        ]}
-      />
+      <section aria-labelledby="client-title" className="overflow-hidden rounded-2xl border border-line bg-white">
+        <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:p-6">
+          <div className="flex min-w-0 flex-1 items-center gap-4">
+            <span className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-navy font-display text-lg font-bold text-white" aria-hidden="true">
+              {getInitials(client.name)}
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-ink-muted">Compte client</p>
+              <h1 id="client-title" className="mt-0.5 font-display text-xl font-bold text-ink text-balance sm:text-2xl">{client.name}</h1>
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
+                <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono font-semibold text-ink-soft">{client.code || `#${client.id}`}</span>
+                {client.type && <StatusBadge tone="slate" dot={false}>{client.type}</StatusBadge>}
+                {(client.city || client.zone) && (
+                  <span className="inline-flex items-center gap-1"><MapPin size={12} aria-hidden="true" /> {[client.city, client.zone && `Zone ${client.zone}`].filter(Boolean).join(' · ')}</span>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+            <a
+              href={client.phone ? `tel:${client.phone}` : undefined}
+              aria-disabled={!client.phone}
+              className={`ui-btn-secondary ${client.phone ? '' : 'pointer-events-none opacity-50'}`}
+            >
+              <Phone size={16} aria-hidden="true" /> Appeler
+            </a>
+            <a
+              href={client.email ? `mailto:${client.email}` : undefined}
+              aria-disabled={!client.email}
+              className={`ui-btn-primary ${client.email ? '' : 'pointer-events-none opacity-50'}`}
+            >
+              <Mail size={16} aria-hidden="true" /> Écrire
+            </a>
+          </div>
+        </div>
+        <dl className="grid grid-cols-2 divide-line border-t border-line bg-slate-50/60 sm:grid-cols-4 sm:divide-x">
+          {[
+            { label: 'Équipements', value: machines.length, icon: Cpu, tone: 'text-ink' },
+            { label: 'En alerte', value: machinesInAlert, icon: AlertTriangle, tone: machinesInAlert ? 'text-red-700' : 'text-ink' },
+            { label: 'Dossiers ouverts', value: openInterventions, icon: Clock, tone: openInterventions ? 'text-amber-700' : 'text-ink' },
+            { label: 'Dernière intervention', value: lastIntervention ? fmtDate(lastIntervention) : '—', icon: Wrench, tone: 'text-ink', small: true },
+          ].map(({ label, value, icon: KpiIcon, tone, small }) => (
+            <div key={label} className="flex flex-col gap-1 px-5 py-3.5 sm:px-6">
+              <dt className="flex items-center gap-1.5 text-xs font-medium text-ink-muted"><KpiIcon size={13} aria-hidden="true" /> {label}</dt>
+              <dd className={`font-display font-bold tabular-nums ${small ? 'text-base' : 'text-2xl'} ${tone}`}>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
 
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <SectionShell
+          className="lg:sticky lg:top-6 lg:order-last"
           icon={Building2}
-          title="Informations client"
-          description="Coordonnées et identifiants"
+          title="Coordonnées"
+          description="Identifiants et contacts du compte"
           actions={
             isEditingClient ? null : canEditClient ? (
               <button type="button" onClick={startClientEdit} className="ui-btn-secondary ui-btn-sm shrink-0">
@@ -750,22 +780,6 @@ export default function ClientDetails360() {
               <InfoCard icon={Mail} label="Email" value={client.email} />
               <InfoCard icon={Globe} label="Site web" value={client.web} />
               <InfoCard icon={MapPin} label="Adresse" value={[client.address, client.city].filter(Boolean).join(', ')} />
-              <div className="grid grid-cols-2 gap-2 border-t border-line pt-4">
-                <a
-                  href={client.phone ? `tel:${client.phone}` : undefined}
-                  aria-disabled={!client.phone}
-                  className={`ui-btn-secondary ui-btn-sm ${client.phone ? '' : 'pointer-events-none opacity-50'}`}
-                >
-                  <Phone size={14} aria-hidden="true" /> Appeler
-                </a>
-                <a
-                  href={client.email ? `mailto:${client.email}` : undefined}
-                  aria-disabled={!client.email}
-                  className={`ui-btn-secondary ui-btn-sm ${client.email ? '' : 'pointer-events-none opacity-50'}`}
-                >
-                  <Mail size={14} aria-hidden="true" /> Écrire
-                </a>
-              </div>
             </div>
           )}
         </SectionShell>
@@ -821,20 +835,20 @@ export default function ClientDetails360() {
 function ModalSection({ icon, title, children, accent = 'slate' }) {
   const SectionIcon = icon
   const accents = {
-    slate:   'bg-slate-50 text-slate-500',
-    blue:    'bg-blue-50 text-blue-600',
+    slate:   'bg-slate-50 text-ink-muted',
+    blue:    'bg-brand-50 text-brand-600',
     violet:  'bg-violet-50 text-violet-600',
     emerald: 'bg-emerald-50 text-emerald-600',
     amber:   'bg-amber-50 text-amber-600',
     rose:    'bg-rose-50 text-rose-600',
   }
   return (
-    <section className="bg-white border border-slate-100 rounded-2xl overflow-hidden">
-      <header className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+    <section className="bg-white border border-line rounded-2xl overflow-hidden">
+      <header className="px-4 py-3 border-b border-line flex items-center gap-2">
         <div className={`w-7 h-7 rounded-lg ${accents[accent]} flex items-center justify-center`}>
           <SectionIcon size={13} />
         </div>
-        <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">{title}</h3>
+        <h3 className="text-xs font-bold text-ink uppercase tracking-wider">{title}</h3>
       </header>
       <div className="p-4">{children}</div>
     </section>
@@ -845,21 +859,21 @@ function ModalField({ icon: Icon, label, value, mono = false, isUser = false }) 
   const empty = value === null || value === undefined || value === ''
   return (
     <div className="min-w-0">
-      <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.12em] flex items-center gap-1.5">
+      <p className="text-[10px] font-bold text-ink-muted uppercase tracking-wider flex items-center gap-1.5">
         {Icon && <Icon size={10} />}
         {label}
       </p>
       {empty ? (
-        <p className="text-sm text-slate-300 italic mt-1">Non renseigné</p>
+        <p className="text-sm text-ink-faint italic mt-1">Non renseigné</p>
       ) : isUser ? (
         <div className="flex items-center gap-2 mt-1.5">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-violet-700 text-white flex items-center justify-center text-[11px] font-black">
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-violet-700 text-white flex items-center justify-center text-[11px] font-bold">
             {getInitials(value)}
           </div>
-          <span className="text-sm font-semibold text-slate-800 truncate">{value}</span>
+          <span className="text-sm font-semibold text-ink truncate">{value}</span>
         </div>
       ) : (
-        <p className={`text-sm text-slate-800 mt-1 ${mono ? 'font-mono' : 'font-medium'} leading-snug whitespace-pre-wrap break-words`}>
+        <p className={`text-sm text-ink mt-1 ${mono ? 'font-mono' : 'font-medium'} leading-snug whitespace-pre-wrap break-words`}>
           {value}
         </p>
       )}
@@ -910,7 +924,7 @@ function InterventionDetailsModal({ intervention, clientName, onClose }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative mt-0 w-full max-w-3xl max-h-[92vh] bg-slate-50 rounded-3xl shadow-2xl flex flex-col overflow-hidden"
+        className="relative mt-0 w-full max-w-3xl max-h-[92vh] bg-slate-50 rounded-3xl shadow-modal flex flex-col overflow-hidden"
         style={{ marginTop: 0 }}
       >
         {/* Header dégradé */}
@@ -923,10 +937,10 @@ function InterventionDetailsModal({ intervention, clientName, onClose }) {
             <X size={18} />
           </button>
 
-          <p className="text-[10px] font-bold text-white/80 uppercase tracking-[0.18em]">
+          <p className="text-[10px] font-bold text-white/80 uppercase tracking-wider">
             Détail intervention SAV
           </p>
-          <h2 id="intervention-modal-title" className="text-xl sm:text-2xl font-black mt-1 font-mono drop-shadow-sm pr-12">
+          <h2 id="intervention-modal-title" className="text-xl sm:text-2xl font-bold mt-1 font-mono drop-shadow-sm pr-12">
             {intervention.id}
           </h2>
 
@@ -994,14 +1008,14 @@ function InterventionDetailsModal({ intervention, clientName, onClose }) {
                 {partsList.map((p, idx) => (
                   <li key={p.id ?? idx} className="py-2.5 flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-slate-800 truncate">
+                      <p className="text-sm font-semibold text-ink truncate">
                         {p.designation || p.reference || 'Pièce'}
                       </p>
                       {p.reference && (
-                        <p className="text-[11px] text-slate-400 font-mono truncate">{p.reference}</p>
+                        <p className="text-[11px] text-ink-faint font-mono truncate">{p.reference}</p>
                       )}
                     </div>
-                    <span className="text-xs font-bold text-slate-700 bg-amber-50 border border-amber-100 px-2 py-1 rounded-md shrink-0">
+                    <span className="text-xs font-bold text-ink-muted bg-amber-50 border border-amber-100 px-2 py-1 rounded-md shrink-0">
                       × {p.quantity ?? 1}
                     </span>
                   </li>
@@ -1031,16 +1045,16 @@ function InterventionDetailsModal({ intervention, clientName, onClose }) {
           <ModalSection icon={TrendingUp} title="Statut & progression" accent="emerald">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-3">
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.12em]">Statut actuel</p>
+                <p className="text-[10px] font-bold text-ink-faint uppercase tracking-wider">Statut actuel</p>
                 <span className={`inline-flex items-center gap-1.5 mt-1.5 px-2.5 py-1 rounded-full border text-[11px] font-bold ${preset.cls}`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${preset.dot}`} />
                   {preset.label}
                 </span>
               </div>
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.12em]">Priorité</p>
-                <p className="text-sm font-semibold text-slate-800 mt-1 capitalize">
-                  {intervention.priority || <span className="text-slate-300 italic font-normal">Non renseigné</span>}
+                <p className="text-[10px] font-bold text-ink-faint uppercase tracking-wider">Priorité</p>
+                <p className="text-sm font-semibold text-ink mt-1 capitalize">
+                  {intervention.priority || <span className="text-ink-faint italic font-normal">Non renseigné</span>}
                 </p>
               </div>
             </div>
@@ -1048,8 +1062,8 @@ function InterventionDetailsModal({ intervention, clientName, onClose }) {
             {completedSections > 0 && (
               <div className="mt-4">
                 <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.12em]">Progression</p>
-                  <span className="text-xs font-bold text-slate-700">
+                  <p className="text-[10px] font-bold text-ink-faint uppercase tracking-wider">Progression</p>
+                  <span className="text-xs font-bold text-ink-muted">
                     {completedSections}/{totalSections} sections — {progressPct}%
                   </span>
                 </div>
@@ -1065,10 +1079,10 @@ function InterventionDetailsModal({ intervention, clientName, onClose }) {
         </div>
 
         {/* Footer actions */}
-        <div className="px-4 sm:px-6 py-3 border-t border-slate-200 bg-white flex items-center justify-end">
+        <div className="px-4 sm:px-6 py-3 border-t border-line bg-white flex items-center justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-semibold text-ink-muted bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
           >
             Fermer
           </button>

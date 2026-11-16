@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Clock, History, Pencil, Trash2, UserCog, Users, AlertTriangle, Mail, Building2 } from 'lucide-react'
-import { apiFetch } from '../../api/apiClient'
+import { apiFetch, readApiErrorMessage } from '../../api/apiClient'
 import Modal from '../ui/Modal'
 import StatusBadge from '../ui/StatusBadge'
 import { EmptyState, InlineAlert, SkeletonTableRows } from '../ui/Feedback'
@@ -14,22 +14,26 @@ function getRoleColorKey(role) {
   return 'gray'
 }
 
-function RowActions({ user, onHistory, onEdit, onDelete, compact = false }) {
+function RowActions({ user, onHistory, onEdit, onDelete, canManage, compact = false }) {
   const base = 'inline-flex h-9 items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-colors'
   return (
-    <div className={compact ? 'grid grid-cols-3 gap-2' : 'flex items-center justify-end gap-1'}>
+    <div className={compact ? `grid ${canManage ? 'grid-cols-3' : 'grid-cols-1'} gap-2` : 'flex items-center justify-end gap-1'}>
       <button type="button" onClick={onHistory} className={`${base} ${compact ? 'bg-slate-100 text-ink hover:bg-slate-200' : 'w-9 text-ink-muted hover:bg-slate-100 hover:text-ink'}`} aria-label={`Historique de ${user.name}`} title="Historique">
         <History size={15} aria-hidden="true" />
         {compact && 'Historique'}
       </button>
-      <button type="button" onClick={onEdit} className={`${base} ${compact ? 'bg-brand-50 text-brand-700 hover:bg-brand-100' : 'w-9 text-ink-muted hover:bg-brand-50 hover:text-brand-700'}`} aria-label={`Modifier ${user.name}`} title="Modifier">
-        <Pencil size={15} aria-hidden="true" />
-        {compact && 'Modifier'}
-      </button>
-      <button type="button" onClick={onDelete} className={`${base} ${compact ? 'bg-red-50 text-red-700 hover:bg-red-100' : 'w-9 text-ink-muted hover:bg-red-50 hover:text-red-600'}`} aria-label={`Supprimer ${user.name}`} title="Supprimer">
-        <Trash2 size={15} aria-hidden="true" />
-        {compact && 'Supprimer'}
-      </button>
+      {canManage && (
+        <button type="button" onClick={onEdit} className={`${base} ${compact ? 'bg-brand-50 text-brand-700 hover:bg-brand-100' : 'w-9 text-ink-muted hover:bg-brand-50 hover:text-brand-700'}`} aria-label={`Modifier ${user.name}`} title="Modifier">
+          <Pencil size={15} aria-hidden="true" />
+          {compact && 'Modifier'}
+        </button>
+      )}
+      {canManage && (
+        <button type="button" onClick={onDelete} className={`${base} ${compact ? 'bg-red-50 text-red-700 hover:bg-red-100' : 'w-9 text-ink-muted hover:bg-red-50 hover:text-red-600'}`} aria-label={`Supprimer ${user.name}`} title="Supprimer">
+          <Trash2 size={15} aria-hidden="true" />
+          {compact && 'Supprimer'}
+        </button>
+      )}
     </div>
   )
 }
@@ -124,11 +128,12 @@ export default function UserTable({ users, isLoading, currentUser, onUsersChange
       })
 
       if (!response.ok) {
-        setActionError(
+        setActionError(await readApiErrorMessage(
+          response,
           response.status === 403
             ? "Vous n'avez pas l'autorisation de modifier cet utilisateur."
             : "Impossible de modifier l'utilisateur. Réessayez plus tard.",
-        )
+        ))
         return
       }
 
@@ -199,11 +204,12 @@ export default function UserTable({ users, isLoading, currentUser, onUsersChange
     try {
       const response = await apiFetch(`/users/${selectedUser.id}`, { method: 'DELETE', auth: true })
       if (!response.ok) {
-        setActionError(
+        setActionError(await readApiErrorMessage(
+          response,
           response.status === 403
             ? "Vous n'avez pas l'autorisation de supprimer cet utilisateur."
             : "Impossible de supprimer l'utilisateur. Réessayez plus tard.",
-        )
+        ))
         return
       }
 
@@ -257,6 +263,7 @@ export default function UserTable({ users, isLoading, currentUser, onUsersChange
               <RowActions
                 compact
                 user={user}
+                canManage={isAdmin}
                 onHistory={() => navigate(`/users/${user.id}/details`)}
                 onEdit={() => handleOpenEdit(user)}
                 onDelete={() => handleOpenDelete(user)}
@@ -312,6 +319,7 @@ export default function UserTable({ users, isLoading, currentUser, onUsersChange
                   <td className="px-5 py-3.5">
                     <RowActions
                       user={user}
+                      canManage={isAdmin}
                       onHistory={() => navigate(`/users/${user.id}/details`)}
                       onEdit={() => handleOpenEdit(user)}
                       onDelete={() => handleOpenDelete(user)}

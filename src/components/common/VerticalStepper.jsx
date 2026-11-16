@@ -1,8 +1,7 @@
-import StepIcon from './StepIcon'
+import { Check } from 'lucide-react'
 
 /**
  * Vertical stepper sidebar used on desktop.
- * Renders steps vertically with connecting lines and descriptions.
  *
  * @param {object} props
  * @param {Array<{id: number, title: string, description: string, icon: import('lucide-react').LucideIcon}>} props.steps
@@ -10,44 +9,60 @@ import StepIcon from './StepIcon'
  * @param {boolean} [props.hidden=false] - If true, the sidebar is hidden (e.g. when zoom forces horizontal layout)
  */
 export default function VerticalStepper({ steps, currentStep, hidden = false }) {
-  const containerClass = hidden
-    ? 'hidden'
-    : 'hidden lg:flex w-[320px] border-r border-slate-50 bg-slate-50/30 flex-col p-8 shrink-0 min-w-0'
+  if (hidden) return null
+
+  const currentIndex = Math.max(0, steps.findIndex((s) => s.id === currentStep))
+  const progress = steps.length > 1 ? (currentIndex / (steps.length - 1)) * 100 : 100
 
   return (
-    <div className={containerClass}>
-      <div className="space-y-2 mb-12">
-        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Progression</h4>
-        <div className="h-1 w-12 bg-brand-600 rounded-full"></div>
+    <aside className="hidden w-[288px] shrink-0 flex-col gap-8 border-r border-line bg-white px-6 py-7 lg:flex" aria-label="Progression">
+      <div className="flex flex-col gap-3">
+        <div className="flex items-baseline justify-between">
+          <p className="ui-eyebrow">Progression</p>
+          <p className="text-xs font-medium text-ink-muted tabular-nums">
+            Étape <span className="font-semibold text-ink">{currentIndex + 1}</span> sur {steps.length}
+          </p>
+        </div>
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+          <div className="h-full rounded-full bg-brand-600 transition-all duration-500" style={{ width: `${progress}%` }} />
+        </div>
       </div>
 
-      <div className="space-y-1">
-        {steps.map((step) => {
+      <ol className="flex flex-col">
+        {steps.map((step, idx) => {
           const isActive = currentStep === step.id
           const isCompleted = currentStep > step.id
+          const Icon = step.icon
           return (
-            <div key={step.id} className="relative pb-10 last:pb-0">
-              {step.id !== steps.length && (
-                <div className={`absolute left-6 top-14 bottom-0 w-0.5 rounded-full ${isCompleted ? 'bg-brand-600' : 'bg-slate-100'}`} />
+            <li key={step.id} className="relative flex gap-4 pb-7 last:pb-0" aria-current={isActive ? 'step' : undefined}>
+              {idx < steps.length - 1 && (
+                <span
+                  className={`absolute left-[19px] top-11 bottom-1 w-0.5 rounded-full transition-colors ${isCompleted ? 'bg-brand-600' : 'bg-line'}`}
+                  aria-hidden="true"
+                />
               )}
-              <div className="flex items-start gap-5 group cursor-default">
-                <StepIcon icon={step.icon} isActive={isActive} isCompleted={isCompleted} size="lg" />
-                <div className="pt-1">
-                  <p className={`text-[10px] font-black uppercase tracking-widest leading-none mb-1 transition-colors ${isActive ? 'text-brand-600' : 'text-slate-300'}`}>
-                    Étape 0{step.id}
-                  </p>
-                  <p className={`text-base font-black tracking-tight transition-colors ${isActive ? 'text-slate-900' : 'text-slate-400'}`}>
-                    {step.title}
-                  </p>
-                  <p className={`text-[11px] font-bold mt-0.5 transition-colors ${isActive ? 'text-slate-500' : 'text-slate-300'}`}>
-                    {step.description}
-                  </p>
-                </div>
+              <span
+                className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-all
+                  ${isCompleted ? 'bg-brand-600 text-white' : ''}
+                  ${isActive ? 'bg-navy text-white shadow-raised ring-4 ring-brand-100' : ''}
+                  ${!isActive && !isCompleted ? 'bg-slate-50 text-ink-faint ring-1 ring-inset ring-line' : ''}`}
+              >
+                {isCompleted ? <Check size={17} strokeWidth={2.5} aria-hidden="true" /> : Icon ? <Icon size={17} aria-hidden="true" /> : step.id}
+              </span>
+              <div className="min-w-0 pt-0.5">
+                <p className={`text-[11px] font-semibold uppercase tracking-wider ${isActive ? 'text-brand-600' : 'text-ink-faint'}`}>
+                  Étape {idx + 1}
+                </p>
+                <p className={`truncate text-sm font-semibold ${isActive || isCompleted ? 'text-ink' : 'text-ink-muted'}`}>{step.title}</p>
+                {step.description && (
+                  <p className="mt-0.5 truncate text-xs text-ink-muted">{step.description}</p>
+                )}
               </div>
-            </div>
+              {isCompleted && <span className="sr-only">(terminée)</span>}
+            </li>
           )
         })}
-      </div>
-    </div>
+      </ol>
+    </aside>
   )
 }

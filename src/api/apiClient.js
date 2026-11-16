@@ -1,3 +1,5 @@
+import { responseCache } from './responseCache'
+
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
 export function getAuthToken() {
@@ -32,6 +34,7 @@ export function isAuthTokenUsable(token) {
 }
 
 function clearStoredAuth() {
+  responseCache.clear()
   if (typeof window === 'undefined') return
   try {
     window.localStorage.removeItem('auth_token')
@@ -107,6 +110,22 @@ function createTimeoutSignal(signal, timeoutMs) {
 }
 
 export async function apiFetch(path, options = {}) {
+  const { noCache = false, ...fetchOptions } = options
+  const method = String(fetchOptions.method || 'GET').toUpperCase()
+
+  if (method === 'GET' && fetchOptions.auth !== false && !noCache) {
+    const token = getAuthToken()?.trim() || null
+    return responseCache.get(path, token, () => rawApiFetch(path, fetchOptions))
+  }
+
+  const response = await rawApiFetch(path, fetchOptions)
+  if (method !== 'GET' && response.ok) {
+    responseCache.invalidateForMutation(path)
+  }
+  return response
+}
+
+async function rawApiFetch(path, options = {}) {
   const {
     method = 'GET',
     headers = {},
@@ -150,10 +169,30 @@ export async function apiFetch(path, options = {}) {
   }
 }
 
+export async function readApiErrorMessage(response, fallback = 'Une erreur est survenue.') {
+  try {
+    const payload = await response.clone().json()
+    const rawMessage = payload?.message
+    if (Array.isArray(rawMessage)) {
+      const messages = rawMessage.filter((message) => typeof message === 'string' && message.trim())
+      if (messages.length > 0) return messages.join(' ')
+    }
+    if (typeof rawMessage === 'string' && rawMessage.trim()) return rawMessage
+  } catch {
+    // Some error responses intentionally have no JSON body.
+  }
+
+  return fallback
+}
+
 export async function logoutSession() {
   try {
     await apiFetch('/auth/logout', { method: 'POST', auth: true })
   } catch {
     // Local cleanup is handled by the caller even if API logout fails.
+  } finally {
+    responseCache.clear()
   }
 }
+
+export { responseCache }

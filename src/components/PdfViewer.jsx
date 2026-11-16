@@ -1,4 +1,4 @@
-﻿import { useState, useCallback, useEffect } from 'react'
+﻿import { useState, useCallback } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
@@ -53,17 +53,17 @@ export default function PdfViewer({ url, name, onClose, embedded = false }) {
     }
   }, [])
 
-  const resetViewerState = useCallback(() => {
+  // Reset during render when the document changes (React's "adjust state on prop change" pattern)
+  // instead of an effect, so the previous PDF's outline/page never renders against the new one.
+  const [viewerUrl, setViewerUrl] = useState(url)
+  if (viewerUrl !== url) {
+    setViewerUrl(url)
     setShowOutline(false)
     setHasOutline(false)
     setOutlineItems([])
     setPdfInstance(null)
     setPageNumber(1)
-  }, [])
-
-  useEffect(() => {
-    resetViewerState()
-  }, [resetViewerState, url])
+  }
 
   const onOutlineItemClick = useCallback(async (item) => {
     if (!pdfInstance || !item?.dest) return

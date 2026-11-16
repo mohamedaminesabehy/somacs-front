@@ -47,8 +47,11 @@ export async function fetchNotificationCenter({
   dateFrom = '',
   dateTo = '',
   order = 'DESC',
+  type = '',
+  strict = false,
 } = {}) {
   const params = new URLSearchParams()
+  if (type) params.set('type', type)
   params.set('page', String(page))
   params.set('limit', String(limit))
   if (search) params.set('search', search)
@@ -63,6 +66,7 @@ export async function fetchNotificationCenter({
     auth: true,
   })
   if (!res.ok) {
+    if (strict) throw new Error(`Chargement des notifications impossible (HTTP ${res.status})`)
     return { data: [], total: 0, page, limit, totalPages: 1 }
   }
   const json = await res.json().catch(() => null)

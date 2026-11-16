@@ -8,10 +8,10 @@ export const INTERVENTION_STATUS_TO_SECTION = {
 
 export const INTERVENTION_STATUS_CONFIG = {
   PENDING: { label: 'En attente', color: 'bg-amber-50 text-amber-700 border border-amber-200', dot: 'bg-amber-500' },
-  ASSIGNED: { label: 'AffectÃ©e', color: 'bg-blue-50 text-blue-700 border border-blue-200', dot: 'bg-blue-500' },
+  ASSIGNED: { label: 'Affectée', color: 'bg-blue-50 text-blue-700 border border-blue-200', dot: 'bg-blue-500' },
   IN_PROGRESS: { label: 'En cours', color: 'bg-orange-50 text-orange-700 border border-orange-200', dot: 'bg-orange-500' },
   TESTING: { label: 'En test', color: 'bg-purple-50 text-purple-700 border border-purple-200', dot: 'bg-purple-500' },
-  CLOSED: { label: 'ClÃ´turÃ©', color: 'bg-green-50 text-green-700 border border-green-200', dot: 'bg-green-500' },
+  CLOSED: { label: 'Clôturé', color: 'bg-green-50 text-green-700 border border-green-200', dot: 'bg-green-500' },
 }
 
 export const INTERVENTION_STATUS_BADGE = Object.fromEntries(

@@ -73,22 +73,30 @@ export function useMissionStatusActions({
         body: { status, notes },
         auth: true,
       })
-      if (response.ok) {
-        const fullRes = await apiFetch(`/missions/${mission.id}`, { auth: true, cache: 'no-store' })
-        if (fullRes.ok) {
-          const full = await fullRes.json().catch(() => null)
-          if (full) {
-            setMission((prev) => (prev ? { ...prev, ...full } : full))
-            setStatus(full?.status || status)
-            setGroupedEmployeesDisplay(buildGroupedEmployeesDisplay(full))
-            try { window.dispatchEvent(new CustomEvent('mission:updated', { detail: full })) } catch { /* best-effort */ }
-          }
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const message = Array.isArray(errorData.message) ? errorData.message.join(', ') : errorData.message
+        setMissionActionError(message || `Enregistrement refusé (HTTP ${response.status}).`)
+        return
+      }
+      const fullRes = await apiFetch(`/missions/${mission.id}`, { auth: true, cache: 'no-store' })
+      if (fullRes.ok) {
+        const full = await fullRes.json().catch(() => null)
+        if (full) {
+          setMission((prev) => (prev ? { ...prev, ...full } : full))
+          setStatus(full?.status || status)
+          setGroupedEmployeesDisplay(buildGroupedEmployeesDisplay(full))
+          try { window.dispatchEvent(new CustomEvent('mission:updated', { detail: full })) } catch { /* best-effort */ }
         }
       }
+      setMissionActionError('')
       setShowSaveToast(true)
       setTimeout(() => setShowSaveToast(false), 3000)
-    } catch { /* preserve current view */ }
-    setIsSaving(false)
+    } catch {
+      setMissionActionError('Impossible de joindre le serveur. Modifications non enregistrées.')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return {

@@ -1,163 +1,97 @@
-import { Clock, AlertCircle, Wrench, PhoneCall } from 'lucide-react'
+import { Clock, AlertTriangle, Wrench, PhoneCall, FlaskConical, CheckCircle2, XCircle, Timer } from 'lucide-react'
+import { FieldGroup, FormField, InterventionTypePicker } from '../components/interventionUi'
 
 export default function SectionDiagnostic({ interventionData, handleChange, setInterventionData }) {
+  const problem = interventionData.problemDescription || ''
   return (
-    <div className="space-y-6 sm:space-y-10 animate-in fade-in zoom-in-95 duration-500">
-      <div className="pb-4 sm:pb-6 border-b-2 border-slate-100">
-        <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-1 sm:mb-2 flex items-center gap-2 sm:gap-3">
-          <AlertCircle className="text-blue-600" size={24} />
-          D&eacute;tail de l&apos;Intervention
-        </h2>
-        <p className="text-xs sm:text-sm text-slate-500 font-medium">Diagnostic, rapport d&apos;expertise et d&eacute;tail des travaux effectu&eacute;s</p>
+    <div className="flex flex-col gap-7">
+      <InterventionTypePicker value={interventionData.interventionType} onChange={handleChange} compact />
+
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <FieldGroup title="Constat" icon={AlertTriangle} columns={1}>
+          <FormField label="Type de panne" htmlFor="diag-problem" counter={`${problem.length} car.`}>
+            <textarea id="diag-problem" name="problemDescription" value={problem} onChange={handleChange}
+              placeholder="Décrivez précisément la panne constatée…"
+              className="ui-textarea min-h-28 w-full resize-y leading-relaxed" />
+          </FormField>
+          <FormField label="Diagnostic téléphonique" htmlFor="diag-phone" icon={PhoneCall}>
+            <textarea id="diag-phone" name="telephoneDiagnostic" value={interventionData.telephoneDiagnostic || ''} onChange={handleChange}
+              placeholder="Résumé du diagnostic réalisé à distance…"
+              className="ui-textarea min-h-28 w-full resize-y pl-10 leading-relaxed" />
+          </FormField>
+        </FieldGroup>
+
+        <FieldGroup title="Solution" icon={Wrench} columns={1}>
+          <FormField label="Solution d'intervention" htmlFor="diag-solution" hint="Actions correctives réalisées sur l’équipement.">
+            <textarea id="diag-solution" name="interventionDetail" value={interventionData.interventionDetail || ''} onChange={handleChange}
+              placeholder="Remplacement, réglage, mise à jour…"
+              className="ui-textarea min-h-[15.5rem] w-full resize-y leading-relaxed" />
+          </FormField>
+        </FieldGroup>
       </div>
 
-      <div className="space-y-6 sm:space-y-8">
-        <InterventionTypeField interventionData={interventionData} handleChange={handleChange} />
-        <ProblemDescriptionField interventionData={interventionData} handleChange={handleChange} />
-        <PhoneDiagnosticField interventionData={interventionData} handleChange={handleChange} />
-        <SolutionField interventionData={interventionData} handleChange={handleChange} />
-        <TestResultFields interventionData={interventionData} handleChange={handleChange} setInterventionData={setInterventionData} />
-        <TimeFields interventionData={interventionData} handleChange={handleChange} />
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <TestResultPanel interventionData={interventionData} handleChange={handleChange} setInterventionData={setInterventionData} />
+        <TimePanel interventionData={interventionData} handleChange={handleChange} />
       </div>
     </div>
   )
 }
 
-function InterventionTypeField({ interventionData, handleChange }) {
-  return (
-    <div className="space-y-2 sm:space-y-3 group">
-      <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-blue-600 transition-colors">
-        <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
-        Type d&apos;Intervention
-      </label>
-      <select name="interventionType" value={interventionData.interventionType} onChange={handleChange}
-        className="w-full px-4 py-3 sm:py-4 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all font-bold text-sm sm:text-base text-blue-700 appearance-none cursor-pointer shadow-sm hover:border-slate-300"
-        style={{ backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")", backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em' }}
-      >
-        <option value="Réparation">{'🔧'} Réparation</option>
-        <option value="Installation">{'⚡'} Installation</option>
-        <option value="Garantie">{'🛡️'} Sous Garantie</option>
-        <option value="Devis">{'📄'} Établissement Devis</option>
-        <option value="Formation">{'🎓'} Formation</option>
-        <option value="Livraison">{'📦'} Livraison</option>
-      </select>
-    </div>
+function TestResultPanel({ interventionData, handleChange, setInterventionData }) {
+  const value = interventionData.essaiConcluant
+  const option = (val, label, Icon, activeClass) => (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={value === val}
+      onClick={() => setInterventionData((prev) => ({ ...prev, essaiConcluant: val }))}
+      className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-600/15 ${value === val ? activeClass : 'border-line bg-white text-ink-muted hover:bg-slate-50'}`}
+    >
+      <Icon size={16} aria-hidden="true" /> {label}
+    </button>
   )
-}
-
-function ProblemDescriptionField({ interventionData, handleChange }) {
   return (
-    <div className="space-y-2 sm:space-y-3 group">
-      <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-blue-600 transition-colors">
-        <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
-        Type de panne
-      </label>
-      <div className="relative">
-        <textarea name="problemDescription" value={interventionData.problemDescription} onChange={handleChange}
-          placeholder="Décrivez précisément le type de panne constaté..."
-          className="w-full px-4 py-3 sm:py-4 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-medium h-24 sm:h-28 resize-none leading-relaxed shadow-sm hover:border-slate-300" />
-        <div className="absolute bottom-3 right-3 text-[10px] text-slate-400 font-semibold">
-          {interventionData.problemDescription.length} caractères
+    <div className="flex flex-col gap-4 rounded-2xl border border-line bg-slate-50/50 p-4">
+      <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-ink-faint">
+        <FlaskConical size={13} className="text-brand-600" aria-hidden="true" /> Essais
+      </p>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[8rem_1fr]">
+        <FormField label="Nombre d'essais" htmlFor="diag-essai">
+          <input id="diag-essai" type="number" name="numEssai" value={interventionData.numEssai ?? ''} onChange={handleChange} min="0" step="1" className="ui-input w-full font-semibold tabular-nums" />
+        </FormField>
+        <div className="flex flex-col gap-1.5">
+          <p id="diag-concluant" className="text-xs font-semibold text-ink-soft">Essai concluant</p>
+          <div role="radiogroup" aria-labelledby="diag-concluant" className="flex gap-2">
+            {option(true, 'Oui', CheckCircle2, 'border-teal-300 bg-teal-50 text-teal-800')}
+            {option(false, 'Non', XCircle, 'border-red-300 bg-red-50 text-red-700')}
+          </div>
         </div>
       </div>
     </div>
   )
 }
 
-function PhoneDiagnosticField({ interventionData, handleChange }) {
+function TimePanel({ interventionData, handleChange }) {
   return (
-    <div className="space-y-2 sm:space-y-3 group">
-      <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-blue-600 transition-colors">
-        <PhoneCall size={12} className="text-blue-600" />
-        Diagnostic Téléphonique
-      </label>
-      <textarea name="telephoneDiagnostic" value={interventionData.telephoneDiagnostic} onChange={handleChange}
-        placeholder="Résumé du diagnostic réalisé par téléphone avant l'intervention sur site..."
-        className="w-full px-4 py-3 sm:py-4 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-medium h-28 sm:h-32 resize-none leading-relaxed shadow-sm hover:border-slate-300" />
-    </div>
-  )
-}
-
-function SolutionField({ interventionData, handleChange }) {
-  return (
-    <div className="space-y-2 sm:space-y-3 group">
-      <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-blue-600 transition-colors">
-        <Wrench size={12} className="text-blue-600" />
-        Solution d&apos;intervention
-      </label>
-      <textarea name="interventionDetail" value={interventionData.interventionDetail} onChange={handleChange}
-        placeholder="Décrivez précisément les actions correctives réalisées sur l'équipement..."
-        className="w-full px-4 py-3 sm:py-4 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-medium min-h-[140px] sm:min-h-[160px] resize-none leading-relaxed shadow-sm hover:border-slate-300" />
-    </div>
-  )
-}
-
-function TestResultFields({ interventionData, handleChange, setInterventionData }) {
-  const ouiClass = interventionData.essaiConcluant === true
-    ? 'bg-green-50 border-green-500 text-green-700 shadow-sm'
-    : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'
-  const nonClass = interventionData.essaiConcluant === false
-    ? 'bg-red-50 border-red-500 text-red-700 shadow-sm'
-    : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'
-
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-      <div className="space-y-2 sm:space-y-3 group">
-        <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-blue-600 transition-colors">
-          <span className="w-1.5 h-1.5 bg-slate-300 rounded-full"></span>
-          Nombre d&apos;Essai
-        </label>
-        <input type="number" name="numEssai" value={interventionData.numEssai} onChange={handleChange} min="0" step="1"
-          className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-bold shadow-sm hover:border-slate-300" />
-      </div>
-      <div className="space-y-2 sm:space-y-3">
-        <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2">
-          <span className="w-1.5 h-1.5 bg-slate-300 rounded-full"></span>
-          Essai Concluant
-        </label>
-        <div className="flex gap-2 sm:gap-3">
-          <button type="button"
-            onClick={() => setInterventionData(prev => ({ ...prev, essaiConcluant: true }))}
-            className={`flex-1 py-3 sm:py-3.5 rounded-xl font-black text-[11px] sm:text-sm uppercase tracking-wider transition-all border-2 ${ouiClass}`}>
-            ✓ Oui
-          </button>
-          <button type="button"
-            onClick={() => setInterventionData(prev => ({ ...prev, essaiConcluant: false }))}
-            className={`flex-1 py-3 sm:py-3.5 rounded-xl font-black text-[11px] sm:text-sm uppercase tracking-wider transition-all border-2 ${nonClass}`}>
-            ✕ Non
-          </button>
+    <div className="flex flex-col gap-4 rounded-2xl border border-line bg-slate-50/50 p-4">
+      <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-ink-faint">
+        <Clock size={13} className="text-brand-600" aria-hidden="true" /> Durée sur site
+      </p>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <FormField label="Entrée" htmlFor="diag-start">
+          <input id="diag-start" type="time" name="startTime" value={interventionData.startTime || ''} onChange={handleChange} className="ui-input w-full tabular-nums" />
+        </FormField>
+        <FormField label="Sortie" htmlFor="diag-end">
+          <input id="diag-end" type="time" name="endTime" value={interventionData.endTime || ''} onChange={handleChange} className="ui-input w-full tabular-nums" />
+        </FormField>
+        <div className="col-span-2 flex flex-col gap-1.5 sm:col-span-1">
+          <span className="text-xs font-semibold text-ink-soft">Total calculé</span>
+          <output name="totalTime" className="flex h-11 items-center gap-2 rounded-xl bg-navy px-3 font-display text-base font-bold text-white tabular-nums">
+            <Timer size={15} className="text-brand-300" aria-hidden="true" />
+            {interventionData.totalTime || '—'}
+          </output>
         </div>
-      </div>
-    </div>
-  )
-}
-
-function TimeFields({ interventionData, handleChange }) {
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-      <div className="space-y-2 sm:space-y-3 group">
-        <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-green-600 transition-colors">
-          <Clock size={12} className="text-green-600" />
-          Entrée
-        </label>
-        <input type="time" name="startTime" value={interventionData.startTime} onChange={handleChange}
-          className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-green-600 focus:ring-4 focus:ring-green-600/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-bold shadow-sm hover:border-slate-300" />
-      </div>
-      <div className="space-y-2 sm:space-y-3 group">
-        <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-green-600 transition-colors">
-          <Clock size={12} className="text-green-600" />
-          Sortie
-        </label>
-        <input type="time" name="endTime" value={interventionData.endTime} onChange={handleChange}
-          className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-green-600 focus:ring-4 focus:ring-green-600/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-bold shadow-sm hover:border-slate-300" />
-      </div>
-      <div className="space-y-2 sm:space-y-3 group">
-        <label className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2 group-focus-within:text-green-600 transition-colors">
-          <Clock size={12} className="text-green-600" />
-          Total
-        </label>
-        <input type="text" name="totalTime" value={interventionData.totalTime} readOnly
-          className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-green-600 focus:ring-4 focus:ring-green-600/10 outline-none transition-all text-sm sm:text-base text-slate-800 font-bold shadow-sm hover:border-slate-300" />
       </div>
     </div>
   )

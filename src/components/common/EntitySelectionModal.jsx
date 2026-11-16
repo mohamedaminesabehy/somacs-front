@@ -15,13 +15,13 @@ import {
 const getPrimaryColorClasses = (color) => {
   const classes = {
     blue: {
-      bg: 'bg-blue-600',
-      bgHover: 'hover:bg-blue-700',
-      bgLight: 'bg-blue-50',
-      text: 'text-blue-600',
-      textHover: 'hover:text-blue-600',
-      borderFocus: 'focus:border-blue-500',
-      shadow: 'shadow-blue-100'
+      bg: 'bg-brand-600',
+      bgHover: 'hover:bg-brand-700',
+      bgLight: 'bg-brand-50',
+      text: 'text-brand-600',
+      textHover: 'hover:text-brand-600',
+      borderFocus: 'focus:border-brand-500',
+      shadow: 'shadow-brand-100'
     },
     green: {
       bg: 'bg-green-600',
@@ -67,7 +67,7 @@ function SearchBar({ searchQuery, setSearchQuery, primaryColor, placeholder = 'R
   const colorClasses = getPrimaryColorClasses(primaryColor)
   return (
     <div className="relative flex-1">
-      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-faint" size={18} />
       <input
         type="text"
         placeholder={placeholder}
@@ -82,10 +82,10 @@ function SearchBar({ searchQuery, setSearchQuery, primaryColor, placeholder = 'R
 function EmptyState({ emptyMessage }) {
   return (
     <div className="flex flex-col items-center gap-3">
-      <div className="w-12 h-12 sm:w-16 sm:h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">
+      <div className="w-12 h-12 sm:w-16 sm:h-16 bg-slate-50 rounded-full flex items-center justify-center text-ink-faint">
         <Search size={24} className="sm:w-8 sm:h-8" />
       </div>
-      <p className="text-slate-400 font-bold text-xs sm:text-sm">{emptyMessage}</p>
+      <p className="text-ink-faint font-bold text-xs sm:text-sm">{emptyMessage}</p>
     </div>
   )
 }
@@ -106,14 +106,14 @@ function Pagination({
 
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-2">
-      <p className="text-[10px] sm:text-xs font-bold text-slate-400 order-2 sm:order-1">
-        Affichage de <span className="text-slate-900">{startIndex + 1}</span> à <span className="text-slate-900">{Math.min(startIndex + itemsPerPage, totalItems)}</span> sur <span className="text-slate-900">{totalItems}</span> {entityName}s
+      <p className="text-[10px] sm:text-xs font-bold text-ink-faint order-2 sm:order-1">
+        Affichage de <span className="text-ink">{startIndex + 1}</span> à <span className="text-ink">{Math.min(startIndex + itemsPerPage, totalItems)}</span> sur <span className="text-ink">{totalItems}</span> {entityName}s
       </p>
       <div className="flex items-center gap-1.5 sm:gap-2 order-1 sm:order-2">
         <button
           onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
           disabled={currentPage === 1}
-          className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center bg-white border border-slate-200 rounded-lg sm:rounded-xl text-slate-400 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center bg-white border border-line rounded-lg sm:rounded-xl text-ink-faint hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
           <ChevronLeft size={16} className="sm:w-5 sm:h-5" />
         </button>
@@ -121,7 +121,7 @@ function Pagination({
           <button
             key={i}
             onClick={() => setCurrentPage(i + 1)}
-            className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-black transition-all ${currentPage === i + 1 ? `${colorClasses.bg} text-white shadow-lg ${colorClasses.shadow}` : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-50'}`}
+            className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all ${currentPage === i + 1 ? `${colorClasses.bg} text-white shadow-lg ${colorClasses.shadow}` : 'bg-white border border-line text-ink-faint hover:bg-slate-50'}`}
           >
             {i + 1}
           </button>
@@ -129,7 +129,7 @@ function Pagination({
         <button
           onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
           disabled={currentPage === totalPages}
-          className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center bg-white border border-slate-200 rounded-lg sm:rounded-xl text-slate-400 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center bg-white border border-line rounded-lg sm:rounded-xl text-ink-faint hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
           <ChevronRight size={16} className="sm:w-5 sm:h-5" />
         </button>
@@ -150,21 +150,21 @@ function EntityRowActions({
     <div className="flex items-center justify-end gap-1.5 sm:gap-2">
       <button
         onClick={() => onEdit(entity)}
-        className={`w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-slate-50 text-slate-400 hover:${colorClasses.bgLight} ${colorClasses.textHover} rounded-lg sm:rounded-xl transition-all`}
+        className={`w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-slate-50 text-ink-faint hover:${colorClasses.bgLight} ${colorClasses.textHover} rounded-lg sm:rounded-xl transition-all`}
         title="Modifier"
       >
         <Edit2 size={14} className="sm:w-4 sm:h-4" />
       </button>
       <button
         onClick={() => onDelete(entity.id)}
-        className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-slate-50 text-slate-400 hover:bg-red-50 hover:text-red-600 rounded-lg sm:rounded-xl transition-all"
+        className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-slate-50 text-ink-faint hover:bg-red-50 hover:text-red-600 rounded-lg sm:rounded-xl transition-all"
         title="Supprimer"
       >
         <Trash2 size={14} className="sm:w-4 sm:h-4" />
       </button>
       <button
         onClick={() => onSelect(entity)}
-        className="h-8 sm:h-9 px-4 sm:px-6 flex items-center justify-center bg-slate-900 text-white hover:bg-blue-600 rounded-lg sm:rounded-xl transition-all font-black text-[9px] sm:text-[10px] uppercase tracking-widest text-center"
+        className="h-8 sm:h-9 px-4 sm:px-6 flex items-center justify-center bg-slate-900 text-white hover:bg-brand-600 rounded-lg sm:rounded-xl transition-all font-bold text-[9px] sm:text-[10px] uppercase tracking-wider text-center"
       >
         Sélectionner
       </button>
@@ -179,12 +179,12 @@ function FormField({ field, formData, onChange }) {
   if (field.type === 'select') {
     return (
       <div className={field.className || ''}>
-        <label className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">{field.label}</label>
+        <label className="text-[10px] sm:text-xs font-bold text-ink-muted uppercase tracking-wider mb-2 block">{field.label}</label>
         <select
           name={field.name}
           value={value}
           onChange={onChange}
-          className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-xl outline-none transition-all text-sm font-bold"
+          className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-sm font-bold"
           required={field.required}
         >
           {(field.options || []).map((option) => (
@@ -199,16 +199,16 @@ function FormField({ field, formData, onChange }) {
 
   return (
     <div className={field.className || ''}>
-      <label className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest mb-2 block">{field.label}</label>
+      <label className="text-[10px] sm:text-xs font-bold text-ink-muted uppercase tracking-wider mb-2 block">{field.label}</label>
       <div className="relative">
-        {Icon && <Icon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />}
+        {Icon && <Icon className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-faint" size={18} />}
         <input
           type={field.type || 'text'}
           name={field.name}
           value={value}
           onChange={onChange}
           placeholder={field.placeholder || ''}
-          className={`${Icon ? 'pl-11' : 'pl-4'} w-full pr-4 py-3 bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white rounded-xl outline-none transition-all text-sm font-bold`}
+          className={`${Icon ? 'pl-11' : 'pl-4'} w-full pr-4 py-3 bg-slate-50 border-2 border-transparent focus:border-brand-500 focus:bg-white rounded-xl outline-none transition-all text-sm font-bold`}
           required={field.required}
         />
       </div>
@@ -222,16 +222,16 @@ function EntityFormSections({ formSections, formData, handleInputChange }) {
       {formSections.map((section) => {
         const SectionIcon = section.icon
         return (
-          <section key={section.title} className="bg-white border border-slate-100 rounded-2xl p-4 sm:p-6 shadow-sm">
+          <section key={section.title} className="bg-white border border-line rounded-2xl p-4 sm:p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-4">
               {SectionIcon && (
-                <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-500 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-slate-50 text-ink-muted flex items-center justify-center">
                   <SectionIcon size={18} />
                 </div>
               )}
               <div>
-                <h4 className="text-sm sm:text-base font-black text-slate-900">{section.title}</h4>
-                {section.subtitle && <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest">{section.subtitle}</p>}
+                <h4 className="text-sm sm:text-base font-bold text-ink">{section.title}</h4>
+                {section.subtitle && <p className="text-[10px] sm:text-xs font-bold text-ink-faint uppercase tracking-wider">{section.subtitle}</p>}
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -398,28 +398,28 @@ export default function EntitySelectionModal({
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300" onClick={onClose} />
       
       {/* Modal Content */}
-      <div className={`relative bg-white w-full ${maxWidthClass} h-[90vh] sm:h-[85vh] rounded-2xl sm:rounded-3xl overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-300`}>
+      <div className={`relative bg-white w-full ${maxWidthClass} h-[90vh] sm:h-[85vh] rounded-2xl sm:rounded-3xl overflow-hidden flex flex-col shadow-modal animate-in zoom-in-95 duration-300`}>
         
         {/* Header */}
-        <div className="px-4 py-4 sm:px-6 sm:py-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
+        <div className="px-4 py-4 sm:px-6 sm:py-5 border-b border-line flex items-center justify-between shrink-0 bg-white">
           <div className="flex items-center gap-2 sm:gap-4">
             {view === 'form' && (
               <button 
                 onClick={() => setView('list')}
-                className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-slate-50 text-slate-500 rounded-xl hover:bg-slate-100 hover:text-slate-900 transition-all active:scale-90 mr-1 sm:mr-2"
+                className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-slate-50 text-ink-muted rounded-xl hover:bg-slate-100 hover:text-ink transition-all active:scale-90 mr-1 sm:mr-2"
                 title="Retour à la liste"
               >
                 <ChevronLeft size={20} className="sm:w-6 sm:h-6" />
               </button>
             )}
-            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center ${view === 'list' ? `${colorClasses.bgLight} ${colorClasses.text}` : `bg-blue-50 text-blue-600`}`}>
+            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center ${view === 'list' ? `${colorClasses.bgLight} ${colorClasses.text}` : `bg-brand-50 text-brand-600`}`}>
               {view === 'list' ? listIcon : formIcon}
             </div>
             <div>
-              <h3 className="text-base sm:text-xl font-black text-slate-900 tracking-tight leading-tight">
+              <h3 className="text-base sm:text-xl font-bold text-ink tracking-tight leading-tight">
                 {getTitle(view, editingEntity)}
               </h3>
-              <p className="hidden sm:block text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+              <p className="hidden sm:block text-[10px] sm:text-xs font-bold text-ink-faint uppercase tracking-wider mt-0.5">
                 {getSubtitle(view)}
               </p>
             </div>
@@ -448,7 +448,7 @@ export default function EntitySelectionModal({
                 <button
                   onClick={handleAddEntity}
                   disabled={loading}
-                  className={`flex items-center justify-center gap-2 px-6 py-2.5 sm:py-3 ${colorClasses.bg} ${colorClasses.bgHover} text-white rounded-xl sm:rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-widest transition-all active:scale-95 shadow-lg ${colorClasses.shadow} disabled:opacity-50 disabled:cursor-not-allowed`}
+                  className={`flex items-center justify-center gap-2 px-6 py-2.5 sm:py-3 ${colorClasses.bg} ${colorClasses.bgHover} text-white rounded-xl sm:rounded-2xl font-bold text-[10px] sm:text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${colorClasses.shadow} disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   <Plus size={16} />
                   {actions?.addLabel || `Ajouter ${entityName}`}
@@ -456,21 +456,21 @@ export default function EntitySelectionModal({
               </div>
 
               {/* Table */}
-              <div className="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl overflow-x-auto shadow-sm">
+              <div className="bg-white border border-line rounded-2xl sm:rounded-3xl overflow-x-auto shadow-sm">
                 {loading ? (
                   <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+                    <Loader2 className="w-8 h-8 animate-spin text-ink-faint" />
                   </div>
                 ) : (
                   <table className="w-full text-left border-collapse min-w-[600px] sm:min-w-full">
                     <thead>
-                      <tr className="bg-slate-50/80 border-b border-slate-100">
+                      <tr className="bg-slate-50/80 border-b border-line">
                         {columns.map((col, index) => (
-                          <th key={index} className={`px-4 py-3 sm:px-6 sm:py-4 text-[10px] sm:text-[11px] font-black text-slate-600 uppercase tracking-wider ${col.className || ''}`}>
+                          <th key={index} className={`px-4 py-3 sm:px-6 sm:py-4 text-[10px] sm:text-[11px] font-bold text-ink-muted uppercase tracking-wider ${col.className || ''}`}>
                             {col.label}
                           </th>
                         ))}
-                        <th className="hidden md:table-cell px-4 py-3 sm:px-6 sm:py-4 text-[10px] sm:text-[11px] font-black text-slate-600 uppercase tracking-wider text-right">Actions</th>
+                        <th className="hidden md:table-cell px-4 py-3 sm:px-6 sm:py-4 text-[10px] sm:text-[11px] font-bold text-ink-muted uppercase tracking-wider text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -523,19 +523,19 @@ export default function EntitySelectionModal({
             customForm ? customForm({ formData, handleInputChange, handleSaveEntity, setView, editingEntity, primaryColor, loading }) : (
               <form onSubmit={handleSaveEntity} className="max-w-5xl mx-auto space-y-4 sm:space-y-6 pb-8">
                 <EntityFormSections formSections={formSections} formData={formData} handleInputChange={handleInputChange} />
-                <div className="flex flex-col sm:flex-row items-center justify-end gap-3 sm:gap-4 pt-6 sm:pt-8 border-t border-slate-100 mt-4 sm:mt-8">
+                <div className="flex flex-col sm:flex-row items-center justify-end gap-3 sm:gap-4 pt-6 sm:pt-8 border-t border-line mt-4 sm:mt-8">
                   <button 
                     type="button"
                     onClick={() => setView('list')}
                     disabled={loading}
-                    className="w-full sm:w-auto px-8 py-3.5 sm:py-4 bg-red-50 text-red-600 rounded-xl sm:rounded-2xl font-black text-[10px] sm:text-[11px] uppercase tracking-[0.2em] transition-all hover:bg-red-100 order-2 sm:order-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full sm:w-auto px-8 py-3.5 sm:py-4 bg-red-50 text-red-600 rounded-xl sm:rounded-2xl font-bold text-[10px] sm:text-[11px] uppercase tracking-wider transition-all hover:bg-red-100 order-2 sm:order-1 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Annuler
                   </button>
                   <button 
                     type="submit"
                     disabled={loading}
-                    className={`w-full sm:w-auto px-10 py-3.5 sm:py-4 ${colorClasses.bg} text-white rounded-xl sm:rounded-2xl font-black text-[10px] sm:text-[11px] uppercase tracking-[0.2em] transition-all active:scale-95 shadow-xl ${colorClasses.shadow} ${colorClasses.bgHover} order-1 sm:order-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
+                    className={`w-full sm:w-auto px-10 py-3.5 sm:py-4 ${colorClasses.bg} text-white rounded-xl sm:rounded-2xl font-bold text-[10px] sm:text-[11px] uppercase tracking-wider transition-all active:scale-95 shadow-xl ${colorClasses.shadow} ${colorClasses.bgHover} order-1 sm:order-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
                   >
                     {loading && <Loader2 className="w-4 h-4 animate-spin" />}
                     {editingEntity ? (actions?.updateLabel || 'Mettre à jour') : (actions?.saveLabel || `Enregistrer ${entityName}`)}

@@ -115,10 +115,15 @@ export function useMissionDetailsData(id) {
       setIntervention, mileageEditingRef,
     })
     const onFocus = () => refresh()
+    const onLiveUpdate = (e) => {
+      if (Number(e?.detail?.missionId) === Number(missionId)) refresh()
+    }
     window.addEventListener('focus', onFocus)
+    window.addEventListener('mission:live-update', onLiveUpdate)
     refreshTimerRef.current = window.setInterval(refresh, 5000)
     return () => {
       window.removeEventListener('focus', onFocus)
+      window.removeEventListener('mission:live-update', onLiveUpdate)
       if (refreshTimerRef.current) window.clearInterval(refreshTimerRef.current)
       refreshTimerRef.current = null
     }

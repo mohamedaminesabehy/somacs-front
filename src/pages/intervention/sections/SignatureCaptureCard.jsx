@@ -1,4 +1,5 @@
-import { Camera, Trash2 } from 'lucide-react'
+import { useRef } from 'react'
+import { Camera, Trash2, RefreshCw, CheckCircle2, PenLine } from 'lucide-react'
 
 function formatSignatureDate(value) {
   if (!value) return ''
@@ -12,76 +13,76 @@ function formatSignatureDate(value) {
 export default function SignatureCaptureCard({
   title, placeholder, type,
   signature, isBusy, canManageSignatures,
-  signatureInputRef, onFileChange, onDelete,
+  onFileChange, onDelete,
 }) {
+  const inputRef = useRef(null)
   const inputId = `signature-input-${type}`
-  const borderClass = canManageSignatures
-    ? 'bg-slate-50 border-slate-200 hover:border-brand-600 cursor-pointer'
-    : 'bg-slate-50 border-slate-200 cursor-default'
+  const disabled = !canManageSignatures || isBusy
+  const hasSignature = Boolean(signature?.url)
+  const openPicker = () => inputRef.current?.click()
 
   return (
-    <div className="space-y-3 sm:space-y-4">
-      <p className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">{title}</p>
+    <div className={`flex flex-col overflow-hidden rounded-2xl border bg-white transition-colors ${hasSignature ? 'border-teal-200' : 'border-line'}`}>
+      <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
+        <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+          <PenLine size={15} className="text-brand-600" aria-hidden="true" /> {title}
+        </p>
+        {hasSignature
+          ? <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-[11px] font-semibold text-teal-800 ring-1 ring-inset ring-teal-200"><CheckCircle2 size={11} aria-hidden="true" /> Signée</span>
+          : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-ink-muted">En attente</span>}
+      </div>
+
       <input
         id={inputId}
-        ref={signatureInputRef}
+        ref={inputRef}
         type="file"
         accept="image/*"
         capture="environment"
-        className="hidden"
-        disabled={!canManageSignatures || isBusy}
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
+        disabled={disabled}
         onChange={(event) => onFileChange(type, event)}
       />
+
       <button
         type="button"
-        disabled={!canManageSignatures || isBusy}
-        onClick={() => signatureInputRef?.current?.click()}
-        className={`relative aspect-[2.5/1] sm:aspect-[2/1] w-full overflow-hidden rounded-2xl border-2 border-dashed transition-all ${borderClass}`}
+        disabled={disabled}
+        onClick={openPicker}
+        aria-label={hasSignature ? `${title} — remplacer` : `${title} — ajouter`}
+        className={`relative m-4 aspect-[2.4/1] overflow-hidden rounded-xl border-2 border-dashed transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-600/15
+          ${hasSignature ? 'border-transparent bg-slate-50' : canManageSignatures ? 'border-brand-200 bg-brand-50/30 hover:border-brand-400 hover:bg-brand-50/60' : 'border-line bg-slate-50 cursor-default'}`}
       >
-        {signature?.url ? (
-          <img src={signature.url} alt={title} className="absolute inset-0 h-full w-full object-contain bg-white p-3" />
+        {hasSignature ? (
+          <img src={signature.url} alt={title} className="absolute inset-0 h-full w-full object-contain p-3" />
         ) : (
           <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center">
-            <Camera size={20} className={canManageSignatures ? 'text-brand-600' : 'text-slate-300'} />
-            <span className={['text-[9px] sm:text-[10px] font-black uppercase transition-colors', canManageSignatures ? 'text-slate-400' : 'text-slate-300'].join(' ')}>
-              {isBusy ? 'Enregistrement...' : placeholder}
-            </span>
+            {isBusy
+              ? <RefreshCw size={20} className="animate-spin text-brand-600" aria-hidden="true" />
+              : <Camera size={20} className={canManageSignatures ? 'text-brand-600' : 'text-ink-faint'} aria-hidden="true" />}
+            <span className="text-xs font-medium text-ink-muted">{isBusy ? 'Enregistrement…' : placeholder}</span>
           </span>
         )}
+        <span className="pointer-events-none absolute bottom-3 left-6 right-6 h-px bg-slate-300" aria-hidden="true" />
       </button>
-      {signature?.url && (
-        <SignatureInfo
-          signature={signature}
-          canManageSignatures={canManageSignatures}
-          isBusy={isBusy}
-          signatureInputRef={signatureInputRef}
-          onDelete={onDelete}
-        />
-      )}
-    </div>
-  )
-}
 
-function SignatureInfo({ signature, canManageSignatures, isBusy, signatureInputRef, onDelete }) {
-  return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
-      <div className="min-w-0">
-        <p className="text-[10px] font-black text-slate-700 truncate">{signature.signerName || 'Non renseigné'}</p>
-        <p className="text-[9px] font-semibold text-slate-400">
-          {formatSignatureDate(signature.signedAt) || 'Date non renseignée'}
-        </p>
-      </div>
-      {canManageSignatures && (
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => signatureInputRef?.current?.click()} disabled={isBusy}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-[9px] font-black uppercase tracking-wider text-white hover:bg-slate-800 transition-colors disabled:opacity-60">
-            <Camera size={13} /> Remplacer
-          </button>
-          <button type="button" onClick={() => onDelete(signature)} disabled={isBusy}
-            className="inline-flex items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-60"
-            aria-label="Supprimer la signature">
-            <Trash2 size={14} />
-          </button>
+      {hasSignature && (
+        <div className="flex flex-col gap-2 border-t border-line bg-slate-50/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-ink">{signature.signerName || 'Signataire non renseigné'}</p>
+            <p className="text-xs text-ink-muted">{formatSignatureDate(signature.signedAt) || 'Date non renseignée'}</p>
+          </div>
+          {canManageSignatures && (
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={openPicker} disabled={isBusy} className="ui-btn-secondary ui-btn-sm">
+                <Camera size={13} aria-hidden="true" /> Remplacer
+              </button>
+              <button type="button" onClick={() => onDelete(signature)} disabled={isBusy} aria-label="Supprimer la signature"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-red-600 ring-1 ring-inset ring-red-200 transition-colors hover:bg-red-50 disabled:opacity-60">
+                <Trash2 size={14} aria-hidden="true" />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

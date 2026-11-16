@@ -36,7 +36,7 @@ const STATUS_TONE = {
   basse: 'slate',
 }
 
-export function toneForStatus(status) {
+function toneForStatus(status) {
   return STATUS_TONE[String(status || '').trim().toLowerCase()] || 'slate'
 }
 

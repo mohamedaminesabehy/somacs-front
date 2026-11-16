@@ -35,6 +35,7 @@ export function getGroupedEmployeeNames(mission) {
 }
 
 export function getGroupedEmployeeStatuses(mission) {
+  if (mission?.team?.length) return mission.team.map(member => ({ name: member.name || 'Non renseigné', status: member.status || mission.status, notes: member.notes || '' }))
   const rows = Array.isArray(mission?.groupedEmployeeStatuses) ? mission.groupedEmployeeStatuses : []
   if (rows.length > 0) {
     return rows
@@ -117,7 +118,8 @@ export function getViewStatusColor(status) {
 import { apiFetch } from '../../api/apiClient'
 
 export function validateMissionForm({ formTitle, formDescription, formEmployeeIds, formEmployee, missionType, selectedInterventionId }) {
-  if (!formTitle || !formDescription) return 'Veuillez remplir le titre et la description.'
+  if (!formTitle?.trim() || !formDescription?.trim()) return 'Veuillez remplir le titre et la description.'
+  if (formEmployeeIds?.length > 3) return 'Une mission peut avoir au maximum 3 techniciens.'
   const hasMultiple = Array.isArray(formEmployeeIds) && formEmployeeIds.length > 0
   const hasSingle = formEmployee && String(formEmployee).trim() !== ''
   if (!hasMultiple && !hasSingle) return 'Veuillez sélectionner au moins un employé.'
@@ -125,103 +127,10 @@ export function validateMissionForm({ formTitle, formDescription, formEmployeeId
   return null
 }
 
-function buildMissionSite(missionType, formSite, selectedIntervention) {
-  return missionType === 'Normal' ? formSite : selectedIntervention?.client
-}
+import { updateMissionWith } from './missionUpdate.mjs'
 
-function buildDueDatePart(modalMode, formDueDate) {
-  if (modalMode === 'create') return { dueDate: formDueDate || "Aujourd'hui" }
-  if (formDueDate) return { dueDate: formDueDate }
-  return {}
-}
+export { buildMissionUpdateRequest, submitMissionEdit } from './missionUpdate.mjs'
 
-export async function submitGroupMission({ formTitle, formDescription, formPriority, formDueDate, formDueTime, formNotes, missionType, formSite, formAddress, selectedIntervention, selectedInterventionId, formEmployeeIds, refreshAfterSave, setIsModalOpen }) {
-  const payload = {
-    title: formTitle,
-    description: formDescription,
-    priority: formPriority,
-    status: 'À faire',
-    dueDate: formDueDate || "Aujourd'hui",
-    dueTime: formDueTime || null,
-    notes: formNotes,
-    type: missionType,
-    site: buildMissionSite(missionType, formSite, selectedIntervention),
-    address: missionType === 'Normal' ? formAddress : 'N/A',
-    interventionId: missionType === 'Intervention' ? selectedInterventionId : null,
-    employeeUserIds: formEmployeeIds,
-  }
-  try {
-    const response = await apiFetch('/missions', { method: 'POST', body: payload, auth: true })
-    if (response.ok) {
-      refreshAfterSave()
-      setIsModalOpen(false)
-    }
-  } catch (error) {
-    console.error('Error saving missions:', error)
-  }
-}
-
-async function uploadMissionAttachments(missionId, newAttachments) {
-  if (!missionId || newAttachments.length === 0) return
-  const form = new FormData()
-  for (const file of newAttachments) form.append('files', file)
-  const uploadRes = await apiFetch(`/missions/${missionId}/attachments`, { method: 'POST', body: form, auth: true })
-  if (!uploadRes.ok) alert('Mission enregistrée, mais erreur lors de l’upload des fichiers.')
-}
-
-export async function submitSingleMission(params) {
-  const {
-    formTitle, formDescription, formPriority, formStatus, formDueDate, formDueTime, formNotes,
-    missionType, formSite, formAddress, selectedIntervention, selectedInterventionId,
-    modalMode, formMissionId, formEmployee, employeeUsers,
-    existingAttachments, newAttachments, refreshAfterSave, fetchInterventions, setIsModalOpen,
-  } = params
-
-  const selectedEmployee = employeeUsers.find((u) => String(u.id) === String(formEmployee)) || null
-  const selectedEmployeeName = selectedEmployee?.name || ''
-
-  const payload = {
-    title: formTitle,
-    description: formDescription,
-    employee: selectedEmployeeName,
-    employeeUserId: selectedEmployee ? Number(selectedEmployee.id) : null,
-    priority: formPriority,
-    status: modalMode === 'create' ? 'À faire' : formStatus,
-    ...buildDueDatePart(modalMode, formDueDate),
-    dueTime: formDueTime || null,
-    notes: formNotes,
-    type: missionType,
-    site: buildMissionSite(missionType, formSite, selectedIntervention),
-    address: missionType === 'Normal' ? formAddress : 'N/A',
-    interventionId: missionType === 'Intervention' ? selectedInterventionId : null,
-  }
-
-  try {
-    const response = await apiFetch(
-      modalMode === 'create' ? '/missions' : `/missions/${formMissionId}`,
-      {
-        method: modalMode === 'create' ? 'POST' : 'PATCH',
-        body: modalMode === 'edit' ? { ...payload, attachments: existingAttachments } : payload,
-        auth: true,
-      },
-    )
-    if (!response.ok) return
-
-    const saved = await response.json().catch(() => null)
-    const missionId = saved?.id || formMissionId
-    await uploadMissionAttachments(missionId, newAttachments)
-
-    if (missionType === 'Intervention' && selectedInterventionId) {
-      await apiFetch(`/interventions/${selectedInterventionId}`, {
-        method: 'PATCH',
-        body: { status: 'ASSIGNED', assignedTo: selectedEmployeeName },
-        auth: true,
-      })
-      fetchInterventions()
-    }
-    refreshAfterSave()
-    setIsModalOpen(false)
-  } catch (error) {
-    console.error('Error saving mission:', error)
-  }
+export function updateMission(params) {
+  return updateMissionWith(apiFetch, params)
 }

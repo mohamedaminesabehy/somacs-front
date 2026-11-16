@@ -1,104 +1,217 @@
-﻿import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../api/apiClient'
-import { 
-  ChevronRight, 
-  ChevronLeft, 
-  Check, 
-  User, 
-  Settings, 
-  AlertCircle, 
-  ClipboardCheck,
-  Building2,
-  Phone,
-  MapPin,
-  Cpu,
-  Hash,
-  FileText,
-  Printer,
-  Zap,
-  Calendar,
-  Eye,
-  Users
+import {
+  ChevronRight, ChevronLeft, Check, User, Settings, AlertCircle, ClipboardCheck,
+  Building2, Phone, MapPin, Cpu, Hash, Mail, Calendar, Eye, Users, PhoneCall,
+  Pencil, RefreshCw, AlertTriangle, CheckCircle2, Barcode, Tag, Layers, ShieldCheck,
 } from 'lucide-react'
 import logo from '../../assets/logo.jpg'
-import FicheContent from '../../components/intervention/FicheContent'
+import FicheViewport from './components/FicheViewport'
 import MobileFichePreviewModal from '../../components/intervention/MobileFichePreviewModal'
 import ClientSelectionModal from '../../components/client/ClientSelectionModal'
 import MachineSelectionModal from '../../components/machine/MachineSelectionModal'
 import HorizontalStepper from '../../components/common/HorizontalStepper'
 import VerticalStepper from '../../components/common/VerticalStepper'
 import { useZoomDetection } from './hooks/useZoomDetection'
+import {
+  DossierSection, FieldGroup, FormField, DataTile, InterventionTypePicker, ConfirmDialog,
+} from './components/interventionUi'
+import { getInterventionType } from './components/interventionTypes'
 
 const steps = [
   { id: 1, title: 'Client', description: 'Identification', icon: User },
-  { id: 2, title: 'Machine', description: 'Fiche Technique', icon: Settings },
+  { id: 2, title: 'Machine', description: 'Fiche technique', icon: Settings },
   { id: 3, title: 'Diagnostic', description: 'Analyse initiale', icon: AlertCircle },
-  { id: 4, title: 'Validation', description: 'Clôture dossier', icon: ClipboardCheck },
+  { id: 4, title: 'Validation', description: 'Récapitulatif', icon: ClipboardCheck },
 ]
 
 function generateFicheNumber() {
   const d = new Date()
-  const yyyy = String(d.getFullYear())
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  const HH = String(d.getHours()).padStart(2, '0')
-  const MM = String(d.getMinutes()).padStart(2, '0')
-  const SS = String(d.getSeconds()).padStart(2, '0')
-  return `${yyyy}/${mm}/${dd} ${HH}${MM}${SS}`
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
 }
 
-// ── Shared fiche content (identical layout for both desktop preview and mobile modal) ──
+function initialsOf(name) {
+  return String(name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?'
+}
+
+/** Règles de validation par étape — mêmes exigences que l'ancien contrôle à la création. */
+function validateStep(step, data) {
+  const errors = {}
+  if (step === 1 && !data.clientId) errors.clientId = 'Sélectionnez le client concerné.'
+  if (step === 2 && !data.machineId) errors.machineId = 'Sélectionnez l’équipement concerné.'
+  if (step === 3) {
+    if (!data.interventionType) errors.interventionType = 'Choisissez un type d’intervention.'
+    if (!String(data.problemDescription || '').trim()) errors.problemDescription = 'Décrivez le type de panne.'
+  }
+  return errors
+}
+
+function SelectionPrompt({ icon, title, description, actionLabel, onAction, error }) {
+  const Icon = icon
+  return (
+    <div className={`flex flex-col items-center gap-4 rounded-2xl border-2 border-dashed px-6 py-10 text-center ${error ? 'border-red-300 bg-red-50/40' : 'border-brand-200 bg-brand-50/30'}`}>
+      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-brand-700 shadow-card ring-1 ring-inset ring-line">
+        <Icon size={24} aria-hidden="true" />
+      </span>
+      <div className="max-w-sm">
+        <p className="font-display text-base font-bold text-ink">{title}</p>
+        <p className="mt-1 text-sm leading-relaxed text-ink-muted">{description}</p>
+      </div>
+      <button type="button" onClick={onAction} className="ui-btn-primary">
+        <Icon size={16} aria-hidden="true" /> {actionLabel}
+      </button>
+      {error && (
+        <p role="alert" className="flex items-center gap-1.5 text-xs font-semibold text-red-600">
+          <AlertTriangle size={13} aria-hidden="true" /> {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function IdentityCard({ badge, title, subtitle, avatar, meta, onChange, changeLabel }) {
+  return (
+    <div className="relative overflow-hidden rounded-2xl bg-navy text-white shadow-raised">
+      <div className="ui-blueprint pointer-events-none absolute inset-0 opacity-40" aria-hidden="true" />
+      <div className="relative flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:p-6">
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/10 font-display text-lg font-bold ring-1 ring-inset ring-white/20">
+          {avatar}
+        </span>
+        <div className="min-w-0 flex-1">
+          {badge && <span className="mb-1.5 inline-flex rounded-md bg-white/10 px-2 py-0.5 font-mono text-[11px] font-semibold tracking-wide text-brand-100 ring-1 ring-inset ring-white/15">{badge}</span>}
+          <p className="truncate font-display text-lg font-bold leading-tight sm:text-xl">{title}</p>
+          {subtitle && <p className="mt-0.5 truncate text-sm text-brand-100/80">{subtitle}</p>}
+          {meta && <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-brand-50/90">{meta}</div>}
+        </div>
+        <button
+          type="button"
+          onClick={onChange}
+          className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-navy transition-colors hover:bg-brand-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/30"
+        >
+          <RefreshCw size={15} aria-hidden="true" /> {changeLabel}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function MetaItem({ icon, children }) {
+  const Icon = icon
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5">
+      <Icon size={13} className="shrink-0 text-brand-300" aria-hidden="true" />
+      <span className="truncate">{children}</span>
+    </span>
+  )
+}
+
+function RecapBlock({ icon, title, step, onEdit, status, children }) {
+  const Icon = icon
+  return (
+    <div className="flex flex-col overflow-hidden rounded-2xl border border-line bg-white">
+      <div className="flex items-center justify-between gap-3 border-b border-line bg-slate-50/70 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-brand-700 ring-1 ring-inset ring-line">
+            <Icon size={15} aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">Étape {step}</p>
+            <p className="truncate text-sm font-bold text-ink">{title}</p>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {status === 'ok'
+            ? <CheckCircle2 size={16} className="text-teal-600" aria-label="Complet" />
+            : <AlertTriangle size={16} className="text-red-600" aria-label="Incomplet" />}
+          <button type="button" onClick={onEdit} className="ui-btn-ghost ui-btn-sm">
+            <Pencil size={13} aria-hidden="true" /> Modifier
+          </button>
+        </div>
+      </div>
+      <dl className="grid grid-cols-1 gap-x-6 gap-y-3 p-4 sm:grid-cols-2">{children}</dl>
+    </div>
+  )
+}
+
+function RecapItem({ label, value, full, mono }) {
+  const empty = value == null || String(value).trim() === ''
+  return (
+    <div className={`min-w-0 ${full ? 'sm:col-span-2' : ''}`}>
+      <dt className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">{label}</dt>
+      <dd className={`mt-0.5 break-words text-sm ${empty ? 'italic text-ink-faint' : 'font-medium text-ink'} ${mono && !empty ? 'font-mono' : ''}`}>
+        {empty ? '—' : value}
+      </dd>
+    </div>
+  )
+}
+
+const INITIAL_FORM = () => ({
+  clientId: '',
+  clientName: '',
+  clientCode: '',
+  clientPhone: '',
+  clientEmail: '',
+  clientAddress: '',
+  siteName: '',
+  requestorName: '',
+  machineId: '',
+  machineType: '',
+  machineBrand: '',
+  machineModel: '',
+  serialNumber: '',
+  problemDescription: '',
+  telephoneDiagnostic: '',
+  interventionDetail: '',
+  interventionType: 'Réparation',
+  interventionDate: new Date().toISOString().split('T')[0],
+  totalTime: '',
+  ficheNumber: generateFicheNumber(),
+  technicianName: '',
+  numEssai: '',
+  essaiConcluant: null,
+  laborPrice: '',
+})
+
 export default function CreateIntervention() {
   const navigate = useNavigate()
   const [currentStep, setCurrentStep] = useState(1)
+  const [maxReached, setMaxReached] = useState(1)
   const uiZoomPercent = useZoomDetection()
   const [showMobilePreview, setShowMobilePreview] = useState(false)
   const [isClientModalOpen, setIsClientModalOpen] = useState(false)
   const [isMachineModalOpen, setIsMachineModalOpen] = useState(false)
-  const [formData, setFormData] = useState(() => ({
-    clientId: '',
-    clientName: '',
-    clientCode: '',
-    clientPhone: '',
-    clientEmail: '',
-    clientAddress: '',
-    siteName: '',
-    requestorName: '',
-    machineId: '',
-    machineType: '',
-    machineBrand: '',
-    machineModel: '',
-    serialNumber: '',
-    problemDescription: '',
-    telephoneDiagnostic: '',
-    interventionDetail: '',
-    interventionType: 'Réparation',
-    interventionDate: new Date().toISOString().split('T')[0],
-    totalTime: '',
-    ficheNumber: generateFicheNumber(),
-    technicianName: '',
-    numEssai: '',
-    essaiConcluant: null,
-    laborPrice: ''
-  }))
-  const previewInterventionData = {
-    ...formData,
-    startTime: '',
-    endTime: '',
-  }
+  const [formData, setFormData] = useState(INITIAL_FORM)
+  const [errors, setErrors] = useState({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+  const [confirmLeave, setConfirmLeave] = useState(false)
+
+  const previewInterventionData = { ...formData, startTime: '', endTime: '' }
   const previewParts = []
   const previewLaborPrice = Number(formData.laborPrice) || ''
-
   const useHorizontalProgress = uiZoomPercent > 80
+
+  const isDirty = Boolean(
+    formData.clientId || formData.machineId || formData.problemDescription.trim()
+    || formData.requestorName.trim() || formData.telephoneDiagnostic.trim(),
+  )
+
+  const stepStatus = useMemo(() => ({
+    1: Object.keys(validateStep(1, formData)).length === 0,
+    2: Object.keys(validateStep(2, formData)).length === 0,
+    3: Object.keys(validateStep(3, formData)).length === 0,
+  }), [formData])
 
   const handleChange = (e) => {
     const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+    setFormData((prev) => ({ ...prev, [name]: value }))
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: undefined }))
   }
 
   const handleClientSelect = (client) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       clientId: client.id,
       clientName: client.name,
@@ -107,31 +220,58 @@ export default function CreateIntervention() {
       clientEmail: client.email,
       clientAddress: String(client.address || '').trim()
         ? String(client.address || '').trim()
-        : `${client.city}${client.zone ? `, ${client.zone}` : ''}`
+        : `${client.city}${client.zone ? `, ${client.zone}` : ''}`,
     }))
+    setErrors((prev) => ({ ...prev, clientId: undefined }))
   }
 
   const handleMachineSelect = (machine) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       machineId: machine.id,
       machineType: machine.designation,
       machineBrand: machine.brand,
       machineModel: String(machine.model || '').trim() ? machine.model : machine.year,
       serialNumber: machine.serialNumber,
-      siteName: String(prev.siteName || '').trim() ? prev.siteName : (machine.site || '')
+      siteName: String(prev.siteName || '').trim() ? prev.siteName : (machine.site || ''),
     }))
+    setErrors((prev) => ({ ...prev, machineId: undefined }))
   }
 
-  const nextStep = () => setCurrentStep(prev => Math.min(prev + 1, steps.length))
-  const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1))
+  const goToStep = (step) => {
+    setCurrentStep(step)
+    setMaxReached((m) => Math.max(m, step))
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const nextStep = () => {
+    const stepErrors = validateStep(currentStep, formData)
+    if (Object.keys(stepErrors).length > 0) {
+      setErrors(stepErrors)
+      return
+    }
+    setErrors({})
+    goToStep(Math.min(currentStep + 1, steps.length))
+  }
+  const prevStep = () => goToStep(Math.max(currentStep - 1, 1))
+
+  const requestLeave = () => {
+    if (isDirty && !isSubmitting) setConfirmLeave(true)
+    else navigate('/interventions')
+  }
 
   const createIntervention = async () => {
-    try {
-      if (!formData.clientId || !formData.machineId) {
-        alert('Veuillez sélectionner un client et une machine avant de créer le dossier.')
+    for (const step of [1, 2, 3]) {
+      const stepErrors = validateStep(step, formData)
+      if (Object.keys(stepErrors).length > 0) {
+        setErrors(stepErrors)
+        goToStep(step)
         return
       }
+    }
+    setIsSubmitting(true)
+    setSubmitError('')
+    try {
       const response = await apiFetch('/interventions', {
         method: 'POST',
         body: {
@@ -154,7 +294,8 @@ export default function CreateIntervention() {
         },
       })
       if (!response.ok) {
-        alert('Erreur lors de la création du dossier.')
+        const payload = await response.json().catch(() => null)
+        setSubmitError(payload?.message || 'Erreur lors de la création du dossier.')
         return
       }
       const created = await response.json().catch(() => null)
@@ -162,580 +303,346 @@ export default function CreateIntervention() {
       const highlight = createdId ? `?highlight=${encodeURIComponent(createdId)}&toast=created` : '?toast=created'
       navigate(`/interventions${highlight}`, { state: { createdInterventionId: createdId } })
     } catch {
-      alert('Impossible de joindre le serveur.')
+      setSubmitError('Impossible de joindre le serveur.')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   const renderStep1 = () => (
-          <div className="ui-card space-y-6 p-4 animate-in fade-in zoom-in-95 duration-300 sm:p-6">
-            <div className="pb-6 border-b-2 border-slate-100 flex flex-col items-start gap-4">
-              <div>
-                <h2 className="flex items-center gap-3 font-display text-xl font-bold tracking-tight text-ink sm:text-2xl">
-                  <Building2 className="text-brand-600" size={28} />
-                  Informations Client
-                </h2>
-                <p className="text-sm text-slate-500 font-medium">Renseignez les coordonnées complètes du client et le lieu d'intervention</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsClientModalOpen(true)}
-                className="ui-btn-primary min-h-11 w-fit shrink-0 whitespace-nowrap"
-              >
-                <Users size={18} />
-                Créer / Sélectionner Client
-              </button>
-            </div>
+    <DossierSection
+      index={1}
+      icon={Building2}
+      title="Informations du client"
+      description="Identifiez le client, puis précisez le demandeur et le lieu d’intervention."
+      actions={formData.clientId ? null : (
+        <button type="button" onClick={() => setIsClientModalOpen(true)} className="ui-btn-secondary ui-btn-sm">
+          <Users size={14} aria-hidden="true" /> Annuaire clients
+        </button>
+      )}
+    >
+      {formData.clientId ? (
+        <IdentityCard
+          badge={formData.clientCode}
+          title={formData.clientName}
+          subtitle={formData.clientAddress}
+          avatar={initialsOf(formData.clientName)}
+          onChange={() => setIsClientModalOpen(true)}
+          changeLabel="Changer"
+          meta={<>
+            {formData.clientPhone && <MetaItem icon={Phone}>{formData.clientPhone}</MetaItem>}
+            {formData.clientEmail && <MetaItem icon={Mail}>{formData.clientEmail}</MetaItem>}
+          </>}
+        />
+      ) : (
+        <SelectionPrompt
+          icon={Users}
+          title="Aucun client sélectionné"
+          description="Recherchez un client existant dans l’annuaire ou créez-en un nouveau."
+          actionLabel="Créer / Sélectionner un client"
+          onAction={() => setIsClientModalOpen(true)}
+          error={errors.clientId}
+        />
+      )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-3 group">
-                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
-                  <span className="w-2 h-2 bg-brand-600 rounded-full"></span>
-                  Nom du Client
-                  <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={20} />
-                  <input
-                    type="text"
-                    name="clientName"
-                    value={formData.clientName}
-                    onChange={handleChange}
-                    readOnly
-                    placeholder="Ex: Garage Automobile Central"
-                    className="ui-input w-full pl-11 font-medium read-only:bg-slate-50 read-only:text-ink-muted"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="space-y-3 group">
-                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
-                  <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
-                  Code Client
-                </label>
-                <div className="relative">
-                  <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={20} />
-                  <input
-                    type="text"
-                    name="clientCode"
-                    value={formData.clientCode}
-                    onChange={handleChange}
-                    readOnly
-                    placeholder="CLT-2026-001"
-                    className="ui-input w-full pl-11 font-medium read-only:bg-slate-50 read-only:text-ink-muted"
-                  />
-                </div>
-              </div>
-              <div className="space-y-3 group">
-                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
-                  <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
-                  Demandeur
-                </label>
-                <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={20} />
-                  <input
-                    type="text"
-                    name="requestorName"
-                    value={formData.requestorName}
-                    onChange={handleChange}
-                    placeholder="Nom du responsable ou contact"
-                    className="ui-input w-full pl-11 font-medium read-only:bg-slate-50 read-only:text-ink-muted"
-                  />
-                </div>
-              </div>
-              <div className="space-y-3 group">
-                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
-                  <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
-                  Téléphone
-                </label>
-                <div className="relative">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={20} />
-                  <input
-                    type="tel"
-                    name="clientPhone"
-                    value={formData.clientPhone}
-                    onChange={handleChange}
-                    readOnly
-                    placeholder="+216 XX XXX XXX"
-                    className="ui-input w-full pl-11 font-medium read-only:bg-slate-50 read-only:text-ink-muted"
-                  />
-                </div>
-              </div>
-              <div className="md:col-span-2 space-y-3 group">
-                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
-                  <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
-                  Adresse E-mail
-                </label>
-                <div className="relative">
-                  <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={20} />
-                  <input
-                    type="email"
-                    name="clientEmail"
-                    value={formData.clientEmail}
-                    onChange={handleChange}
-                    readOnly
-                    placeholder="contact@exemple.com"
-                    className="ui-input w-full pl-11 font-medium read-only:bg-slate-50 read-only:text-ink-muted"
-                  />
-                </div>
-              </div>
-              <div className="md:col-span-2 space-y-3 group">
-                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
-                  <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
-                  Site / Localisation
-                </label>
-                <div className="relative">
-                  <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-brand-600 transition-colors" size={20} />
-                  <input
-                    type="text"
-                    name="siteName"
-                    value={formData.siteName}
-                    onChange={handleChange}
-                    placeholder="Ex: Usine Principale - Zone Industrielle"
-                    className="ui-input w-full pl-11 font-medium read-only:bg-slate-50 read-only:text-ink-muted"
-                  />
-                </div>
-              </div>
-              <div className="md:col-span-2 space-y-3 group">
-                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
-                  <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
-                  Adresse Complète d'Intervention
-                </label>
-                <div className="relative">
-                  <textarea
-                    name="clientAddress"
-                    value={formData.clientAddress}
-                    onChange={handleChange}
-                    readOnly
-                    placeholder="Saisissez l'adresse physique complète : rue, ville, code postal..."
-                    className="ui-input min-h-32 w-full resize-y font-medium leading-relaxed read-only:bg-slate-50"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+      <FieldGroup title="Contact & localisation" icon={MapPin}>
+        <FormField label="Demandeur" htmlFor="requestorName" icon={User} hint="Personne ayant signalé la demande.">
+          <input id="requestorName" name="requestorName" value={formData.requestorName} onChange={handleChange} placeholder="Nom du responsable ou contact" className="ui-input w-full pl-10" />
+        </FormField>
+        <FormField label="Site / localisation" htmlFor="siteName" icon={MapPin} hint="Prérempli depuis la machine si disponible.">
+          <input id="siteName" name="siteName" value={formData.siteName} onChange={handleChange} placeholder="Ex : Bloc opératoire, bâtiment B" className="ui-input w-full pl-10" />
+        </FormField>
+      </FieldGroup>
+
+      {formData.clientId && (
+        <FieldGroup title="Coordonnées enregistrées" icon={Hash} columns={3}>
+          <DataTile label="Code client" value={formData.clientCode} mono icon={Hash} />
+          <DataTile label="Téléphone" value={formData.clientPhone} icon={Phone} />
+          <DataTile label="E-mail" value={formData.clientEmail} icon={Mail} />
+          <DataTile label="Adresse d’intervention" value={formData.clientAddress} icon={MapPin} full />
+        </FieldGroup>
+      )}
+    </DossierSection>
   )
 
   const renderStep2 = () => (
-          <div className="ui-card space-y-6 p-4 animate-in fade-in zoom-in-95 duration-300 sm:p-6">
-            <div className="pb-6 border-b-2 border-slate-100 flex flex-col items-start gap-4">
-              <div>
-                <h2 className="flex items-center gap-3 font-display text-xl font-bold tracking-tight text-ink sm:text-2xl">
-                  <Settings className="text-orange-500" size={28} />
-                  Fiche Technique Machine
-                </h2>
-                <p className="text-sm text-slate-500 font-medium">Identifiez précisément l'équipement concerné par l'intervention</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsMachineModalOpen(true)}
-                className="ui-btn-primary min-h-11 w-fit shrink-0 whitespace-nowrap"
-              >
-                <Cpu size={18} />
-                Créer / Choisir Machine
-              </button>
-            </div>
+    <DossierSection
+      index={2}
+      icon={Cpu}
+      title="Informations techniques"
+      description="Identifiez précisément l’équipement concerné par l’intervention."
+      actions={formData.machineId ? null : (
+        <button type="button" onClick={() => setIsMachineModalOpen(true)} className="ui-btn-secondary ui-btn-sm">
+          <Layers size={14} aria-hidden="true" /> Parc machines
+        </button>
+      )}
+    >
+      {formData.machineId ? (
+        <IdentityCard
+          badge={formData.serialNumber ? `S/N ${formData.serialNumber}` : null}
+          title={formData.machineType}
+          subtitle={[formData.machineBrand, formData.machineModel].filter(Boolean).join(' · ')}
+          avatar={<Cpu size={22} aria-hidden="true" />}
+          onChange={() => setIsMachineModalOpen(true)}
+          changeLabel="Changer"
+          meta={formData.siteName ? <MetaItem icon={MapPin}>{formData.siteName}</MetaItem> : null}
+        />
+      ) : (
+        <SelectionPrompt
+          icon={Cpu}
+          title="Aucun équipement sélectionné"
+          description="Choisissez la machine dans le parc du client ou enregistrez un nouvel équipement."
+          actionLabel="Créer / Choisir une machine"
+          onAction={() => setIsMachineModalOpen(true)}
+          error={errors.machineId}
+        />
+      )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-3 group">
-                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
-                  <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
-                  Type de Machine
-                  <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <Cpu className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 transition-colors" size={20} />
-                  <input
-                    type="text"
-                    name="machineType"
-                    value={formData.machineType}
-                    onChange={handleChange}
-                    readOnly
-                    placeholder="Ex: Pont Élévateur 4 Colonnes"
-                    className="w-full pl-12 pr-4 py-3.5 bg-white border-2 border-slate-200 rounded-xl focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 outline-none transition-all text-slate-800 font-semibold placeholder:text-slate-400 placeholder:font-normal shadow-sm hover:border-slate-300"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="space-y-3 group">
-                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
-                  <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
-                  Marque
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    name="machineBrand"
-                    value={formData.machineBrand}
-                    onChange={handleChange}
-                    readOnly
-                    placeholder="Ex: Ravaglioli, Hofmann, etc."
-                    className="ui-input w-full font-medium read-only:bg-slate-50 read-only:text-ink-muted"
-                  />
-                </div>
-              </div>
-              <div className="space-y-3 group">
-                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
-                  <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
-                  Modèle
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    name="machineModel"
-                    value={formData.machineModel}
-                    onChange={handleChange}
-                    readOnly
-                    placeholder="Ex: RAV-3000, KPH-370"
-                    className="ui-input w-full font-medium read-only:bg-slate-50 read-only:text-ink-muted"
-                  />
-                </div>
-              </div>
-              <div className="space-y-3 group">
-                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
-                  <span className="w-2 h-2 bg-slate-300 rounded-full"></span>
-                  Numéro de Série
-                </label>
-                <div className="relative">
-                  <Zap className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-orange-500 transition-colors" size={20} />
-                  <input
-                    type="text"
-                    name="serialNumber"
-                    value={formData.serialNumber}
-                    onChange={handleChange}
-                    readOnly
-                    placeholder="SN-123456789"
-                    className="ui-input w-full pl-11 font-mono font-medium read-only:bg-slate-50 read-only:text-ink-muted"
-                  />
-                </div>
-              </div>
-            </div>
+      {formData.machineId && (
+        <FieldGroup title="Fiche technique" icon={Settings}>
+          <DataTile label="Type de machine" value={formData.machineType} icon={Cpu} emphasis />
+          <DataTile label="Marque" value={formData.machineBrand} icon={Tag} />
+          <DataTile label="Modèle" value={formData.machineModel} icon={Layers} />
+          <DataTile label="Numéro de série" value={formData.serialNumber} icon={Barcode} mono />
+        </FieldGroup>
+      )}
 
-            <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <div className="w-10 h-10 bg-orange-500 text-white rounded-xl flex items-center justify-center shrink-0">
-                <AlertCircle size={22} />
-              </div>
-              <div>
-                <h4 className="font-black text-orange-900 text-sm mb-1">Important pour la garantie</h4>
-                <p className="text-orange-800 text-xs leading-relaxed">Le numéro de série est essentiel pour vérifier la validité de la garantie constructeur et accéder à l'historique complet de maintenance.</p>
-              </div>
-            </div>
-          </div>
+      <div className="flex items-start gap-3 rounded-2xl border border-brand-100 bg-brand-50/50 p-4">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-brand-700 ring-1 ring-inset ring-brand-100">
+          <ShieldCheck size={18} aria-hidden="true" />
+        </span>
+        <div>
+          <p className="text-sm font-semibold text-ink">Numéro de série et garantie</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
+            Le numéro de série permet de vérifier la garantie constructeur et d’accéder à l’historique complet de maintenance.
+          </p>
+        </div>
+      </div>
+    </DossierSection>
   )
 
   const renderStep3 = () => (
-          <div className="ui-card space-y-6 p-4 animate-in fade-in zoom-in-95 duration-300 sm:p-6">
-            <div className="pb-6 border-b-2 border-slate-100">
-              <h2 className="flex items-center gap-3 font-display text-xl font-bold tracking-tight text-ink sm:text-2xl">
-                <AlertCircle className="text-blue-600" size={28} />
-                Diagnostic & Analyse
-              </h2>
-              <p className="text-sm text-slate-500 font-medium">Décrivez en détail la nature de l'intervention et les problèmes constatés</p>
-            </div>
+    <DossierSection
+      index={3}
+      icon={AlertCircle}
+      title="Intervention & diagnostic"
+      description="Qualifiez la demande : nature de l’intervention, panne signalée et premier diagnostic."
+    >
+      <InterventionTypePicker value={formData.interventionType} onChange={handleChange} />
+      {errors.interventionType && <p role="alert" className="-mt-3 text-xs font-medium text-red-600">{errors.interventionType}</p>}
 
-            <div className="space-y-6">
-              <div className="space-y-3 group">
-                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
-                  <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
-                  Type d'Intervention
-                  <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <select
-                    name="interventionType"
-                    value={formData.interventionType}
-                    onChange={handleChange}
-                    className="ui-input w-full cursor-pointer font-semibold text-ink"
-                    style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em' }}
-                  >
-                    <option value="Réparation">🔧 Réparation</option>
-                    <option value="Installation">⚡ Installation</option>
-                    <option value="Garantie">🛡️ Sous Garantie</option>
-                    <option value="Devis">📄 Établissement Devis</option>
-                    <option value="Formation">🎓 Formation</option>
-                    <option value="Livraison">📦 Livraison</option>
-                  </select>
-                </div>
-              </div>
+      <FieldGroup title="Panne signalée" icon={AlertTriangle} columns={1}>
+        <FormField
+          label="Type de panne"
+          htmlFor="problemDescription"
+          required
+          error={errors.problemDescription}
+          counter={`${formData.problemDescription.length} car.`}
+        >
+          <textarea
+            id="problemDescription"
+            name="problemDescription"
+            value={formData.problemDescription}
+            onChange={handleChange}
+            aria-invalid={Boolean(errors.problemDescription)}
+            placeholder="Décrivez précisément la panne constatée par le client…"
+            className={`ui-textarea min-h-32 w-full resize-y leading-relaxed ${errors.problemDescription ? 'border-red-300 ring-4 ring-red-100' : ''}`}
+          />
+        </FormField>
+        <FormField label="Diagnostic téléphonique" htmlFor="telephoneDiagnostic" icon={PhoneCall} hint="Facultatif — résumé de l’échange avant le déplacement.">
+          <textarea
+            id="telephoneDiagnostic"
+            name="telephoneDiagnostic"
+            value={formData.telephoneDiagnostic}
+            onChange={handleChange}
+            placeholder="Premières vérifications réalisées à distance…"
+            className="ui-textarea min-h-24 w-full resize-y pl-10 leading-relaxed"
+          />
+        </FormField>
+      </FieldGroup>
 
-              <div className="space-y-3 group">
-                <label className="flex items-center gap-2 text-xs font-semibold text-ink-soft transition-colors group-focus-within:text-brand-700">
-                  <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
-                  Type de panne
-                  <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <textarea
-                    name="problemDescription"
-                    value={formData.problemDescription}
-                    onChange={handleChange}
-                    placeholder="Décrivez précisément le type de panne..."
-                    className="ui-input min-h-32 w-full resize-y font-medium leading-relaxed"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+      <FieldGroup title="Planification" icon={Calendar}>
+        <FormField label="Date d’intervention" htmlFor="interventionDate" icon={Calendar}>
+          <input id="interventionDate" type="date" name="interventionDate" value={formData.interventionDate} onChange={handleChange} className="ui-input w-full pl-10" />
+        </FormField>
+        <DataTile label="N° de fiche (généré)" value={formData.ficheNumber} icon={Hash} mono />
+      </FieldGroup>
+    </DossierSection>
   )
 
-  const renderStep4 = () => (
-          <div className="ui-card space-y-6 p-4 animate-in fade-in zoom-in-95 duration-300 sm:p-6">
-            <div className="pb-6 border-b-2 border-slate-100">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-lg">
-                  <ClipboardCheck size={28} />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-black text-slate-900">Validation</h2>
-                  <p className="text-sm text-slate-500 font-medium">Vérifiez les informations saisies avant de créer le dossier</p>
-                </div>
-              </div>
-            </div>
+  const renderStep4 = () => {
+    const type = getInterventionType(formData.interventionType)
+    const warnings = [
+      !formData.requestorName.trim() && 'Aucun demandeur renseigné.',
+      !formData.siteName.trim() && 'Aucun site / localisation précisé.',
+      !formData.serialNumber && 'L’équipement n’a pas de numéro de série.',
+    ].filter(Boolean)
+    const blocking = [1, 2, 3].filter((s) => !stepStatus[s])
 
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between gap-4">
-                <div className="w-14 h-14 shrink-0">
-                  <img src={logo} alt="Logo Left" className="w-full h-full object-contain grayscale opacity-80" />
-                </div>
-                <div className="text-center flex-1 px-2">
-                  <p className="text-sm font-black uppercase tracking-wider text-slate-900">Fiche d’intervention de S.A.V</p>
-                  <p className="text-xs italic text-slate-500 mt-1">Nous vous garantissons la qualité</p>
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-700 mt-1">SOMACS SERVICE S.A.R.L</p>
-                </div>
-                <div className="w-14 h-14 shrink-0">
-                  <img src={logo} alt="Logo Right" className="w-full h-full object-contain grayscale opacity-80" />
-                </div>
-              </div>
+    return (
+      <DossierSection
+        index={4}
+        icon={ClipboardCheck}
+        title="Récapitulatif & validation"
+        description="Vérifiez la synthèse du dossier avant sa création. Le statut initial sera « En attente »."
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {[1, 2, 3].map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => goToStep(s)}
+              className={`flex items-center gap-2.5 rounded-xl border px-3.5 py-3 text-left transition-colors ${stepStatus[s] ? 'border-teal-200 bg-teal-50/60 hover:bg-teal-50' : 'border-red-200 bg-red-50/60 hover:bg-red-50'}`}
+            >
+              {stepStatus[s]
+                ? <CheckCircle2 size={18} className="shrink-0 text-teal-600" aria-hidden="true" />
+                : <AlertTriangle size={18} className="shrink-0 text-red-600" aria-hidden="true" />}
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-ink">{steps[s - 1].title}</span>
+                <span className="block text-xs text-ink-muted">{stepStatus[s] ? 'Complet' : 'À compléter'}</span>
+              </span>
+            </button>
+          ))}
+        </div>
 
-              <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-blue-600">
-                      <Building2 size={18} />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Client / Site</p>
-                      <p className="text-sm font-black text-slate-900">Coordonnées</p>
-                    </div>
-                  </div>
+        <RecapBlock icon={Building2} title="Client" step={1} status={stepStatus[1] ? 'ok' : 'ko'} onEdit={() => goToStep(1)}>
+          <RecapItem label="Client" value={formData.clientName} />
+          <RecapItem label="Code client" value={formData.clientCode} mono />
+          <RecapItem label="Demandeur" value={formData.requestorName} />
+          <RecapItem label="Téléphone" value={formData.clientPhone} />
+          <RecapItem label="Site" value={formData.siteName} />
+          <RecapItem label="E-mail" value={formData.clientEmail} />
+          <RecapItem label="Adresse" value={formData.clientAddress} full />
+        </RecapBlock>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="sm:col-span-2">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Client</p>
-                      <p className="text-sm font-black text-slate-900">{formData.clientName || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Code client</p>
-                      <p className="text-sm font-semibold text-slate-700">{formData.clientCode || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Téléphone</p>
-                      <p className="text-sm font-semibold text-slate-700">{formData.clientPhone || '—'}</p>
-                    </div>
-                    <div className="sm:col-span-2">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Adresse</p>
-                      <p className="text-sm font-semibold text-slate-700 break-words">{formData.clientAddress || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Site</p>
-                      <p className="text-sm font-semibold text-slate-700">{formData.siteName || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Demandeur</p>
-                      <p className="text-sm font-semibold text-slate-700">{formData.requestorName || '—'}</p>
-                    </div>
-                  </div>
-                </div>
+        <RecapBlock icon={Cpu} title="Machine" step={2} status={stepStatus[2] ? 'ok' : 'ko'} onEdit={() => goToStep(2)}>
+          <RecapItem label="Type" value={formData.machineType} />
+          <RecapItem label="Marque" value={formData.machineBrand} />
+          <RecapItem label="Modèle" value={formData.machineModel} />
+          <RecapItem label="N° de série" value={formData.serialNumber} mono />
+        </RecapBlock>
 
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-indigo-600">
-                      <Cpu size={18} />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Machine</p>
-                      <p className="text-sm font-black text-slate-900">Fiche technique</p>
-                    </div>
-                  </div>
+        <RecapBlock icon={AlertCircle} title="Intervention & diagnostic" step={3} status={stepStatus[3] ? 'ok' : 'ko'} onEdit={() => goToStep(3)}>
+          <RecapItem label="Type d’intervention" value={type?.label || formData.interventionType} />
+          <RecapItem label="Date" value={formData.interventionDate} />
+          <RecapItem label="Type de panne" value={formData.problemDescription} full />
+          <RecapItem label="Diagnostic téléphonique" value={formData.telephoneDiagnostic} full />
+          <RecapItem label="N° de fiche" value={formData.ficheNumber} mono />
+          <RecapItem label="Technicien" value={formData.technicianName || 'Affecté plus tard via une mission'} />
+        </RecapBlock>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="sm:col-span-2">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Type</p>
-                      <p className="text-sm font-black text-slate-900">{formData.machineType || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Marque</p>
-                      <p className="text-sm font-semibold text-slate-700">{formData.machineBrand || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Modèle</p>
-                      <p className="text-sm font-semibold text-slate-700">{formData.machineModel || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">N° Série</p>
-                      <p className="text-sm font-semibold text-slate-700 break-words">{formData.serialNumber || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Date</p>
-                      <p className="text-sm font-semibold text-slate-700">{formData.interventionDate || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">N° Fiche</p>
-                      <p className="text-sm font-semibold text-slate-700 break-words">{formData.ficheNumber || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Technicien</p>
-                      <p className="text-sm font-semibold text-slate-700">{formData.technicianName || 'Non assigné'}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Temps total</p>
-                      <p className="text-sm font-semibold text-slate-700">{formData.totalTime || '—'}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+        {blocking.length > 0 && (
+          <div role="alert" className="flex items-start gap-3 rounded-2xl bg-red-50 px-4 py-3.5 ring-1 ring-inset ring-red-200">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-red-600" aria-hidden="true" />
+            <p className="text-sm font-medium text-red-800">
+              Le dossier ne peut pas être créé : complétez {blocking.map((s) => `l’étape ${s}`).join(', ')}.
+            </p>
+          </div>
+        )}
+        {blocking.length === 0 && warnings.length > 0 && (
+          <div className="flex items-start gap-3 rounded-2xl bg-amber-50 px-4 py-3.5 ring-1 ring-inset ring-amber-200">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-700" aria-hidden="true" />
+            <div>
+              <p className="text-sm font-semibold text-amber-900">Points d’attention (non bloquants)</p>
+              <ul className="mt-1 flex flex-col gap-0.5 text-xs text-amber-800">
+                {warnings.map((w) => <li key={w}>{w}</li>)}
+              </ul>
             </div>
           </div>
-  )
-
-  const stepRenderers = {
-    1: renderStep1,
-    2: renderStep2,
-    3: renderStep3,
-    4: renderStep4,
+        )}
+        {submitError && (
+          <div role="alert" className="flex items-start gap-3 rounded-2xl bg-red-50 px-4 py-3.5 ring-1 ring-inset ring-red-200">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-red-600" aria-hidden="true" />
+            <p className="text-sm font-medium text-red-800">{submitError}</p>
+          </div>
+        )}
+      </DossierSection>
+    )
   }
 
-  const renderStepContent = () => {
-    const renderer = stepRenderers[currentStep]
-    return renderer ? renderer() : null
-  }
-
+  const stepRenderers = { 1: renderStep1, 2: renderStep2, 3: renderStep3, 4: renderStep4 }
 
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-canvas">
-
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-30 flex shrink-0 items-center justify-between gap-3 border-b border-line bg-white/95 px-4 py-3 backdrop-blur sm:px-6 sm:py-4">
-        <div className="flex items-center gap-3 sm:gap-6 min-w-0">
-          <button
-            onClick={() => navigate('/interventions')}
-            className="ui-icon-btn h-10 w-10 shrink-0"
-          >
-            <ChevronLeft size={22} strokeWidth={2.5} />
+      <header className="sticky top-0 z-30 flex shrink-0 items-center justify-between gap-3 border-b border-line bg-white/95 px-4 py-3 backdrop-blur sm:px-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <button type="button" onClick={requestLeave} className="ui-icon-btn h-10 w-10 shrink-0" aria-label="Retour aux interventions">
+            <ChevronLeft size={20} aria-hidden="true" />
           </button>
           <div className="min-w-0">
-            <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-              <h1 className="truncate font-display text-lg font-bold tracking-tight text-ink sm:text-2xl">Nouvelle Intervention</h1>
-              <span className="hidden sm:inline px-3 py-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-[10px] font-black rounded-full uppercase tracking-wider shadow-lg shadow-blue-200 shrink-0">
-                SAV Administration
-              </span>
-            </div>
-            <p className="hidden sm:flex text-slate-500 text-sm font-semibold mt-1 items-center gap-2">
-              <Calendar size={14} />
-              Création et enregistrement d'un nouveau dossier d'intervention
-            </p>
+            <p className="ui-eyebrow hidden sm:block">Service après-vente · Nouveau dossier</p>
+            <h1 className="truncate font-display text-lg font-bold tracking-tight text-ink sm:text-xl">Nouvelle intervention</h1>
           </div>
         </div>
-
-        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-          <button className="ui-btn-secondary hidden sm:inline-flex">
-            <Printer size={18} /> Brouillon
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="ui-ref hidden md:inline-flex" title="Numéro de fiche">
+            <Hash size={12} aria-hidden="true" /> {formData.ficheNumber}
+          </span>
+          <span className="hidden rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 ring-1 ring-inset ring-amber-200 sm:inline-flex">
+            Statut initial : En attente
+          </span>
+          <button type="button" onClick={() => setShowMobilePreview(true)} className="ui-btn-secondary ui-btn-sm xl:hidden">
+            <Eye size={15} aria-hidden="true" /> <span className="hidden sm:inline">Aperçu</span>
           </button>
         </div>
       </header>
 
-      {/* ── Mobile / Tablet horizontal stepper ── */}
       <HorizontalStepper steps={steps} currentStep={currentStep} alwaysVisible={useHorizontalProgress} />
 
       <div className="flex min-w-0 flex-1 overflow-hidden">
-
-        {/* ── Desktop left stepper sidebar ── */}
         <VerticalStepper steps={steps} currentStep={currentStep} hidden={useHorizontalProgress} />
 
-        {/* ── Form area ── */}
         <div className="flex min-w-0 flex-1 flex-col overflow-y-auto bg-canvas">
           <div className="mx-auto w-full max-w-4xl min-w-0 flex-1 px-4 py-5 sm:px-7 sm:py-7">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-              }}
-              className="h-full flex flex-col"
-            >
-              <div className="flex-1">
-                {renderStepContent()}
+            <form onSubmit={(e) => e.preventDefault()} className="flex h-full flex-col" noValidate>
+              <div key={currentStep} className="flex-1 animate-fade-up">
+                {stepRenderers[currentStep]?.()}
               </div>
 
-              {/* ── Navigation buttons ── */}
-              <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t-2 border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between shrink-0 gap-4 sm:gap-3">
-                {/* Right side buttons (Continuer/Valider) placed first on mobile via order */}
-                <div className="order-1 sm:order-2">
+              <div className="sticky bottom-0 z-10 -mx-4 mt-6 flex shrink-0 items-center gap-2 border-t border-line bg-white/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:static sm:mx-0 sm:mt-6 sm:rounded-2xl sm:border sm:bg-white sm:px-4 sm:shadow-card">
+                <button type="button" onClick={prevStep} disabled={currentStep === 1} className="ui-btn-secondary">
+                  <ChevronLeft size={16} aria-hidden="true" />
+                  <span className="hidden sm:inline">Précédent</span>
+                </button>
+                <p className="hidden flex-1 text-center text-xs font-medium text-ink-muted sm:block">
+                  Étape <span className="font-semibold text-ink tabular-nums">{currentStep}</span> sur {steps.length}
+                  {maxReached > currentStep && <> · <button type="button" onClick={() => goToStep(maxReached)} className="font-semibold text-brand-700 hover:underline">reprendre à l’étape {maxReached}</button></>}
+                </p>
+                <div className="flex flex-1 justify-end gap-2 sm:flex-none">
+                  <button type="button" onClick={() => setShowMobilePreview(true)} className="ui-btn-secondary xl:hidden" aria-label="Aperçu de la fiche">
+                    <Eye size={16} aria-hidden="true" />
+                  </button>
                   {currentStep < steps.length ? (
-                    <button
-                      type="button"
-                      onClick={nextStep}
-                      className="ui-btn-primary w-full sm:w-auto"
-                    >
-                      Continuer
-                      <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" strokeWidth={3} />
+                    <button type="button" onClick={nextStep} className="ui-btn-primary flex-1 sm:flex-none">
+                      Continuer <ChevronRight size={16} aria-hidden="true" />
                     </button>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={createIntervention}
-                      className="ui-btn-primary w-full sm:w-auto"
-                    >
-                      <Check size={18} strokeWidth={3} />
-                      Valider
+                    <button type="button" onClick={createIntervention} disabled={isSubmitting} className="ui-btn-primary flex-1 sm:flex-none">
+                      {isSubmitting ? <RefreshCw size={16} className="animate-spin" aria-hidden="true" /> : <Check size={16} strokeWidth={2.5} aria-hidden="true" />}
+                      {isSubmitting ? 'Création…' : 'Créer le dossier'}
                     </button>
                   )}
-                </div>
-
-                {/* Left side buttons (Précédente/Aperçu) placed second on mobile via order */}
-                <div className="flex items-center justify-between sm:justify-start gap-3 order-2 sm:order-1">
-                  <button
-                    type="button"
-                    onClick={prevStep}
-                    disabled={currentStep === 1}
-className="ui-btn-secondary flex-1 sm:flex-none"
-                  >
-                    <ChevronLeft size={18} />
-                    <span className="hidden sm:inline">Étape </span>Précédente
-                  </button>
-
-                  {/* Aperçu button — mobile/tablet only */}
-                  <button
-                    type="button"
-                    onClick={() => setShowMobilePreview(true)}
-                    className="ui-btn-secondary flex-1 xl:hidden"
-                  >
-                    <Eye size={16} />
-                    Aperçu
-                  </button>
                 </div>
               </div>
             </form>
           </div>
         </div>
 
-        {/* ── Desktop fiche preview ── */}
-        <div className="hidden xl:flex w-[620px] bg-slate-100 border-l border-slate-200 flex-col items-center justify-start overflow-y-auto no-scrollbar py-8 px-6 min-w-0">
-          <div className="w-full space-y-4">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Aperçu de la fiche officielle</h4>
-              <div className="flex gap-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-brand-600"></div>
-              </div>
-            </div>
-
-            <div className="w-full bg-white shadow-2xl rounded-none px-7 pt-5 pb-8 relative transition-all duration-700 overflow-hidden border border-slate-300 text-slate-900 leading-none" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-              <FicheContent interventionData={previewInterventionData} parts={previewParts} laborPrice={previewLaborPrice} logo={logo} />
-            </div>
-          </div>
-        </div>
-
+        <aside className="hidden w-[440px] min-w-0 shrink-0 flex-col overflow-y-auto border-l border-line bg-slate-100/80 px-5 py-6 no-scrollbar xl:flex 2xl:w-[540px]" aria-label="Aperçu de la fiche">
+          <FicheViewport
+            reference={
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-teal-700 ring-1 ring-inset ring-line">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-teal-500" aria-hidden="true" /> Synchronisé
+              </span>
+            }
+            interventionData={previewInterventionData}
+            parts={previewParts}
+            laborPrice={previewLaborPrice}
+            logo={logo}
+          />
+        </aside>
       </div>
 
-      {/* ── Mobile preview modal ── */}
       {showMobilePreview && (
         <MobileFichePreviewModal
           onClose={() => setShowMobilePreview(false)}
@@ -746,18 +653,18 @@ className="ui-btn-secondary flex-1 sm:flex-none"
         />
       )}
 
-      {/* ── Client Selection Modal ── */}
-      <ClientSelectionModal 
-        isOpen={isClientModalOpen}
-        onClose={() => setIsClientModalOpen(false)}
-        onSelect={handleClientSelect}
-      />
+      <ClientSelectionModal isOpen={isClientModalOpen} onClose={() => setIsClientModalOpen(false)} onSelect={handleClientSelect} />
+      <MachineSelectionModal isOpen={isMachineModalOpen} onClose={() => setIsMachineModalOpen(false)} onSelect={handleMachineSelect} />
 
-      {/* ── Machine Selection Modal ── */}
-      <MachineSelectionModal 
-        isOpen={isMachineModalOpen}
-        onClose={() => setIsMachineModalOpen(false)}
-        onSelect={handleMachineSelect}
+      <ConfirmDialog
+        open={confirmLeave}
+        tone="warning"
+        title="Quitter sans enregistrer ?"
+        message="Les informations saisies pour ce nouveau dossier seront perdues."
+        confirmLabel="Quitter"
+        cancelLabel="Continuer la saisie"
+        onClose={() => setConfirmLeave(false)}
+        onConfirm={() => navigate('/interventions')}
       />
     </div>
   )

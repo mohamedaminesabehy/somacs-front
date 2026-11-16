@@ -55,7 +55,7 @@ export function parseDateLike(value) {
   return null
 }
 
-export function relativeDateLabel(value, emptyLabel = 'Date non prÃ©cisÃ©e') {
+export function relativeDateLabel(value, emptyLabel = 'Date non précisée') {
   const date = parseDateLike(value)
   if (!date) return emptyLabel
   const today = new Date()

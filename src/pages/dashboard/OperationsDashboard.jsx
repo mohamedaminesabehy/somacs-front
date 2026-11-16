@@ -70,7 +70,7 @@ export default function OperationsDashboard({ currentUser }) {
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear())
   const [activityPage, setActivityPage] = useState(1)
 
-  const { isLoading, users, missions, interventions, machines } = useOperationsDashboardData()
+  const { isLoading, users, missions, interventions, machines, overdueMissions = null } = useOperationsDashboardData()
 
   const yearOptions = useMemo(() => {
     const years = new Set()
@@ -132,13 +132,16 @@ export default function OperationsDashboard({ currentUser }) {
     const machinesWithoutDocs = Math.max(machines.length - machinesWithDocs, 0)
 
     const alerts = [
+      ...(overdueMissions != null
+        ? [{ key: 'overdue', title: 'Missions en retard', value: overdueMissions, severity: overdueMissions > 0 ? 'high' : 'low', to: '/missions?status=overdue' }]
+        : []),
       { key: 'unassigned', title: 'Interventions non affectées', value: unassignedInterventions, severity: unassignedInterventions > 0 ? 'medium' : 'low', to: '/interventions' },
       { key: 'blocked', title: 'Missions bloquées', value: missionCounts.Bloquée, severity: missionCounts.Bloquée > 0 ? 'high' : 'low', to: '/missions' },
       { key: 'docs', title: 'Machines sans documentation', value: machinesWithoutDocs, severity: machinesWithoutDocs > 0 ? 'medium' : 'low', to: '/machines' },
     ]
 
     return { activeUsers, missionCounts, missionOpen, interventionCounts, interventionOpen, highPriorityInterventions, machinesWithDocs, alerts }
-  }, [users, machines, filteredMissions, filteredInterventions])
+  }, [users, machines, filteredMissions, filteredInterventions, overdueMissions])
 
   const missionRows = missionStatuses.map((status) => ({ key: status, count: analytics.missionCounts[status] || 0, ...MISSION_META[status] }))
   const interventionRows = interventionStatuses.map((status) => ({ key: status, count: analytics.interventionCounts[status] || 0, ...INTERVENTION_META[status] }))

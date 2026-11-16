@@ -128,7 +128,55 @@ function json(payload, status = 200) {
   return new Response(JSON.stringify(payload), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
-function route(method, pathname, body) {
+const AUDIT_TEMPLATES = [
+  { action: 'UPDATE_INTERVENTION', entity: 'INTERVENTION', description: 'Clôture de l\'intervention INT-2041 — autoclave Melag remis en service' },
+  { action: 'USE_AI_ASSISTANT', entity: 'MACHINE', description: 'Diagnostic IA : erreur E12 pompe à vide sur MC-101' },
+  { action: 'UPDATE_MISSION', entity: 'MISSION', description: 'Mission MS-318 passée au statut « En cours »' },
+  { action: 'CREATE_MACHINE', entity: 'MACHINE', description: 'Ajout de l\'analyseur Mindray BS-240 au parc client' },
+  { action: 'ASSIGN_USER_INTERVENTION', entity: 'INTERVENTION', description: 'Affectation d\'un technicien sur l\'intervention INT-2046' },
+  { action: 'CREATE_MISSION', entity: 'MISSION', description: 'Création de la mission préventive Clinique Les Oliviers' },
+  { action: 'UPDATE_MACHINE', entity: 'MACHINE', description: 'Mise à jour de la date de prochaine maintenance MC-126' },
+  { action: 'CREATE_INTERVENTION', entity: 'INTERVENTION', description: 'Ouverture d\'une intervention corrective — échographe GE' },
+  { action: 'DELETE_MISSION', entity: 'MISSION', description: 'Suppression d\'une mission en doublon' },
+  { action: 'UPDATE_INTERVENTION', entity: 'INTERVENTION', description: 'Ajout des pièces remplacées et du rapport technicien' },
+  { action: 'DELETE_MACHINE', entity: 'MACHINE', description: 'Retrait du parc : fauteuil dentaire réformé' },
+  { action: 'UPDATE_MISSION', entity: 'MISSION', description: 'Replanification de la mission MS-322' },
+]
+const TECH_AUDIT_ACTIONS = ['UPDATE_MISSION', 'UPDATE_INTERVENTION', 'ASSIGN_USER_INTERVENTION', 'USE_AI_ASSISTANT']
+
+function demoAuditLogs(userId, query) {
+  const user = users.find((u) => u.id === userId)
+  if (!user || !user.isActive) return []
+  const templates = user.role === 'Technicien'
+    ? AUDIT_TEMPLATES.filter((t) => TECH_AUDIT_ACTIONS.includes(t.action))
+    : AUDIT_TEMPLATES
+  const start = query?.get('dateStart') ? new Date(`${query.get('dateStart')}T00:00:00`) : null
+  const end = query?.get('dateEnd') ? new Date(`${query.get('dateEnd')}T23:59:59`) : null
+  const now = Date.now()
+  const logs = []
+  for (let i = 0; i < 46; i += 1) {
+    const template = templates[(i * 7 + userId) % templates.length]
+    const createdAt = new Date(now - i * 15.5 * 3600000 - ((i * 37) % 60) * 60000)
+    if (start && createdAt < start) continue
+    if (end && createdAt > end) continue
+    const entityId = 100 + ((i * 13 + userId * 5) % 80)
+    const isUpdate = template.action.startsWith('UPDATE')
+    logs.push({
+      id: userId * 1000 + i,
+      userId,
+      ...template,
+      entityId,
+      status: i % 17 === 5 ? 'FAILED' : 'SUCCESS',
+      ipAddress: `10.0.${userId}.${20 + (i % 40)}`,
+      oldData: isUpdate ? { statut: 'Planifiée', priorite: 'Normale' } : null,
+      newData: isUpdate ? { statut: 'En cours', priorite: i % 2 ? 'Haute' : 'Normale' } : template.action.startsWith('CREATE') ? { reference: `REF-${entityId}` } : null,
+      createdAt: createdAt.toISOString(),
+    })
+  }
+  return logs
+}
+
+function route(method, pathname, body, query) {
   const parts = pathname.split('/').filter(Boolean)
   const [resource, idOrSub, sub] = parts
 
@@ -145,6 +193,23 @@ function route(method, pathname, body) {
     if (idOrSub === 'center') return json({ items: notifications, total: notifications.length, unreadCount: 2 })
     if (idOrSub === 'unread-count') return json({ count: 2 })
     return json(notifications)
+  }
+
+  if (resource === 'audit-logs' && idOrSub === 'user') {
+    const logs = demoAuditLogs(Number(sub), query)
+    if (parts[3] === 'stats') {
+      const actionsByType = {}
+      logs.forEach((log) => { actionsByType[log.action] = (actionsByType[log.action] || 0) + 1 })
+      return json({ total: logs.length, actionsByType })
+    }
+    const limit = Math.max(1, Number(query?.get('limit')) || 20)
+    const totalPages = Math.max(1, Math.ceil(logs.length / limit))
+    const page = Math.min(totalPages, Math.max(1, Number(query?.get('page')) || 1))
+    return json({ items: logs.slice((page - 1) * limit, page * limit), total: logs.length, page, totalPages })
+  }
+
+  if (resource === 'missions' && sub === 'view' && method === 'POST') {
+    return json({ recorded: false, demo: true })
   }
 
   const collection = collections[resource]
@@ -180,11 +245,11 @@ export function installDemoApi(apiBaseUrl) {
   window.fetch = async (input, init = {}) => {
     const url = typeof input === 'string' ? input : input.url
     if (!url.startsWith(apiBaseUrl)) return originalFetch(input, init)
-    const { pathname } = new URL(url.slice(apiBaseUrl.length) || '/', 'http://demo.local')
+    const { pathname, searchParams } = new URL(url.slice(apiBaseUrl.length) || '/', 'http://demo.local')
     let body = null
     try { body = typeof init.body === 'string' ? JSON.parse(init.body) : null } catch { body = null }
     await new Promise((resolve) => setTimeout(resolve, 180))
-    return route((init.method || 'GET').toUpperCase(), pathname, body)
+    return route((init.method || 'GET').toUpperCase(), pathname, body, searchParams)
   }
   console.info('[SOMACS] Mode démonstration UI actif (dev uniquement). Identifiants : admin / coord / tech / autre = Responsable.')
 }

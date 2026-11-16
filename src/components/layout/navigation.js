@@ -1,4 +1,5 @@
 import {
+  Bell,
   Building2,
   ClipboardList,
   History,
@@ -11,6 +12,7 @@ import {
   Users,
   Wrench,
   CheckSquare,
+  Gauge,
 } from 'lucide-react'
 
 export function getRoleFlags(currentUser) {
@@ -81,6 +83,7 @@ export function getNavigationSections(currentUser) {
       title: 'Espace technicien',
       items: [
         { to: '/missions/my', icon: ClipboardList, label: 'Mes missions' },
+        { to: '/sav', icon: Gauge, label: 'Pilotage SAV' },
         { to: `/employees/${currentUser?.id || 'me'}/history`, icon: History, label: 'Historique interventions' },
         { to: '/machines', icon: Settings, label: 'Parc machines' },
         { to: '/clients', icon: Building2, label: 'Clients 360' },
@@ -91,7 +94,10 @@ export function getNavigationSections(currentUser) {
   if (canAccessOperationsDashboard || canAccessAdminMenu) {
     sections.push({
       title: 'Pilotage',
-      items: [{ to: '/dashboard', end: true, icon: LayoutDashboard, label: 'Tableau de bord' }],
+      items: [
+        { to: '/dashboard', end: true, icon: LayoutDashboard, label: 'Tableau de bord' },
+        { to: '/sav', icon: Gauge, label: 'Pilotage SAV' },
+      ],
     })
     sections.push(operationalSection, assetsSection)
   }
@@ -103,11 +109,18 @@ export function getNavigationSections(currentUser) {
     })
   }
 
+  sections.push({
+    title: 'Communication',
+    items: [{ to: '/notifications', icon: Bell, label: 'Notifications' }],
+  })
+
   return sections
 }
 
 const ROUTE_TITLES = [
   { match: /^\/dashboard/, title: 'Tableau de bord', section: 'Pilotage' },
+  { match: /^\/sav/, title: 'Pilotage SAV', section: 'Pilotage' },
+  { match: /^\/notifications/, title: 'Centre de notifications', section: 'Communication' },
   { match: /^\/missions\/my/, title: 'Mes missions', section: 'Espace technicien' },
   { match: /^\/missions\/assign/, title: 'Affecter une mission', section: 'Missions' },
   { match: /^\/missions\/[^/]+/, title: 'Détail de la mission', section: 'Missions' },

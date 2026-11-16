@@ -1,9 +1,9 @@
 import { Eye, Edit2, UserCheck2, Trash2 } from 'lucide-react'
 
-const BASE_BTN = 'flex items-center justify-center gap-1.5 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all border active:scale-95'
-const PRIMARY_BTN = `${BASE_BTN} text-brand-800 bg-brand-800/5 hover:bg-brand-900 hover:text-white border-brand-800/10`
-const DANGER_BTN = `${BASE_BTN} text-red-600 bg-red-50 hover:bg-red-600 hover:text-white border-red-100`
-const DISABLED_BTN = `${BASE_BTN} text-slate-300 bg-slate-100 border-slate-200 cursor-not-allowed pointer-events-none`
+const BASE_BTN = 'flex min-h-9 items-center justify-center gap-1.5 text-xs font-semibold rounded-xl transition-colors ring-1 ring-inset active:scale-[0.98]'
+const PRIMARY_BTN = `${BASE_BTN} text-ink bg-white ring-line hover:bg-brand-50 hover:text-brand-700 hover:ring-brand-200`
+const DANGER_BTN = `${BASE_BTN} text-red-600 bg-white ring-red-100 hover:bg-red-50`
+const DISABLED_BTN = `${BASE_BTN} text-slate-300 bg-slate-50 ring-line cursor-not-allowed pointer-events-none`
 
 /**
  * Renders the 4 action buttons for an intervention item.

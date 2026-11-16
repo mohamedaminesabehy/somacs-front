@@ -1,70 +1,42 @@
-﻿import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import {
-  ArrowLeft, CheckCircle2, Clock, Calendar, MapPin,
-  Building2, Wrench, ClipboardList, AlertTriangle, Link2,
-  User, FileText, Hash, ChevronRight, Edit2,
-  CheckSquare, Flag, Phone, Zap, Info,
-  ExternalLink, History, Save,
-  MoreVertical, Paperclip, File, X,
-  Download, Eye, Truck
-} from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Calendar, CheckCircle2, ClipboardList, Hash, X } from 'lucide-react'
 import {
   MISSION_PRIORITY_CONFIG as PRIORITY_CONFIG,
   MISSION_STATUS_CONFIG as STATUS_CONFIG,
-  MISSION_STATUS_STEPS as STATUS_STEPS,
 } from '../../constants/missionConstants'
-import { getAuthToken, isAuthTokenUsable } from '../../api/apiClient'
+import { apiFetch, getAuthToken, isAuthTokenUsable } from '../../api/apiClient'
 import LoginRequiredModal from '../../components/auth/LoginRequiredModal'
 import { useMissionDetailsData } from './hooks/useMissionDetailsData'
 import { useMissionStatusActions } from './hooks/useMissionStatusActions'
+import { ROLE_TECHNICIEN, buildTeamMembers, normalizeRole, readStoredUser } from './details/missionDetailsUtils'
+import MissionHero from './details/MissionHero'
+import MissionActionPanel from './details/MissionActionPanel'
+import MissionInfoCard from './details/MissionInfoCard'
+import MissionClientCard from './details/MissionClientCard'
+import MissionTeamCard from './details/MissionTeamCard'
+import MissionInterventionCard, { InterventionClosedDialog } from './details/MissionInterventionCard'
+import MissionNotesCard from './details/MissionNotesCard'
+import MissionDocumentsCard, { DocumentViewer } from './details/MissionDocumentsCard'
 
-const ACTIONS_SECTION_ACCENT = {
-  'À faire': 'border-blue-200',
-  'En cours': 'border-amber-300',
-  'Terminée': 'border-green-200',
-  'Bloquée': 'border-red-200',
-}
+const CLOSED_DOC_VIEWER = { open: false, url: '', type: '', name: '', isPdf: false, downloadUrl: '', publicId: '' }
 
-function SectionHeader({ icon, title, children }) {
-  const SectionIcon = icon
+function MissionDetailsSkeleton() {
   return (
-    <div className="flex items-center justify-between mb-4">
-      <div className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500">
-          <SectionIcon size={18} />
+    <div className="min-h-screen bg-canvas" aria-busy="true" aria-label="Chargement de la mission">
+      <div className="bg-navy-900 px-4 pb-8 pt-4 sm:px-6">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4">
+          <div className="h-9 w-9 rounded-lg bg-white/10" />
+          <div className="h-4 w-32 rounded bg-white/10" />
+          <div className="h-7 w-2/3 rounded bg-white/10" />
         </div>
-        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">{title}</h3>
       </div>
-      {children}
-    </div>
-  )
-}
-
-function InfoItem({ label, value, icon, colorClass = "text-slate-500" }) {
-  const ItemIcon = icon
-  return (
-    <div className="flex items-start gap-3 py-3 border-b border-slate-50 last:border-0">
-      <div className={`mt-0.5 ${colorClass}`}>
-        <ItemIcon size={16} />
-      </div>
-      <div>
-        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-tight mb-0.5">{label}</p>
-        <p className="text-sm font-semibold text-slate-700">{value || 'Non spécifié'}</p>
+      <div className="mx-auto grid max-w-6xl gap-4 p-4 sm:p-6 lg:grid-cols-12">
+        <div className="ui-skeleton h-64 rounded-2xl lg:col-span-4" />
+        <div className="ui-skeleton h-64 rounded-2xl lg:col-span-8" />
       </div>
     </div>
   )
-}
-
-function downloadDocument(url, filename) {
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename || 'document'
-  link.target = '_blank'
-  link.rel = 'noopener noreferrer'
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
 }
 
 export default function MissionDetails({ allowUnauthenticated = false }) {
@@ -75,6 +47,10 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
   // ── Authentication gate ─────────────────────────────────────────────────────
   const [isAuthenticated, setIsAuthenticated] = useState(() => isAuthTokenUsable(getAuthToken()))
   const [showLoginModal, setShowLoginModal] = useState(() => allowUnauthenticated && !isAuthTokenUsable(getAuthToken()))
+  const [currentUser] = useState(readStoredUser)
+  const isTechnician = normalizeRole(currentUser) === ROLE_TECHNICIEN
+  const backPath = isTechnician ? '/missions/my' : '/missions'
+  const backLabel = isTechnician ? 'Mes missions' : 'Missions'
 
   const handleModalLoginSuccess = () => {
     setIsAuthenticated(true)
@@ -109,79 +85,101 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
     setMissionActionError, refreshTimerRef, mileageEditingRef,
   })
 
+  const [pendingStatus, setPendingStatus] = useState('')
+  const onStatusChange = async (nextStatus) => {
+    if (pendingStatus || nextStatus === status) return
+    setPendingStatus(nextStatus)
+    try {
+      await handleStatusChange(nextStatus)
+    } finally {
+      setPendingStatus('')
+    }
+  }
+
   const [showInterventionPreview, setShowInterventionPreview] = useState(false)
-  const [docViewer, setDocViewer] = useState({ open: false, url: '', type: '', name: '', isPdf: false, downloadUrl: '', publicId: '' })
+  const [docViewer, setDocViewer] = useState(CLOSED_DOC_VIEWER)
   const [showInterventionClosedSuccess, setShowInterventionClosedSuccess] = useState(false)
   const [showStatusAttention, setShowStatusAttention] = useState(false)
   const [statusAttentionText, setStatusAttentionText] = useState('')
-  const statusAttentionTimerRef = useRef(null)
-  const lastStatusAttentionRef = useRef('')
-  const lastInterventionStatusRef = useRef('')
 
-  // Handle intervention closed success toast from navigation state
+  // Consultation : un seul appel par ouverture de fiche (garde contre le double montage StrictMode).
+  // Le backend ne retient que l'ouverture par le technicien assigné.
+  const recordedViewRef = useRef(null)
   useEffect(() => {
-    if (!location.state?.interventionClosedSuccess) return undefined
+    if (!isAuthenticated || !id || recordedViewRef.current === id) return
+    recordedViewRef.current = id
+    apiFetch(`/missions/${id}/view`, { method: 'POST', auth: true }).catch(() => {})
+  }, [id, isAuthenticated])
+
+  // Intervention closed success toast from navigation state: shown during render for each
+  // navigation entry carrying the flag, then the flag is cleared from history by the effect below.
+  const interventionClosedFlag = Boolean(location.state?.interventionClosedSuccess)
+  const [handledClosedKey, setHandledClosedKey] = useState(null)
+  if (interventionClosedFlag && handledClosedKey !== location.key) {
+    setHandledClosedKey(location.key)
     setShowInterventionClosedSuccess(true)
+  }
+
+  useEffect(() => {
+    if (!interventionClosedFlag) return
     navigate(
       { pathname: location.pathname, search: location.search },
       { replace: true, state: { ...location.state, interventionClosedSuccess: false } },
     )
+  }, [interventionClosedFlag, location.pathname, location.search, location.state, navigate])
+
+  useEffect(() => {
+    if (!showInterventionClosedSuccess) return undefined
     const timer = window.setTimeout(() => setShowInterventionClosedSuccess(false), 4500)
     return () => window.clearTimeout(timer)
-  }, [location.pathname, location.search, location.state, navigate])
+  }, [showInterventionClosedSuccess])
 
-  // Status attention notification
-  useEffect(() => {
-    if (!status) return
+  // Status attention notification: triggered when the mission status changes, or when the
+  // intervention status changes to a new non-empty value.
+  const [lastAttention, setLastAttention] = useState({ status: '', interventionStatus: '', seq: 0 })
+  if (status) {
     const interventionStatus = intervention?.status || ''
-    const interventionChanged = interventionStatus && lastInterventionStatusRef.current !== interventionStatus
-    if (interventionChanged) lastInterventionStatusRef.current = interventionStatus
-    if (!interventionChanged && lastStatusAttentionRef.current === status) return
-    lastStatusAttentionRef.current = status
-    if (statusAttentionTimerRef.current) window.clearTimeout(statusAttentionTimerRef.current)
-    setStatusAttentionText(`Statut actuel : ${status}`)
-    setShowStatusAttention(true)
-    statusAttentionTimerRef.current = window.setTimeout(() => {
-      setShowStatusAttention(false)
-      statusAttentionTimerRef.current = null
-    }, 3500)
-  }, [status, intervention?.status])
+    const interventionChanged = Boolean(interventionStatus) && lastAttention.interventionStatus !== interventionStatus
+    if (interventionChanged || lastAttention.status !== status) {
+      setLastAttention({
+        status,
+        interventionStatus: interventionChanged ? interventionStatus : lastAttention.interventionStatus,
+        seq: lastAttention.seq + 1,
+      })
+      setStatusAttentionText(`Statut actuel : ${status}`)
+      setShowStatusAttention(true)
+    }
+  }
+
+  useEffect(() => {
+    if (!showStatusAttention) return undefined
+    const timer = window.setTimeout(() => setShowStatusAttention(false), 3500)
+    return () => window.clearTimeout(timer)
+  }, [showStatusAttention, lastAttention.seq])
 
   // ── Unauthenticated preview (notification flow) ──────────────────────────────
   if (!isAuthenticated && allowUnauthenticated) {
     return (
-      <div className="min-h-screen bg-canvas flex flex-col items-center justify-center p-6">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-canvas p-6">
         <LoginRequiredModal
           isOpen={showLoginModal}
           onLoginSuccess={handleModalLoginSuccess}
           message="Connectez-vous pour accéder aux détails complets de cette mission."
         />
-        <div className="w-full max-w-lg bg-white rounded-3xl border border-slate-200 shadow-xl p-8 text-center">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center mb-5">
-            <ClipboardList size={28} className="text-blue-600" />
-          </div>
-          <h1 className="text-xl font-black text-slate-900 mb-2">Nouvelle mission reçue</h1>
-          <p className="text-sm text-slate-500 mb-6">
-            Vous avez reçu une notification pour la mission <span className="font-bold text-slate-700">#{id}</span>.
+        <div className="ui-card w-full max-w-md p-6 text-center sm:p-8">
+          <span className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-100">
+            <ClipboardList size={26} aria-hidden="true" />
+          </span>
+          <h1 className="font-display text-xl font-bold text-ink">Nouvelle mission reçue</h1>
+          <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+            Vous avez reçu une notification pour la mission <span className="font-mono font-semibold text-ink-soft">#{id}</span>.
           </p>
-          <div className="bg-slate-50 rounded-2xl border border-slate-100 p-5 mb-6 text-left space-y-3">
-            <div className="flex items-center gap-3">
-              <Hash size={14} className="text-slate-400" />
-              <span className="text-sm font-semibold text-slate-700">Référence : #{id}</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <Calendar size={14} className="text-slate-400" />
-              <span className="text-sm text-slate-600">Date : {new Date().toLocaleDateString('fr-FR')}</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <AlertTriangle size={14} className="text-amber-500" />
-              <span className="text-sm text-slate-600">Connectez-vous pour voir tous les détails</span>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowLoginModal(true)}
-            className="w-full px-6 py-3.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-200"
-          >
+          <ul className="my-6 flex flex-col gap-3 rounded-xl border border-line bg-canvas p-4 text-left text-sm text-ink-soft">
+            <li className="flex items-center gap-3"><Hash size={14} aria-hidden="true" className="text-ink-faint" />Référence : #{id}</li>
+            <li className="flex items-center gap-3"><Calendar size={14} aria-hidden="true" className="text-ink-faint" />Date : {new Date().toLocaleDateString('fr-FR')}</li>
+            <li className="flex items-center gap-3"><AlertTriangle size={14} aria-hidden="true" className="text-amber-500" />Connectez-vous pour voir tous les détails</li>
+          </ul>
+          <button type="button" onClick={() => setShowLoginModal(true)} className="ui-btn-primary h-12 w-full">
             Se connecter pour voir les détails
           </button>
         </div>
@@ -192,742 +190,124 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
   // Loading and error states
   if (!mission && !isLoadingMission) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4">
-        <div className="w-20 h-20 bg-white rounded-3xl border-2 border-slate-200 flex items-center justify-center shadow-sm">
-          <AlertTriangle size={36} className="text-slate-300" />
-        </div>
-        <p className="text-slate-500 font-black text-lg">{missionActionError || 'Mission introuvable'}</p>
-        <button
-          onClick={() => navigate('/missions/my')}
-          className="flex items-center gap-2 px-6 py-3 bg-brand-600 text-white rounded-xl text-sm font-black shadow-lg shadow-blue-200 hover:bg-brand-700 transition-colors"
-        >
-          <ArrowLeft size={16} strokeWidth={3} /> Retour à mes missions
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-canvas p-6 text-center">
+        <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-ink-faint ring-1 ring-inset ring-line">
+          <AlertTriangle size={30} aria-hidden="true" />
+        </span>
+        <p className="font-display text-lg font-bold text-ink">{missionActionError || 'Mission introuvable'}</p>
+        <button type="button" onClick={() => navigate(backPath)} className="ui-btn-primary">
+          <ArrowLeft size={16} aria-hidden="true" /> Retour à {backLabel.toLowerCase()}
         </button>
       </div>
     )
   }
-  if (!mission) {
-    return (
-      <div className="min-h-screen bg-canvas flex flex-col">
-        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200">
-          <div className="max-w-[1600px] mx-auto px-3 sm:px-4 h-14 sm:h-16 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-slate-100 animate-pulse" />
-            <div className="h-4 w-40 bg-slate-100 rounded animate-pulse" />
-          </div>
-        </header>
-        <main className="flex-1 max-w-[1600px] mx-auto w-full p-4 sm:p-6 lg:p-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-pulse">
-            <div className="lg:col-span-8 space-y-6">
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
-                <div className="flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-slate-100" /><div className="flex-1 space-y-2"><div className="h-3 w-24 bg-slate-100 rounded" /><div className="h-5 w-2/3 bg-slate-100 rounded" /></div></div>
-                <div className="h-20 bg-slate-50 rounded-xl" />
-              </div>
-            </div>
-            <div className="lg:col-span-4 space-y-6">
-              <div className="bg-white rounded-2xl border border-slate-200 p-6 h-48" />
-            </div>
-          </div>
-        </main>
-      </div>
-    )
+  if (!mission) return <MissionDetailsSkeleton />
+
+  const priority = PRIORITY_CONFIG[mission.priority] || PRIORITY_CONFIG['Moyenne']
+  const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG['À faire']
+  const teamMembers = buildTeamMembers(mission, groupedEmployeesDisplay || mission.employee)
+
+  const openIntervention = () => {
+    if (intervention.status === 'CLOSED') setShowInterventionPreview(true)
+    else navigate(`/interventions/${intervention.id}`, { state: { assignedTechnicianName: mission.employee, missionId: mission.id, fromMissionDetails: true } })
   }
 
-  const priority   = PRIORITY_CONFIG[mission.priority] || PRIORITY_CONFIG['Moyenne']
-  const statusCfg  = STATUS_CONFIG[status] || STATUS_CONFIG['À faire']
-  const PROGRESS_MAP = { 'À faire': 10, 'En cours': 50, 'Terminée': 100 }
-  const progressPct = PROGRESS_MAP[status] || 0
+  const openDocument = (doc) => setDocViewer({
+    open: true,
+    url: doc.viewUrl || doc.url,
+    type: doc.type,
+    name: doc.name,
+    isPdf: doc.isPdf,
+    downloadUrl: doc.downloadUrl,
+    publicId: doc.publicId,
+  })
 
   return (
-    <div className="min-h-screen bg-canvas flex flex-col">
-      {/* TOAST NOTIFICATION */}
+    <div className="min-h-screen bg-canvas pb-10">
+      <p className="sr-only" role="status" aria-live="polite">{showStatusAttention ? statusAttentionText : ''}</p>
+
       {showSaveToast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-4">
-          <div className="bg-slate-900 text-white border border-slate-700 px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3">
-            <CheckCircle2 size={20} className="text-green-400" />
-            <span className="text-sm font-bold tracking-wide">{typeof showSaveToast === 'string' ? showSaveToast : 'Statut mis à jour'}</span>
+        <div className="fixed left-1/2 top-4 z-[100] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 animate-in fade-in slide-in-from-top-4" role="status">
+          <div className="flex items-center gap-3 rounded-xl bg-navy-900 px-4 py-3 text-white shadow-raised">
+            <CheckCircle2 size={18} aria-hidden="true" className="shrink-0 text-emerald-400" />
+            <span className="text-sm font-semibold">{typeof showSaveToast === 'string' ? showSaveToast : 'Modifications enregistrées'}</span>
           </div>
         </div>
       )}
 
       {showInterventionClosedSuccess && (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm" onClick={() => setShowInterventionClosedSuccess(false)} />
-          <div className="relative z-10 w-full max-w-md rounded-2xl border border-green-200 bg-white shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-5 sm:p-6">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-green-50 border border-green-200 text-green-600 flex items-center justify-center shrink-0">
-                  <CheckCircle2 size={24} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-green-600 mb-1">Succès</p>
-                  <h2 className="text-base sm:text-lg font-black text-slate-900 leading-snug">
-                    L’intervention a été clôturée avec succès.
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowInterventionClosedSuccess(false)}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition-colors shrink-0"
-                  aria-label="Fermer"
-                >
-                  <X size={17} />
-                </button>
-              </div>
-              <div className="mt-5 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setShowInterventionClosedSuccess(false)}
-                  className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-xs font-black uppercase tracking-wider transition-colors shadow-lg shadow-blue-100"
-                >
-                  OK
-                </button>
-              </div>
-            </div>
+        <div className="fixed left-1/2 top-4 z-[130] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 animate-in fade-in slide-in-from-top-4" role="status">
+          <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 shadow-raised">
+            <CheckCircle2 size={18} aria-hidden="true" className="shrink-0 text-emerald-600" />
+            <span className="flex-1 text-sm font-semibold text-ink">L’intervention a été clôturée avec succès.</span>
+            <button type="button" onClick={() => setShowInterventionClosedSuccess(false)} aria-label="Fermer" className="rounded-md p-1 text-ink-muted hover:bg-canvas">
+              <X size={14} aria-hidden="true" />
+            </button>
           </div>
         </div>
       )}
 
-      {/* ── Top Bar ── */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200">
-        <div className="max-w-[1600px] mx-auto px-3 sm:px-4 h-14 sm:h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-            <button
-              onClick={() => navigate('/missions/my')}
-              className="p-1.5 sm:p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors shrink-0"
-            >
-              <ArrowLeft size={18} />
-            </button>
-            <div className="hidden sm:block h-6 w-px bg-slate-200 mx-1" />
-            <div className="min-w-0">
-              <div className="hidden sm:flex items-center gap-2 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                <button onClick={() => navigate('/missions/my')} className="hover:text-brand-600">Missions</button>
-                <ChevronRight size={10} />
-                <span className="text-slate-500">Détails</span>
-              </div>
-              <h1 className="text-xs sm:text-sm font-black text-slate-900 leading-none mt-0.5 sm:mt-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                <span className="truncate">{mission.title}</span>
-                {mission?.dueTime && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 text-[10px] font-black w-fit">
-                    <Clock size={12} />
-                    {mission.dueTime}
-                  </span>
-                )}
-              </h1>
-            </div>
-          </div>
+      <MissionHero
+        mission={mission}
+        status={status}
+        statusCfg={statusCfg}
+        priority={priority}
+        teamSize={teamMembers.length}
+        onBack={() => navigate(backPath)}
+        backLabel={backLabel}
+      />
 
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <div className="hidden sm:flex items-center gap-2 mr-4">
-              <span className={`px-2.5 py-1 rounded-full text-[10px] font-black border ${priority.badge}`}>
-                {priority.label}
-              </span>
-              <span className={`px-2.5 py-1 rounded-full text-[10px] font-black border ${statusCfg.badge}`}>
-                {status}
-              </span>
-            </div>
-            <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400">
-              <MoreVertical size={18} />
-            </button>
+      <main className="mx-auto -mt-4 grid max-w-6xl grid-cols-1 gap-4 px-4 sm:px-6 lg:grid-cols-12 lg:gap-6">
+        <div className="flex flex-col gap-4 lg:col-span-5 lg:gap-6 xl:col-span-4">
+          <div className="lg:sticky lg:top-4">
+            <MissionActionPanel
+              status={status}
+              onStatusChange={onStatusChange}
+              pendingStatus={pendingStatus}
+              statusJustChangedTo={statusJustChangedTo}
+              missionActionError={missionActionError}
+              onDismissError={() => setMissionActionError('')}
+              vehicle={mission.vehicle}
+              vehicleKilometrageDepart={vehicleKilometrageDepart}
+              setVehicleKilometrageDepart={setVehicleKilometrageDepart}
+              vehicleKilometrageRetour={vehicleKilometrageRetour}
+              setVehicleKilometrageRetour={setVehicleKilometrageRetour}
+              vehicleMileageError={vehicleMileageError}
+              mileageEditingRef={mileageEditingRef}
+              showStatusAttention={showStatusAttention}
+            />
+          </div>
+          <div className="hidden flex-col gap-4 lg:flex lg:gap-6">
+            <MissionTeamCard members={teamMembers} vehicle={mission.vehicle} currentUserId={currentUser?.id} />
           </div>
         </div>
-      </header>
 
-      {/* ── Main Content ── */}
-      <main className="flex-1 max-w-[1600px] mx-auto w-full p-4 sm:p-6 lg:p-8">
-        {/*
-          Responsive note:
-          - On mobile/tablet the column wrappers use `display: contents` so every
-            card becomes a direct flex item of this container and can be ordered
-            independently (Véhicule affecté is pushed last via `order-last`).
-          - At `lg:` the wrappers fall back to normal block columns, so the
-            desktop layout and ordering stay exactly the same.
-        */}
-        <div className="flex flex-col gap-6 lg:grid lg:grid-cols-12 lg:gap-6">
-          
-          {/* Left Column: Mission Content (8 cols) */}
-          <div className="contents lg:block lg:col-span-8 lg:space-y-6">
-            
-            {/* Mission Card */}
-            <div className="bg-blue-50/40 lg:bg-white rounded-2xl border border-blue-100 lg:border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-4 sm:p-6">
-                <div className="flex items-start justify-between mb-4 sm:mb-6">
-                  <div className="flex items-center gap-3 sm:gap-4">
-                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center shrink-0 ${
-                      mission.type === 'Intervention' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'
-                    }`}>
-                      {mission.type === 'Intervention' ? <Wrench size={20} /> : <ClipboardList size={20} />}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="text-[10px] font-black text-brand-600 bg-blue-50 px-2 py-0.5 rounded uppercase tracking-wider">
-                          {mission.type}
-                        </span>
-                        <span className="text-[10px] font-bold text-slate-400">
-                          ID: MIS-{String(mission.id).padStart(4,'0')}
-                        </span>
-                      </div>
-                      <h2 className="text-lg sm:text-xl font-black text-slate-900 min-w-0 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                        <span className="truncate">{mission.title}</span>
-                        {mission?.dueTime && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 text-[10px] font-black w-fit">
-                            <Clock size={12} />
-                            {mission.dueTime}
-                          </span>
-                        )}
-                      </h2>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="prose prose-slate max-w-none mb-8">
-                  <p className="text-slate-600 leading-relaxed font-medium">
-                    {mission.description}
-                  </p>
-                </div>
-
-                {/* Progress Visual */}
-                <div className="bg-slate-50 rounded-xl p-5 border border-slate-100">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-black text-slate-500 uppercase tracking-wider">Progression globale</span>
-                    <span className="text-xs font-black text-brand-600">{progressPct}%</span>
-                  </div>
-                  <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-brand-600 transition-all duration-500 ease-out"
-                      style={{ width: `${progressPct}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between mt-3">
-                    {STATUS_STEPS.map((step, idx) => (
-                      <div key={step} className="flex flex-col items-center">
-                        <div className={`w-2 h-2 rounded-full mb-1 ${
-                          STATUS_STEPS.indexOf(status) >= idx ? 'bg-brand-600' : 'bg-slate-300'
-                        }`} />
-                        <span className={`text-[10px] font-bold ${
-                          status === step ? 'text-brand-600' : 'text-slate-400'
-                        }`}>{step}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Véhicule Affecté Card */}
-            {mission.vehicle && (
-              <div className="order-last lg:order-none bg-emerald-50/40 lg:bg-white rounded-2xl border border-emerald-100 lg:border-slate-200 shadow-sm overflow-hidden">
-                <div className="p-4 sm:p-6">
-                  <SectionHeader icon={Truck} title="Véhicule affecté" />
-                  
-                  <div className="space-y-4 mt-4">
-                    {/* Vehicle Identity Section */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 min-w-0">
-                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5">Matricule</p>
-                        <p className="text-sm font-bold text-slate-900 font-mono">{mission.vehicle.matricule}</p>
-                      </div>
-                      <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 min-w-0">
-                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5">Marque / Modèle</p>
-                        <p className="text-sm font-bold text-slate-900">{mission.vehicle.marque} {mission.vehicle.modele}</p>
-                      </div>
-                    </div>
-
-                    {/* Current Mileage */}
-                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
-                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5">Kilométrage actuel du véhicule</p>
-                      <p className="text-sm font-bold text-slate-900">
-                        {typeof mission.vehicle.kilometrage === 'number' ? `${mission.vehicle.kilometrage.toLocaleString('fr-FR')} km` : '—'}
-                      </p>
-                    </div>
-
-                    {/* Mileage Inputs */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <label className="block">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-2 block">Kilométrage départ</span>
-                        <input
-                          type="number"
-                          min="0"
-                          max="999999"
-                          value={vehicleKilometrageDepart}
-                          onFocus={() => { mileageEditingRef.current = true }}
-                          onBlur={() => { mileageEditingRef.current = false }}
-                          onChange={(e) => {
-                            const v = e.target.value
-                            if (v === '' || (Number(v) >= 0 && Number(v) <= 999999)) {
-                              setVehicleKilometrageDepart(v)
-                            }
-                          }}
-                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-900 outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-600/10"
-                          placeholder="0"
-                        />
-                      </label>
-                      <label className="block">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-2 block">Kilométrage retour</span>
-                        <input
-                          type="number"
-                          min="0"
-                          max="999999"
-                          value={vehicleKilometrageRetour}
-                          onFocus={() => { mileageEditingRef.current = true }}
-                          onBlur={() => { mileageEditingRef.current = false }}
-                          onChange={(e) => {
-                            const v = e.target.value
-                            if (v === '' || (Number(v) >= 0 && Number(v) <= 999999)) {
-                              setVehicleKilometrageRetour(v)
-                            }
-                          }}
-                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-900 outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-600/10"
-                          placeholder="0"
-                        />
-                      </label>
-                    </div>
-
-                    {/* Error Display */}
-                    {vehicleMileageError && (
-                      <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-red-200 bg-red-50">
-                        <AlertTriangle size={14} className="text-red-500 shrink-0" />
-                        <span className="text-xs font-semibold text-red-700">{vehicleMileageError}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div
-              className={`bg-amber-50/30 lg:bg-white rounded-2xl border-2 shadow-sm overflow-hidden transition-all ${
-                showStatusAttention
-                  ? 'border-amber-300 ring-2 ring-amber-300/60 shadow-lg shadow-amber-100 animate-pulse'
-                  : (ACTIONS_SECTION_ACCENT[status] || 'border-slate-200')
-              }`}
-            >
-              <div className="p-4 sm:p-6">
-                <SectionHeader icon={Zap} title="Actions & État" />
-
-                {missionActionError && (
-                  <div className="mt-3 mb-2 px-4 py-3 rounded-xl border border-red-200 bg-red-50 text-red-700 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <AlertTriangle size={16} className="text-red-500 shrink-0" />
-                      <span className="text-xs sm:text-sm font-black truncate">{missionActionError}</span>
-                    </div>
-                    <button type="button" onClick={() => setMissionActionError('')} className="text-[10px] font-black uppercase tracking-wider text-red-600 hover:text-red-700">
-                      Fermer
-                    </button>
-                  </div>
-                )}
-
-                {showStatusAttention ? (
-                  <div className="mt-3 mb-2 px-4 py-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 flex items-center justify-between gap-3 animate-in fade-in zoom-in-95 duration-200">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle size={16} className="text-amber-500" />
-                      <span className="text-xs sm:text-sm font-black">{statusAttentionText}</span>
-                    </div>
-                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-600">Info</span>
-                  </div>
-                ) : null}
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-                  {['À faire', 'En cours', 'Terminée', 'Bloquée'].map((s) => {
-                    const cfg = STATUS_CONFIG[s]
-                    const Icon = cfg.icon
-                    const isActive = status === s
-                    const shouldAnimate = isActive && statusJustChangedTo === s
-                    
-                    return (
-                      <button
-                        key={s}
-                        onClick={() => handleStatusChange(s)}
-                        className={`flex flex-col items-center justify-center gap-3 p-4 rounded-xl border-2 transition-all ${
-                          isActive
-                            ? `${cfg.border} ${cfg.bg} ${cfg.color} scale-[1.02] shadow-sm ${shouldAnimate ? 'ring-2 ring-offset-2 ring-brand-600 animate-in zoom-in-95 duration-200' : ''}`
-                            : 'border-slate-50 bg-slate-50 text-slate-400 hover:border-slate-200 hover:bg-white hover:text-slate-600'
-                        }`}
-                      >
-                        <div className={`p-2 rounded-lg ${isActive ? 'bg-white shadow-sm' : 'bg-slate-200/50'}`}>
-                          <Icon size={20} className={isActive && s === 'En cours' ? 'animate-spin' : ''} />
-                        </div>
-                        <span className="text-xs font-black">{s}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-violet-50/40 lg:bg-white rounded-2xl border border-violet-100 lg:border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-4 sm:p-6">
-                <SectionHeader icon={FileText} title="Notes & Observations" />
-                <div className="relative mt-4">
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Ajoutez vos remarques, observations ou détails techniques ici..."
-                    className="w-full h-40 p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-700 focus:bg-white focus:ring-2 focus:ring-brand-600/10 focus:border-brand-600 outline-none transition-all resize-none"
-                  />
-                  <div className="absolute bottom-3 right-3 flex items-center gap-2 text-[10px] font-bold text-slate-400 bg-white px-2 py-1 rounded border border-slate-100">
-                    <Edit2 size={10} />
-                    Modification en direct
-                  </div>
-                </div>
-                <div className="mt-4 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 text-white text-xs font-black uppercase tracking-wider hover:bg-brand-700 active:scale-95 disabled:opacity-50"
-                  >
-                    <Save size={14} />
-                    Enregistrer
-                  </button>
-                </div>
-              </div>
+        <div className="flex flex-col gap-4 lg:col-span-7 lg:gap-6 xl:col-span-8">
+          <MissionInfoCard mission={mission} status={status} priority={priority} />
+          <div className={`grid grid-cols-1 gap-4 lg:gap-6 ${intervention ? 'xl:grid-cols-2' : ''}`}>
+            <MissionClientCard mission={mission} intervention={intervention} />
+            {intervention && <MissionInterventionCard intervention={intervention} onOpen={openIntervention} />}
+            <div className="lg:hidden">
+              <MissionTeamCard members={teamMembers} vehicle={mission.vehicle} currentUserId={currentUser?.id} />
             </div>
           </div>
-
-          {/* Right Column: Sidebar (4 cols) */}
-          <div className="contents lg:block lg:col-span-4 lg:row-span-3 lg:space-y-6">
-            
-            {/* Linked Intervention (Moved to first position) */}
-            {intervention && (
-              <div className={`bg-indigo-50/40 lg:bg-white rounded-2xl border-2 shadow-sm overflow-hidden relative ${
-                intervention.status === 'CLOSED' ? 'border-red-200' : 'border-blue-600/10'
-              }`}>
-                <div className={`absolute top-0 right-0 w-24 h-24 rounded-bl-full -mr-12 -mt-12 opacity-50 ${
-                  intervention.status === 'CLOSED' ? 'bg-red-50' : 'bg-blue-50'
-                }`} />
-                <div className="p-4 sm:p-6 relative">
-                  <SectionHeader icon={Wrench} title="Intervention liée">
-                    <span className="px-2 py-0.5 rounded bg-blue-100 text-brand-600 text-[10px] font-black uppercase tracking-wider">
-                      SAV
-                    </span>
-                  </SectionHeader>
-                  
-                  <div className="space-y-4 mt-2">
-                    {intervention.status === 'CLOSED' && (
-                      <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-700">
-                        <div className="flex items-center gap-2">
-                          <AlertTriangle size={14} />
-                          <span className="text-xs font-black uppercase tracking-wider">Intervention clôturée</span>
-                        </div>
-                        <span className="text-[10px] font-bold text-red-600">Validée</span>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Référence</p>
-                        <p className="text-sm font-black text-slate-900">{intervention.id}</p>
-                      </div>
-                      <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center shadow-sm text-blue-600">
-                        <Hash size={18} />
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-3 px-1">
-                      <div className="mt-1 text-slate-400">
-                        <Zap size={14} />
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Machine</p>
-                        <p className="text-sm font-bold text-slate-700">{intervention.machine}</p>
-                      </div>
-                    </div>
-
-                    <button 
-                      onClick={() => {
-                        if (intervention.status === 'CLOSED') setShowInterventionPreview(true)
-                        else navigate(`/interventions/${intervention.id}`, { state: { assignedTechnicianName: mission.employee, missionId: mission.id, fromMissionDetails: true } })
-                      }}
-                      className={`w-full mt-2 py-3 rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center gap-2 group ${
-                        intervention.status === 'CLOSED'
-                          ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-100'
-                          : 'bg-brand-600 hover:bg-brand-700 text-white shadow-blue-100'
-                      }`}
-                    >
-                      {intervention.status === 'CLOSED' ? 'Intervention clôturée' : 'Ouvrir le dossier'}
-                      <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {showInterventionPreview && intervention && (
-              <div className="fixed inset-0 z-[120] flex items-center justify-center p-4" onClick={() => setShowInterventionPreview(false)}>
-                <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
-                <div className="relative z-10 w-full max-w-xl bg-white rounded-2xl border border-red-200 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                  <div className="px-5 py-4 border-b border-red-200 bg-red-50 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-black text-red-600 uppercase tracking-widest">Intervention clôturée</p>
-                      <p className="text-sm font-black text-slate-900 truncate">{intervention.id}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowInterventionPreview(false)}
-                      className="inline-flex items-center justify-center w-10 h-10 bg-white hover:bg-red-100 border border-red-200 text-red-600 rounded-xl transition-colors"
-                    >
-                      <X size={18} />
-                    </button>
-                  </div>
-                  <div className="p-5 bg-white">
-                    <div className="rounded-2xl border border-red-200 bg-red-50 p-4 flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-white border border-red-200 flex items-center justify-center shrink-0 text-red-600">
-                        <AlertTriangle size={18} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-black text-red-700">Si vous souhaitez effectuer une modification ou consulter les détails de l’intervention, veuillez vous rendre dans l’interface Historique des interventions.</p>
-                        <p className="text-xs font-semibold text-red-700/80 mt-1">
-                          Intervention : <span className="font-black">{intervention.id}</span>
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowInterventionPreview(false)
-                            navigate(`/employees/${mission?.employeeId || 'me'}/history?highlight=${encodeURIComponent(intervention.id)}`)
-                          }}
-                          className="mt-3 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-red-100 text-red-700 border border-red-200 text-xs font-black transition-colors"
-                        >
-                          <History size={14} />
-                          Aller à l’historique
-                          <ChevronRight size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Summary Details */}
-            <div className="bg-sky-50/40 lg:bg-white rounded-2xl border border-sky-100 lg:border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-4 sm:p-6 bg-brand-50">
-                <SectionHeader icon={Info} title="Détails" />
-                <div className="mt-2">
-                  <InfoItem label="Type" value={mission.type === 'Intervention' ? 'Intervention S.A.V' : mission.type} icon={Wrench} colorClass="text-blue-500" />
-                  <InfoItem label="Statut" value={status} icon={CheckSquare} colorClass={statusCfg.color} />
-                  <InfoItem label="Priorité" value={priority.label} icon={Flag} colorClass={priority.color} />
-                  {mission.type === 'Intervention' && (
-                    <InfoItem label="Dossier SAV lié" value={mission.interventionId} icon={Link2} colorClass="text-indigo-500" />
-                  )}
-                  <InfoItem label="Date mission" value={mission.dueDate} icon={Calendar} />
-                  <div className="flex items-start gap-3 py-3 border-b border-slate-50 last:border-0">
-                    <div className="mt-0.5 text-slate-500">
-                      <Clock size={16} />
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-tight mb-0.5">Heure mission</p>
-                      <p className="text-sm font-black text-slate-900">{mission.dueTime || '—'}</p>
-                    </div>
-                  </div>
-                  <InfoItem label="Employé(s) assigné(s)" value={groupedEmployeesDisplay || mission.employee} icon={User} colorClass="text-blue-500" />
-                </div>
-              </div>
-            </div>
-
-            {/* Location & Primary Document Card */}
-            <div className="bg-rose-50/40 lg:bg-white rounded-2xl border border-rose-100 lg:border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-4 sm:p-6">
-                <SectionHeader icon={MapPin} title="Lieu & Document">
-                  <button className="text-[10px] font-black text-brand-600 flex items-center gap-1 hover:underline">
-                    OUVRIR MAPS <ExternalLink size={10} />
-                  </button>
-                </SectionHeader>
-                <div className="mt-2">
-                  <div className="p-3 bg-slate-50 rounded-xl mb-4 border border-slate-100">
-                    <div className="flex items-center gap-2 text-slate-800 font-bold mb-1">
-                      <Building2 size={14} className="text-slate-400" />
-                      {mission.site}
-                    </div>
-                    <p className="text-xs text-slate-500 font-medium leading-relaxed pl-5">
-                      {mission.address || 'Adresse non renseignée'}
-                    </p>
-                    {intervention?.phone && (
-                      <div className="mt-3 pt-3 border-t border-slate-200/50 flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-slate-600 font-bold text-[11px]">
-                          <Phone size={12} className="text-blue-500" />
-                          {intervention.phone}
-                        </div>
-                        <a 
-                          href={`tel:${intervention.phone}`}
-                          className="px-3 py-1 bg-white border border-slate-200 text-[10px] font-black text-slate-600 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
-                        >
-                          APPELER
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                  {/* Mission Document Preview (Replacing Map) */}
-                  {attachments.length > 0 ? (
-                    <div className="aspect-[4/3] md:aspect-video bg-slate-100 rounded-xl border border-slate-200 overflow-hidden group relative cursor-pointer shadow-sm">
-                      {attachments[0].type === 'image' ? (
-                        <div className="w-full h-full relative">
-                          <img 
-                            src={attachments[0].url}
-                            alt={attachments[0].name}
-                            className="w-full h-full object-contain md:object-cover group-hover:scale-105 transition-transform duration-500"
-                          />
-                          <div className="absolute top-2 left-2 px-2 py-1 bg-white/90 backdrop-blur-sm rounded-md text-[9px] font-black text-blue-600 shadow-sm">
-                            DOCUMENT
-                          </div>
-                        </div>
-                      ) : attachments[0].isPdf ? (
-                        <div className="w-full h-full relative">
-                          <img 
-                            src={attachments[0].displayUrl}
-                            alt={attachments[0].name}
-                            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
-                          />
-                          <div className="absolute top-2 left-2 px-2 py-1 bg-white/90 backdrop-blur-sm rounded-md text-[9px] font-black text-red-600 shadow-sm flex items-center gap-1">
-                            <File size={10} />
-                            PDF
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 text-slate-600 group-hover:bg-slate-100 transition-colors">
-                          <div className="w-16 h-16 bg-white rounded-xl shadow-sm flex items-center justify-center mb-3 border border-slate-200">
-                            <File size={32} strokeWidth={2} className="text-red-500" />
-                          </div>
-                          <span className="text-xs font-black text-slate-700 px-4 text-center mb-1">
-                            {attachments[0].name}
-                          </span>
-                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                            Cliquez pour prévisualiser
-                          </span>
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setDocViewer({ 
-                            open: true, 
-                            url: attachments[0].viewUrl || attachments[0].url, 
-                            type: attachments[0].type, 
-                            name: attachments[0].name,
-                            isPdf: attachments[0].isPdf,
-                            downloadUrl: attachments[0].downloadUrl,
-                            publicId: attachments[0].publicId 
-                          })}
-                          className="p-2 bg-white rounded-lg text-slate-900 shadow-xl hover:scale-110 transition-transform"
-                        >
-                          <Eye size={18} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => downloadDocument(attachments[0].downloadUrl || attachments[0].url, attachments[0].name)}
-                          className="p-2 bg-white rounded-lg text-slate-900 shadow-xl hover:scale-110 transition-transform"
-                        >
-                          <Download size={18} />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="aspect-[4/3] md:aspect-video bg-slate-50 rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center">
-                      <Paperclip size={24} className="text-slate-300 mb-2" />
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center px-4">Aucun document affecté</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          <MissionNotesCard notes={notes} setNotes={setNotes} onSave={handleSave} isSaving={isSaving} />
+          <MissionDocumentsCard attachments={attachments} onView={openDocument} />
         </div>
-        {docViewer.open && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setDocViewer({ open: false, url: '', type: '', name: '', isPdf: false, downloadUrl: '', publicId: '' })}>
-            <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
-            <div className="relative z-10 w-full max-w-4xl bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-              <div className="px-5 py-4 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aperçu du document</p>
-                  <p className="text-sm font-black text-slate-900 truncate">{docViewer.name}</p>
-                </div>
-                <div className="flex items-center gap-2 ml-4">
-                  {docViewer.isPdf && (
-                    <a
-                      href={docViewer.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center w-10 h-10 bg-blue-50 hover:bg-blue-100 text-brand-600 rounded-xl transition-colors"
-                      title="Ouvrir dans un nouvel onglet"
-                    >
-                      <ExternalLink size={18} />
-                    </a>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => downloadDocument(docViewer.downloadUrl || docViewer.url, docViewer.name)}
-                    className="inline-flex items-center justify-center w-10 h-10 bg-green-50 hover:bg-green-100 text-green-600 rounded-xl transition-colors"
-                    title="Télécharger"
-                  >
-                    <Download size={18} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDocViewer({ open: false, url: '', type: '', name: '', isPdf: false, downloadUrl: '', publicId: '' })}
-                    className="inline-flex items-center justify-center w-10 h-10 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-              </div>
-              <div className="p-5 bg-white overflow-auto max-h-[80vh]">
-                {docViewer.type === 'image' ? (
-                  <img src={docViewer.url} alt={docViewer.name} className="w-full h-auto object-contain rounded-xl border border-slate-200" />
-                ) : docViewer.isPdf ? (
-                  <div className="w-full min-h-[75vh] rounded-xl border border-slate-200 overflow-hidden bg-slate-50">
-                    <iframe 
-                      src={`https://docs.google.com/viewer?url=${encodeURIComponent(docViewer.url)}&embedded=true`}
-                      title={docViewer.name} 
-                      className="w-full h-[75vh] md:h-[80vh]"
-                      style={{ border: 'none' }}
-                      onError={(e) => {
-                        console.error('Erreur chargement PDF:', e);
-                      }}
-                    />
-                    <div className="p-4 bg-slate-100 border-t border-slate-200 flex items-center justify-center gap-4">
-                      <p className="text-xs text-slate-600">Le PDF ne s'affiche pas ?</p>
-                      <a
-                        href={docViewer.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg text-xs font-bold hover:bg-brand-700 transition-colors"
-                      >
-                        <ExternalLink size={14} />
-                        Ouvrir dans un nouvel onglet
-                      </a>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="w-full h-[75vh] md:h-[70vh] rounded-xl border border-slate-200 flex flex-col items-center justify-center bg-slate-50">
-                    <File size={48} className="text-slate-400 mb-4" />
-                    <p className="text-sm font-bold text-slate-700 mb-2">{docViewer.name}</p>
-                    <button
-                      type="button"
-                      onClick={() => downloadDocument(docViewer.downloadUrl || docViewer.url, docViewer.name)}
-                      className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-bold hover:bg-brand-700 transition-colors flex items-center gap-2"
-                    >
-                      <Download size={16} />
-                      Télécharger le fichier
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
       </main>
 
-      {/* Action bar supprimée */}
-
-      {/* Save Toast */}
-      {showSaveToast && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
-          <div className="bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3">
-            <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
-              <CheckCircle2 size={14} />
-            </div>
-            <span className="text-sm font-bold">Modifications enregistrées avec succès</span>
-          </div>
-        </div>
+      {showInterventionPreview && intervention && (
+        <InterventionClosedDialog
+          interventionId={intervention.id}
+          onClose={() => setShowInterventionPreview(false)}
+          onGoToHistory={() => {
+            setShowInterventionPreview(false)
+            navigate(`/employees/${mission?.employeeId || 'me'}/history?highlight=${encodeURIComponent(intervention.id)}`)
+          }}
+        />
       )}
+
+      {docViewer.open && <DocumentViewer doc={docViewer} onClose={() => setDocViewer(CLOSED_DOC_VIEWER)} />}
     </div>
   )
 }

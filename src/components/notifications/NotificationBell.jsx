@@ -1,7 +1,7 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bell } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { useNotifications } from '../../notifications/NotificationsProvider'
+import { useNotifications } from '../../notifications/useNotifications'
 
 function formatTime(value) {
   try {
@@ -139,7 +139,7 @@ export default function NotificationBell() {
             <div className="px-4 py-3 border-b border-gray-100 bg-amber-50/40">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-xs font-semibold text-amber-900">
-                  Activez les notifications push pour recevoir les missions en arriÃ¨re-plan.
+                  Activez les notifications push pour recevoir les missions en arrière-plan.
                   {pushState.status === 'error' && (
                     <div className="mt-1 text-[11px] font-bold text-red-700">{pushState.message}</div>
                   )}
@@ -147,7 +147,7 @@ export default function NotificationBell() {
                     <div className="mt-1 text-[11px] font-bold text-emerald-700">{pushState.message}</div>
                   )}
                   {pushState.status === 'loading' && (
-                    <div className="mt-1 text-[11px] font-bold text-amber-900">Activation en coursâ€¦</div>
+                    <div className="mt-1 text-[11px] font-bold text-amber-900">Activation en cours…</div>
                   )}
                 </div>
                 <button
@@ -158,7 +158,7 @@ export default function NotificationBell() {
                     if (res && res.ok) {
                       setPushState({
                         status: 'enabled',
-                        message: 'Notifications activÃ©es.',
+                        message: 'Notifications activées.',
                       })
                       return
                     }
