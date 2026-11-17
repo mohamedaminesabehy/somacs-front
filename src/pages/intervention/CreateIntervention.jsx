@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+﻿import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../api/apiClient'
 import {
@@ -10,7 +10,8 @@ import logo from '../../assets/logo.jpg'
 import FicheViewport from './components/FicheViewport'
 import MobileFichePreviewModal from '../../components/intervention/MobileFichePreviewModal'
 import ClientSelectionModal from '../../components/client/ClientSelectionModal'
-import MachineSelectionModal from '../../components/machine/MachineSelectionModal'
+import ClientMachineSelector from '../../components/machine/ClientMachineSelector'
+import AddClientMachineModal from '../../components/machine/AddClientMachineModal'
 import HorizontalStepper from '../../components/common/HorizontalStepper'
 import VerticalStepper from '../../components/common/VerticalStepper'
 import { useZoomDetection } from './hooks/useZoomDetection'
@@ -182,6 +183,7 @@ export default function CreateIntervention() {
   const [showMobilePreview, setShowMobilePreview] = useState(false)
   const [isClientModalOpen, setIsClientModalOpen] = useState(false)
   const [isMachineModalOpen, setIsMachineModalOpen] = useState(false)
+  const [showAddMachineModal, setShowAddMachineModal] = useState(false)
   const [formData, setFormData] = useState(INITIAL_FORM)
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -221,8 +223,23 @@ export default function CreateIntervention() {
       clientAddress: String(client.address || '').trim()
         ? String(client.address || '').trim()
         : `${client.city}${client.zone ? `, ${client.zone}` : ''}`,
+      // Réinitialiser la machine quand le client change
+      machineId: '',
+      machineType: '',
+      machineBrand: '',
+      machineModel: '',
+      serialNumber: '',
+      siteName: '',
     }))
-    setErrors((prev) => ({ ...prev, clientId: undefined }))
+    setErrors((prev) => ({ ...prev, clientId: undefined, machineId: undefined }))
+    setIsClientModalOpen(false)
+  }
+
+  const handleClientCreated = (newClient) => {
+    // Sélectionner automatiquement le client créé
+    handleClientSelect(newClient)
+    // Ouvrir automatiquement la modal d'ajout de machine
+    setShowAddMachineModal(true)
   }
 
   const handleMachineSelect = (machine) => {
@@ -370,57 +387,39 @@ export default function CreateIntervention() {
       index={2}
       icon={Cpu}
       title="Informations techniques"
-      description="Identifiez précisément l’équipement concerné par l’intervention."
-      actions={formData.machineId ? null : (
-        <button type="button" onClick={() => setIsMachineModalOpen(true)} className="ui-btn-secondary ui-btn-sm">
-          <Layers size={14} aria-hidden="true" /> Parc machines
-        </button>
-      )}
+      description={formData.clientId
+        ? `Machines enregistrees pour ${formData.clientName || 'ce client'}. Selectionnez-en une ou ajoutez-en une nouvelle.`
+        : "Revenez a l'etape precedente pour selectionner d'abord le client."}
     >
-      {formData.machineId ? (
-        <IdentityCard
-          badge={formData.serialNumber ? `S/N ${formData.serialNumber}` : null}
-          title={formData.machineType}
-          subtitle={[formData.machineBrand, formData.machineModel].filter(Boolean).join(' · ')}
-          avatar={<Cpu size={22} aria-hidden="true" />}
-          onChange={() => setIsMachineModalOpen(true)}
-          changeLabel="Changer"
-          meta={formData.siteName ? <MetaItem icon={MapPin}>{formData.siteName}</MetaItem> : null}
-        />
-      ) : (
-        <SelectionPrompt
-          icon={Cpu}
-          title="Aucun équipement sélectionné"
-          description="Choisissez la machine dans le parc du client ou enregistrez un nouvel équipement."
-          actionLabel="Créer / Choisir une machine"
-          onAction={() => setIsMachineModalOpen(true)}
-          error={errors.machineId}
-        />
-      )}
+      <ClientMachineSelector
+        clientId={formData.clientId}
+        clientName={formData.clientName}
+        selectedMachineId={formData.machineId}
+        onSelect={(machine) => {
+          if (!machine) {
+            setFormData((prev) => ({
+              ...prev,
+              machineId: '', machineType: '', machineBrand: '',
+              machineModel: '', serialNumber: '',
+            }))
+          } else {
+            handleMachineSelect(machine)
+          }
+        }}
+        error={errors.machineId}
+        onRequestAddMachine={() => setShowAddMachineModal(true)}
+      />
 
       {formData.machineId && (
         <FieldGroup title="Fiche technique" icon={Settings}>
           <DataTile label="Type de machine" value={formData.machineType} icon={Cpu} emphasis />
           <DataTile label="Marque" value={formData.machineBrand} icon={Tag} />
-          <DataTile label="Modèle" value={formData.machineModel} icon={Layers} />
-          <DataTile label="Numéro de série" value={formData.serialNumber} icon={Barcode} mono />
+          <DataTile label="Modele" value={formData.machineModel} icon={Layers} />
+          <DataTile label="Numero de serie" value={formData.serialNumber} icon={Barcode} mono />
         </FieldGroup>
       )}
-
-      <div className="flex items-start gap-3 rounded-2xl border border-brand-100 bg-brand-50/50 p-4">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-brand-700 ring-1 ring-inset ring-brand-100">
-          <ShieldCheck size={18} aria-hidden="true" />
-        </span>
-        <div>
-          <p className="text-sm font-semibold text-ink">Numéro de série et garantie</p>
-          <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
-            Le numéro de série permet de vérifier la garantie constructeur et d’accéder à l’historique complet de maintenance.
-          </p>
-        </div>
-      </div>
     </DossierSection>
   )
-
   const renderStep3 = () => (
     <DossierSection
       index={3}
@@ -653,8 +652,26 @@ export default function CreateIntervention() {
         />
       )}
 
-      <ClientSelectionModal isOpen={isClientModalOpen} onClose={() => setIsClientModalOpen(false)} onSelect={handleClientSelect} />
-      <MachineSelectionModal isOpen={isMachineModalOpen} onClose={() => setIsMachineModalOpen(false)} onSelect={handleMachineSelect} />
+      <ClientSelectionModal 
+        isOpen={isClientModalOpen} 
+        onClose={() => setIsClientModalOpen(false)} 
+        onSelect={handleClientSelect}
+        onClientCreated={handleClientCreated}
+      />
+      
+      <AddClientMachineModal
+        isOpen={showAddMachineModal}
+        onClose={() => setShowAddMachineModal(false)}
+        preselectedClient={formData.clientId ? {
+          id: formData.clientId,
+          name: formData.clientName,
+          code: formData.clientCode,
+          phone: formData.clientPhone,
+          email: formData.clientEmail,
+          address: formData.clientAddress,
+        } : null}
+        onMachineCreated={handleMachineSelect}
+      />
 
       <ConfirmDialog
         open={confirmLeave}

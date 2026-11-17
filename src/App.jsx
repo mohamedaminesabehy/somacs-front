@@ -24,6 +24,8 @@ const OperationsDashboard = lazy(() => import('./pages/dashboard/OperationsDashb
 const MachineList = lazy(() => import('./pages/machines/MachineList'))
 const MachineForm = lazy(() => import('./pages/machines/MachineForm'))
 const MachineDetails = lazy(() => import('./pages/machines/MachineDetails'))
+const MachineTypeSelector = lazy(() => import('./pages/machines/MachineTypeSelector'))
+const MachineClientForm = lazy(() => import('./pages/machines/MachineClientForm'))
 const VehicleList = lazy(() => import('./pages/VehicleList'))
 const VehicleDetails = lazy(() => import('./pages/VehicleDetails'))
 const CreateVehicle = lazy(() => import('./pages/CreateVehicle'))
@@ -313,8 +315,11 @@ export default function App() {
         }
       />
       <Route path="/machines" element={renderProtectedPage(<MachineList currentUser={currentUser} />)} />
-      <Route path="/machines/create" element={renderProtectedPage(<MachineForm />)} />
+      <Route path="/machines/create" element={renderProtectedPage(<MachineTypeSelector />)} />
+      <Route path="/machines/create/somacs" element={renderProtectedPage(<MachineForm />)} />
+      <Route path="/machines/create/client" element={renderProtectedPage(<MachineClientForm />)} />
       <Route path="/machines/:id/edit" element={renderProtectedPage(<MachineForm />)} />
+      <Route path="/machines/:id/edit-client" element={renderProtectedPage(<MachineClientForm />)} />
       <Route path="/machines/:id" element={renderProtectedPage(<MachineDetails currentUser={currentUser} />)} />
       <Route path="/vehicles" element={renderProtectedPage(<VehicleList />)} />
       <Route path="/vehicles/create" element={renderProtectedPage(<CreateVehicle />)} />

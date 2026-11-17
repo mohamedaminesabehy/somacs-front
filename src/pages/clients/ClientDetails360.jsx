@@ -33,6 +33,7 @@ import {
   TrendingUp,
   FileText,
   Pencil,
+  Plus,
   Save,
 } from 'lucide-react'
 import { apiFetch } from '../../api/apiClient'
@@ -338,7 +339,7 @@ function ClientPhoneEditField({ value, onChange }) {
 
 // ─── Cards ─────────────────────────────────────────────────────────────────
 
-function MachineCard({ machine }) {
+function MachineCard({ machine, onView }) {
   const reference = getMachineReference(machine)
   return (
     <li className="flex flex-col gap-3 p-4 sm:px-5 xl:flex-row xl:items-center xl:gap-4">
@@ -368,8 +369,18 @@ function MachineCard({ machine }) {
           <dd className="font-semibold text-ink">{machine.lastInterventionDate ? fmtDate(machine.lastInterventionDate) : '—'}</dd>
         </div>
       </dl>
-      <div className="xl:w-28 xl:shrink-0 xl:text-right">
+      <div className="flex shrink-0 items-center gap-2 xl:w-auto">
         <MachineStatusPill status={machine.status} />
+        {machine.id && (
+          <button
+            type="button"
+            onClick={() => onView(machine.id)}
+            className="ui-btn-secondary ui-btn-sm"
+            aria-label={`Voir la fiche de ${getMachineLabel(machine)}`}
+          >
+            <Eye size={14} aria-hidden="true" /> Voir
+          </button>
+        )}
       </div>
     </li>
   )
@@ -785,13 +796,47 @@ export default function ClientDetails360() {
         </SectionShell>
 
         <div className="flex min-w-0 flex-col gap-4">
-          <SectionShell icon={Cpu} title="Parc équipements" description="Machines rattachées à ce client" count={machines.length}>
+          <SectionShell
+            icon={Cpu}
+            title="Parc équipements"
+            description="Machines rattachées à ce client"
+            count={machines.length}
+            actions={
+              <button
+                type="button"
+                onClick={() => navigate(`/machines/create/client?clientId=${id}&clientName=${encodeURIComponent(client.name || '')}`)}
+                className="ui-btn-secondary ui-btn-sm shrink-0"
+                aria-label="Ajouter une machine à ce client"
+              >
+                <Plus size={14} aria-hidden="true" /> Ajouter une machine
+              </button>
+            }
+          >
             {machines.length === 0 ? (
-              <EmptyState icon={Cpu} title="Aucun équipement" description="Ce client ne possède pas encore de machine enregistrée." />
+              <div className="flex flex-col items-center gap-3 px-5 py-8 text-center">
+                <span className="flex size-12 items-center justify-center rounded-xl bg-slate-100 text-ink-faint">
+                  <Cpu size={22} aria-hidden="true" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-ink">Aucun équipement</p>
+                  <p className="mt-0.5 text-xs text-ink-muted">Ce client ne possède pas encore de machine enregistrée.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/machines/create/client?clientId=${id}&clientName=${encodeURIComponent(client.name || '')}`)}
+                  className="ui-btn-primary"
+                >
+                  <Plus size={15} aria-hidden="true" /> Ajouter une machine
+                </button>
+              </div>
             ) : (
               <ul className="divide-y divide-line">
                 {machines.map((m) => (
-                  <MachineCard key={machineKey(m) || m.id} machine={m} />
+                  <MachineCard
+                    key={machineKey(m) || m.id}
+                    machine={m}
+                    onView={(machineId) => navigate(`/machines/${machineId}`)}
+                  />
                 ))}
               </ul>
             )}

@@ -19,7 +19,7 @@ export default function MissionTeamCard({ members, vehicle, currentUserId }) {
           {members.map((member) => {
             const isMe = currentUserId != null && String(member.userId) === String(currentUserId)
             return (
-              <li key={member.key} className={`flex items-center gap-3 rounded-xl px-2 py-2 ${isMe ? 'bg-brand-50/70' : ''}`}>
+              <li key={member.key} className={`flex min-w-0 items-center gap-3 rounded-xl px-2 py-2 ${isMe ? 'bg-brand-50/70' : ''}`}>
                 <span
                   aria-hidden="true"
                   className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${isMe ? 'bg-brand-600 text-white' : 'bg-navy-700 text-white'}`}

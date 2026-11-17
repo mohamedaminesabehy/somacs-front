@@ -10,6 +10,7 @@ import { StatStrip, SearchField, SegmentedFilter, Toolbar, Toast } from '../../c
 import {
   Plus, Eye, Pencil, Trash2, Settings, RefreshCw, Cpu, Building2,
   CheckCircle2, Wrench, AlertOctagon, CalendarClock, AlertTriangle,
+  User,
 } from 'lucide-react'
 
 function normalize(raw) {
@@ -56,7 +57,28 @@ function MachineThumb({ machine, size = 'md' }) {
   )
 }
 
+/** Badge visuel distinguant Machine SOMACS, Machine Client, ou non classifiée. */
+function OwnerTypeBadge({ ownerType }) {
+  if (ownerType === 'CLIENT') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md bg-brand-50 px-1.5 py-0.5 text-[11px] font-semibold text-brand-700 ring-1 ring-inset ring-brand-200">
+        <User size={10} aria-hidden="true" /> Client
+      </span>
+    )
+  }
+  if (ownerType === 'SOMACS') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md bg-navy/8 px-1.5 py-0.5 text-[11px] font-semibold text-navy ring-1 ring-inset ring-navy/20">
+        <Settings size={10} aria-hidden="true" /> SOMACS
+      </span>
+    )
+  }
+  return null // ownerType inconnu : pas de badge
+}
 function RowActions({ machine, canManage, onDelete }) {
+  const editPath = machine.ownerType === 'CLIENT'
+    ? `/machines/${machine.id}/edit-client`
+    : `/machines/${machine.id}/edit`
   const base = 'flex h-8 w-8 items-center justify-center rounded-lg text-ink-faint transition-colors'
   return (
     <div className="flex items-center justify-end gap-1">
@@ -65,7 +87,7 @@ function RowActions({ machine, canManage, onDelete }) {
       </Link>
       {canManage && (
         <>
-          <Link to={`/machines/${machine.id}/edit`} className={`${base} hover:bg-brand-50 hover:text-brand-700`} aria-label={`Modifier ${machine.designation}`}>
+          <Link to={editPath} className={`${base} hover:bg-brand-50 hover:text-brand-700`} aria-label={`Modifier ${machine.designation}`}>
             <Pencil size={15} />
           </Link>
           <button type="button" onClick={() => onDelete(machine)} className={`${base} hover:bg-red-50 hover:text-red-600`} aria-label={`Supprimer ${machine.designation}`}>
@@ -78,6 +100,10 @@ function RowActions({ machine, canManage, onDelete }) {
 }
 
 function MachineMobileCard({ machine, canManage, onDelete }) {
+  const clientLabel = machine.ownerType === 'CLIENT'
+    ? (machine.client || machine.clientSite || '—')
+    : (machine.client || machine.supplier || '—')
+  const clientDtLabel = machine.ownerType === 'CLIENT' ? 'Client propriétaire' : 'Client / Fournisseur'
   return (
     <li className="ui-card flex flex-col gap-3 p-4">
       <div className="flex items-start gap-3">
@@ -86,7 +112,10 @@ function MachineMobileCard({ machine, canManage, onDelete }) {
           <Link to={`/machines/${machine.id}`} className="block break-words text-sm font-bold leading-snug text-ink hover:text-brand-700">
             {machine.designation}
           </Link>
-          <p className="mt-0.5 font-mono text-xs text-ink-faint">{machine.code}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <p className="font-mono text-xs text-ink-faint">{machine.code}</p>
+            <OwnerTypeBadge ownerType={machine.ownerType} />
+          </div>
         </div>
         <MachineStatus status={machine.status} />
       </div>
@@ -100,12 +129,12 @@ function MachineMobileCard({ machine, canManage, onDelete }) {
           <dd className="truncate font-mono font-semibold text-ink">{machine.serialNumber || '—'}</dd>
         </div>
         <div className="min-w-0">
-          <dt className="text-ink-faint">Client</dt>
-          <dd className="truncate font-semibold text-ink">{machine.client || '—'}</dd>
+          <dt className="text-ink-faint">{clientDtLabel}</dt>
+          <dd className="truncate font-semibold text-ink">{clientLabel}</dd>
         </div>
         <div className="min-w-0">
           <dt className="text-ink-faint">Site</dt>
-          <dd className="truncate font-semibold text-ink">{machine.site || machine.location || '—'}</dd>
+          <dd className="truncate font-semibold text-ink">{machine.clientSite || machine.site || machine.location || '—'}</dd>
         </div>
       </dl>
       <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
@@ -118,6 +147,13 @@ function MachineMobileCard({ machine, canManage, onDelete }) {
 
 const PAGE_SIZE = 10
 
+const OWNER_TABS = [
+  { key: 'all',    label: 'Toutes' },
+  { key: 'SOMACS', label: 'Machines SOMACS' },
+  { key: 'CLIENT', label: 'Machines clients' },
+  { key: 'unknown',label: 'Non classifiées' },
+]
+
 export default function MachineList({ currentUser }) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -126,6 +162,7 @@ export default function MachineList({ currentUser }) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState(null)
   const [category, setCategory] = useState('all')
+  const [ownerTab, setOwnerTab] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [toast, setToast] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -163,13 +200,16 @@ export default function MachineList({ currentUser }) {
   useEffect(() => () => toastTimer.current && clearTimeout(toastTimer.current), [])
 
   const counts = useMemo(() => {
-    const result = { service: 0, maintenance: 0, panne: 0, due: 0 }
+    const result = { service: 0, maintenance: 0, panne: 0, due: 0, somacs: 0, client: 0, unknown: 0 }
     const soon = Date.now() + 14 * 86400000
     machines.forEach((m) => {
       const group = statusGroup(m.status)
       if (group) result[group] += 1
       const next = m.nextMaintenanceDate ? new Date(m.nextMaintenanceDate).getTime() : NaN
       if (!Number.isNaN(next) && next <= soon) result.due += 1
+      if (m.ownerType === 'SOMACS') result.somacs += 1
+      else if (m.ownerType === 'CLIENT') result.client += 1
+      else result.unknown += 1
     })
     return result
   }, [machines])
@@ -184,6 +224,10 @@ export default function MachineList({ currentUser }) {
     const q = normalize(search)
     const soon = Date.now() + 14 * 86400000
     return machines.filter((m) => {
+      // Filtre onglet ownerType
+      if (ownerTab === 'SOMACS' && m.ownerType !== 'SOMACS') return false
+      if (ownerTab === 'CLIENT' && m.ownerType !== 'CLIENT') return false
+      if (ownerTab === 'unknown' && m.ownerType) return false
       if (category !== 'all' && m.category !== category) return false
       if (statusFilter === 'due') {
         const next = m.nextMaintenanceDate ? new Date(m.nextMaintenanceDate).getTime() : NaN
@@ -193,18 +237,19 @@ export default function MachineList({ currentUser }) {
       return [m.code, m.designation, m.brand, m.model, m.supplier, m.serialNumber, m.client, m.site, m.purchaseOrderNumber]
         .some((v) => v && normalize(v).includes(q))
     })
-  }, [machines, search, statusFilter, category])
+  }, [machines, search, statusFilter, category, ownerTab])
 
-  useEffect(() => { setCurrentPage(1) }, [search, statusFilter, category])
+  useEffect(() => { setCurrentPage(1) }, [search, statusFilter, category, ownerTab])
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
-  const hasFilters = Boolean(search || statusFilter || category !== 'all')
+  const hasFilters = Boolean(search || statusFilter || category !== 'all' || ownerTab !== 'all')
 
   const resetFilters = () => {
     setSearch('')
     setStatusFilter(null)
     setCategory('all')
+    setOwnerTab('all')
   }
 
   const handleDeleteConfirm = async () => {
@@ -251,15 +296,43 @@ export default function MachineList({ currentUser }) {
           }
         />
 
+        {/* Onglets ownerType */}
+        <div role="tablist" aria-label="Type de machine" className="flex flex-wrap gap-2">
+          {OWNER_TABS.map((tab) => {
+            const count = tab.key === 'all' ? machines.length : tab.key === 'SOMACS' ? counts.somacs : tab.key === 'CLIENT' ? counts.client : counts.unknown
+            return (
+              <button
+                key={tab.key}
+                id={`tab-${tab.key}`}
+                role="tab"
+                type="button"
+                aria-selected={ownerTab === tab.key}
+                onClick={() => setOwnerTab(tab.key)}
+                className={[
+                  'inline-flex min-h-9 items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold ring-1 transition-colors',
+                  ownerTab === tab.key
+                    ? 'bg-navy text-white ring-navy'
+                    : 'bg-white text-ink-soft ring-line hover:bg-canvas',
+                ].join(' ')}
+              >
+                {tab.label}
+                <span className={`min-w-[1.5rem] rounded-md px-1.5 py-0.5 text-xs font-bold tabular-nums ${ownerTab === tab.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-ink-muted'}`}>
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
         <StatStrip
           total={machines.length}
           activeKey={statusFilter}
           onSelect={setStatusFilter}
           items={[
-            { key: 'service', label: 'En service', value: counts.service, icon: CheckCircle2, tone: 'teal' },
-            { key: 'maintenance', label: 'En maintenance', value: counts.maintenance, icon: Wrench, tone: 'amber' },
-            { key: 'panne', label: 'En panne / Hors service', value: counts.panne, icon: AlertOctagon, tone: 'red', hint: counts.panne ? 'Intervention à planifier' : undefined, hintTone: 'alert' },
-            { key: 'due', label: 'Maintenance sous 14 j', value: counts.due, icon: CalendarClock, tone: 'brand', showShare: false },
+            { key: 'service',     label: 'En service',           value: counts.service,     icon: CheckCircle2, tone: 'teal' },
+            { key: 'maintenance', label: 'En maintenance',        value: counts.maintenance, icon: Wrench,       tone: 'amber' },
+            { key: 'panne',       label: 'En panne / Hors service', value: counts.panne,    icon: AlertOctagon, tone: 'red', hint: counts.panne ? 'Intervention à planifier' : undefined, hintTone: 'alert' },
+            { key: 'due',         label: 'Maintenance sous 14 j', value: counts.due,         icon: CalendarClock, tone: 'brand', showShare: false },
           ]}
         />
 
@@ -340,9 +413,10 @@ export default function MachineList({ currentUser }) {
                                 <Link to={`/machines/${machine.id}`} className="block break-words font-semibold leading-snug text-ink hover:text-brand-700">
                                   {machine.designation}
                                 </Link>
-                                <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-ink-faint">
+                                <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-faint">
                                   <span className="font-mono">{machine.code}</span>
                                   {machine.category && <><span aria-hidden="true">·</span><span>{machine.category}</span></>}
+                                  <OwnerTypeBadge ownerType={machine.ownerType} />
                                 </p>
                               </div>
                             </div>
@@ -357,9 +431,15 @@ export default function MachineList({ currentUser }) {
                           <td>
                             <p className="flex min-w-0 items-center gap-1.5 font-medium text-ink">
                               <Building2 size={13} className="shrink-0 text-ink-faint" aria-hidden="true" />
-                              <span className="truncate">{machine.client || '—'}</span>
+                              <span className="truncate">
+                                {machine.ownerType === 'CLIENT'
+                                  ? (machine.client || machine.clientSite || '—')
+                                  : (machine.client || machine.supplier || '—')}
+                              </span>
                             </p>
-                            <p className="mt-0.5 break-words text-xs text-ink-faint">{machine.site || machine.location || '—'}</p>
+                            <p className="mt-0.5 break-words text-xs text-ink-faint">
+                              {machine.clientSite || machine.site || machine.location || '—'}
+                            </p>
                           </td>
                           <td><MachineStatus status={machine.status} /></td>
                           <td><RowActions machine={machine} canManage={canManage} onDelete={setDeleteTarget} /></td>

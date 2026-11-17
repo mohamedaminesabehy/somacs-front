@@ -92,12 +92,13 @@ const clientFormSections = [
   }
 ]
 
-export default function ClientSelectionModal({ isOpen, onClose, onSelect }) {
+export default function ClientSelectionModal({ isOpen, onClose, onSelect, onClientCreated }) {
   return (
     <EntitySelectionModal
       isOpen={isOpen}
       onClose={onClose}
       onSelect={onSelect}
+      onCreated={onClientCreated}
       entityName="client"
       fetchEndpoint="/clients"
       getTitle={getClientModalTitle}

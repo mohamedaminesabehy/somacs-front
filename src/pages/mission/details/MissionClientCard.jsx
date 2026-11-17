@@ -44,17 +44,17 @@ export default function MissionClientCard({ mission, intervention }) {
               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapsQuery)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="ui-btn-secondary h-10 flex-1 sm:flex-none"
+              className="ui-btn-secondary h-10 min-w-0 flex-1 sm:flex-none"
             >
               <ExternalLink size={15} aria-hidden="true" />
-              Itinéraire
+              <span className="truncate">Itinéraire</span>
               <span className="sr-only">(nouvel onglet)</span>
             </a>
           )}
           {client.phone && (
-            <a href={`tel:${client.phone}`} className="ui-btn-secondary h-10 flex-1 sm:flex-none">
+            <a href={`tel:${client.phone}`} className="ui-btn-secondary h-10 min-w-0 flex-1 sm:flex-none">
               <Phone size={15} aria-hidden="true" />
-              <span className="font-mono">{client.phone}</span>
+              <span className="truncate font-mono">{client.phone}</span>
             </a>
           )}
         </div>

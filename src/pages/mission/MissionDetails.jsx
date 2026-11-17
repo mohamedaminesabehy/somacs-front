@@ -257,9 +257,9 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
         backLabel={backLabel}
       />
 
-      <main className="mx-auto -mt-4 grid max-w-6xl grid-cols-1 gap-4 px-4 sm:px-6 lg:grid-cols-12 lg:gap-6">
-        <div className="flex flex-col gap-4 lg:col-span-5 lg:gap-6 xl:col-span-4">
-          <div className="lg:sticky lg:top-4">
+      <main className="mx-auto grid max-w-7xl grid-cols-1 gap-4 px-4 pb-10 pt-6 sm:px-6 lg:grid-cols-12 lg:gap-5 xl:gap-6">
+        <div className="flex flex-col gap-4 lg:col-span-4 lg:gap-5 xl:col-span-4 xl:gap-6">
+          <div className="lg:sticky lg:top-20">
             <MissionActionPanel
               status={status}
               onStatusChange={onStatusChange}
@@ -277,14 +277,14 @@ export default function MissionDetails({ allowUnauthenticated = false }) {
               showStatusAttention={showStatusAttention}
             />
           </div>
-          <div className="hidden flex-col gap-4 lg:flex lg:gap-6">
+          <div className="hidden flex-col gap-4 lg:flex lg:gap-5 xl:gap-6">
             <MissionTeamCard members={teamMembers} vehicle={mission.vehicle} currentUserId={currentUser?.id} />
           </div>
         </div>
 
-        <div className="flex flex-col gap-4 lg:col-span-7 lg:gap-6 xl:col-span-8">
+        <div className="flex min-w-0 flex-col gap-4 lg:col-span-8 lg:gap-5 xl:gap-6">
           <MissionInfoCard mission={mission} status={status} priority={priority} />
-          <div className={`grid grid-cols-1 gap-4 lg:gap-6 ${intervention ? 'xl:grid-cols-2' : ''}`}>
+          <div className={`grid grid-cols-1 gap-4 lg:gap-5 xl:gap-6 ${intervention ? 'xl:grid-cols-2' : ''}`}>
             <MissionClientCard mission={mission} intervention={intervention} />
             {intervention && <MissionInterventionCard intervention={intervention} onOpen={openIntervention} />}
             <div className="lg:hidden">

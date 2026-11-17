@@ -286,7 +286,9 @@ export default function EntitySelectionModal({
       const response = await apiFetch(fetchEndpoint, { auth: true })
       if (response.ok) {
         const data = await response.json()
-        setEntities(data)
+        // Si la réponse est paginée (avec items), extraire items. Sinon, utiliser data directement
+        const list = Array.isArray(data) ? data : (data.items || data.data || [])
+        setEntities(list)
       } else {
         throw new Error(`Erreur lors du chargement des ${entityName}s`)
       }

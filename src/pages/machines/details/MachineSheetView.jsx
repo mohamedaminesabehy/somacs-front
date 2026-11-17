@@ -505,7 +505,8 @@ export default function MachineSheetView(props) {
   const lightbox = useLightbox(images)
   const status = machineStatus(machine.status)
   const lastIntervention = interventionCards[0]
-  const goEdit = () => navigate(`/machines/${id}/edit`)
+  const isClientMachine = machine.ownerType === 'CLIENT'
+  const goEdit = () => navigate(isClientMachine ? `/machines/${id}/edit-client` : `/machines/${id}/edit`)
   const openIntervention = (iid) => navigate(`/interventions/${iid}`)
 
   const counts = { documents: docs.length, gallery: images.length, intervention: interventionCards.length }
@@ -548,6 +549,11 @@ export default function MachineSheetView(props) {
                     <span className={`size-1.5 rounded-full ${status.dot}`} aria-hidden="true" /> {status.label}
                   </span>
                   {machine.category && <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-ink-soft">{machine.category}</span>}
+                  {isClientMachine && (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-1 text-xs font-semibold text-brand-700 ring-1 ring-inset ring-brand-200">
+                      <User size={11} aria-hidden="true" /> Machine Client
+                    </span>
+                  )}
                 </div>
                 <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-ink text-balance sm:text-3xl">{machine.designation}</h1>
                 <p className="mt-1 text-sm text-ink-muted">
@@ -621,7 +627,57 @@ export default function MachineSheetView(props) {
             <AlertCircle size={16} aria-hidden="true" /> {error}
           </p>
         )}
-        {activeTab === 'general' && <TechnicalSection machine={machine} warrantyActive={warrantyActive} createdAtLabel={createdAtLabel} updatedAtLabel={updatedAtLabel} />}
+        {activeTab === 'general' && (
+          <>
+            {isClientMachine && (
+              <Panel title="Client propriétaire" icon={User}>
+                <div className="relative overflow-hidden">
+                  <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:gap-4">
+                    <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-navy font-display text-base font-bold text-white">
+                      {String(machine.client || '?').charAt(0).toUpperCase()}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-ink-muted">Propriétaire</p>
+                      <p className="mt-0.5 font-display text-base font-bold text-ink">{machine.client || '—'}</p>
+                      <div className="mt-1.5 grid grid-cols-1 gap-y-1 text-xs text-ink-muted sm:grid-cols-2">
+                        {machine.clientSite && (
+                          <span className="flex items-center gap-1.5">
+                            <Building2 size={12} className="shrink-0 text-ink-faint" aria-hidden="true" />
+                            {machine.clientSite}
+                          </span>
+                        )}
+                        {machine.clientContact && (
+                          <span className="flex items-center gap-1.5">
+                            <User size={12} className="shrink-0 text-ink-faint" aria-hidden="true" />
+                            {machine.clientContact}
+                            {machine.clientContactPhone ? ` · ${machine.clientContactPhone}` : ''}
+                          </span>
+                        )}
+                        {machine.workshopStatus === 'IN_WORKSHOP' && (
+                          <span className="flex items-center gap-1.5 text-amber-700 font-semibold sm:col-span-2">
+                            <Wrench size={12} aria-hidden="true" />
+                            En atelier SOMACS
+                            {machine.workshopReceivedAt ? ` depuis le ${fmtDate(machine.workshopReceivedAt)}` : ''}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {machine.clientId && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/clients/${machine.clientId}/360`)}
+                        className="ui-btn-secondary shrink-0"
+                      >
+                        <Eye size={14} aria-hidden="true" /> Fiche client
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </Panel>
+            )}
+            <TechnicalSection machine={machine} warrantyActive={warrantyActive} createdAtLabel={createdAtLabel} updatedAtLabel={updatedAtLabel} />
+          </>
+        )}
         {activeTab === 'documents' && <DocumentsSection docs={docs} pdfDoc={pdfDoc} setPdfDoc={setPdfDoc} canManage={canManageMachines} onEdit={goEdit} />}
         {activeTab === 'gallery' && <GallerySection images={images} onOpen={lightbox.open} canManage={canManageMachines} onEdit={goEdit} />}
         {activeTab === 'intervention' && (

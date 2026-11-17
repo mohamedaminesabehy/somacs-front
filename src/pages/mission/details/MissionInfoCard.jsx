@@ -13,12 +13,24 @@ export default function MissionInfoCard({ mission, status, priority }) {
           </p>
         </div>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-4 border-t border-line pt-4 sm:grid-cols-3">
-          <Field label="Type">{mission.type === 'Intervention' ? 'Intervention S.A.V' : mission.type}</Field>
-          <Field label="Date d’intervention"><span className="capitalize">{formatLongDate(mission.dueDate)}</span></Field>
+          <Field label="Type">
+            <span className="break-words">{mission.type === 'Intervention' ? 'Intervention S.A.V' : mission.type}</span>
+          </Field>
+          <Field label="Date d'intervention">
+            <span className="capitalize break-words">{formatLongDate(mission.dueDate)}</span>
+          </Field>
           <Field label="Heure">{mission.dueTime}</Field>
-          <Field label="Statut">{status}</Field>
-          <Field label="Priorité"><span className={priority.color}>{priority.label}</span></Field>
-          {mission.interventionId && <Field label="Dossier SAV"><span className="font-mono">{mission.interventionId}</span></Field>}
+          <Field label="Statut">
+            <span className="break-words">{status}</span>
+          </Field>
+          <Field label="Priorité">
+            <span className={`${priority.color} break-words`}>{priority.label}</span>
+          </Field>
+          {mission.interventionId && (
+            <Field label="Dossier SAV">
+              <span className="font-mono break-all">{mission.interventionId}</span>
+            </Field>
+          )}
         </dl>
       </div>
     </DetailCard>
